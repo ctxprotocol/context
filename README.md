@@ -1,5 +1,4 @@
 <div align="center">
-  <img alt="Context Protocol" src="app/(chat)/opengraph-image.png" width="100%" style="border-radius: 12px; margin-bottom: 24px;" />
   
   # Context Protocol
 
