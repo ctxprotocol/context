@@ -1,13 +1,26 @@
-Copyright 2024 Vercel, Inc.
+Business Source License 1.1
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+Parameters:
 
-    http://www.apache.org/licenses/LICENSE-2.0
+Licensor: Context Protocol
+Licensor Profile: https://github.com/ctxprotocol
+Software: Context AI Platform (Source Code)
+Change Date: 2029-01-01
+Change License: MIT
+Additional Use Grant: You may use the Software for testing, development, and personal use. You may NOT use the Software for commercial production usage that competes directly with the Context Protocol marketplace without explicit permission.
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Terms:
+
+The Licensor hereby grants you the right to copy, modify, create derivative works, redistribute, and make non-production use of the Licensor’s Work. The Licensor also grants you the right to make production use of the Licensor’s Work, provided that you do not use the Licensor’s Work for a Competing Use.
+
+If you are using the Licensor’s Work for a Competing Use, you must contact the Licensor to obtain a commercial license.
+
+“Competing Use” means use of the Licensor’s Work to create, provide, or operate a marketplace, platform, or protocol that facilitates the buying and selling of AI context, data, or tools, which is substantially similar to the Context Protocol.
+
+“Change Date” means the date specified in the Parameters.
+
+“Change License” means the license specified in the Parameters.
+
+On the Change Date, the Licensor’s Work will be automatically relicensed under the Change License.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
