@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState } from "react-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +18,14 @@ import {
   submitHttpTool,
 } from "./actions";
 import { contributeFormInitialState } from "./schema";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export function ContributeForm({ developerWallet }: { developerWallet: string }) {
   const [state, formAction] = useFormState(
     submitHttpTool,
     contributeFormInitialState
   );
+  const [kind, setKind] = useState("http");
 
   return (
     <form action={formAction}>
@@ -57,6 +60,26 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             />
             <FieldError message={state.fieldErrors?.description} />
           </div>
+          
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <RadioGroup 
+              name="kind" 
+              defaultValue="http" 
+              onValueChange={setKind}
+              className="flex flex-row gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="http" id="kind-http" />
+                <Label htmlFor="kind-http">HTTP Tool (External API)</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="skill" id="kind-skill" />
+                <Label htmlFor="kind-skill">Native Skill (Internal Module)</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
@@ -80,17 +103,30 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
               <FieldError message={state.fieldErrors?.price} />
             </div>
           </div>
+          
           <div className="space-y-2">
-            <Label htmlFor="endpoint">HTTP Endpoint</Label>
+            <Label htmlFor="endpoint">
+              {kind === "http" ? "HTTP Endpoint" : "Module Path"}
+            </Label>
             <Input
               id="endpoint"
               name="endpoint"
-              type="url"
-              placeholder="https://your-domain.com/context/blocknative"
+              type={kind === "http" ? "url" : "text"}
+              placeholder={
+                kind === "http" 
+                  ? "https://your-domain.com/context/blocknative"
+                  : "@/lib/ai/skills/community/my-skill"
+              }
               required
             />
+            {kind === "skill" && (
+              <p className="text-xs text-muted-foreground">
+                Must match the path in your Pull Request (e.g. @/lib/ai/skills/community/...)
+              </p>
+            )}
             <FieldError message={state.fieldErrors?.endpoint} />
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="defaultParams">Example input (JSON)</Label>
             <Textarea

@@ -19,6 +19,7 @@ export async function submitHttpTool(
     name: formData.get("name"),
     description: formData.get("description"),
     category: formData.get("category") || undefined,
+    kind: formData.get("kind") || "http",
     endpoint: formData.get("endpoint"),
     price: formData.get("price"),
     developerWallet: formData.get("developerWallet"),
@@ -58,6 +59,20 @@ export async function submitHttpTool(
     }
   }
 
+  const toolSchema = parsed.data.kind === "http" 
+    ? {
+        kind: "http",
+        endpoint: parsed.data.endpoint,
+        defaultParams,
+      }
+    : {
+        kind: "skill",
+        skill: {
+          module: parsed.data.endpoint,
+        },
+        defaultParams,
+      };
+
   await createAITool({
     name: parsed.data.name,
     description: parsed.data.description,
@@ -66,11 +81,7 @@ export async function submitHttpTool(
     pricePerQuery: parsed.data.price,
     category: parsed.data.category,
     apiEndpoint: "/api/tools/execute",
-    toolSchema: {
-      kind: "http",
-      endpoint: parsed.data.endpoint,
-      defaultParams,
-    },
+    toolSchema,
   });
 
   revalidatePath("/chat");
