@@ -33,12 +33,14 @@ Developers contribute **Skills** to the protocol.
 - **Native Skills:** Verified TypeScript modules that run inside our secure sandbox for high-performance logic.
 
 ### 2. The Agent (Demand)
-Users chat with the Context Agent. When a query requires specialized knowledge (e.g., "What's the gas price on Base?"), the Agent:
-1. **Plans** a solution.
-2. **Writes Code** to invoke the necessary paid Skills.
+Users chat with the Context Agent. When a query requires specialized knowledge (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
+1. **Plans** a solution using composability.
+2. **Writes Code** to invoke the necessary paid Skills (e.g., `uniswap-quoter` AND `aave-rates`).
 3. **Executes** the code securely.
-4. **Pays** the developer via the `ContextRouter` smart contract.
+4. **Pays** both developers their respective fees instantly.
 5. **Synthesizes** the answer.
+
+This **Composability** is the superpower of Context. Unlike rigid "plugins," our Agent can stitch together any number of tools into a coherent workflow, creating infinite new use cases from your single API.
 
 ### 3. The Protocol (Settlement)
 All value flows through `ContextRouter.sol` on Base. Payments are split instantly between the tool developer and the protocol treasury.
