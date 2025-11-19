@@ -73,6 +73,38 @@ export async function submitHttpTool(
         defaultParams,
       };
 
+  if (parsed.data.kind === "http" && parsed.data.endpoint) {
+    try {
+      const res = await fetch(parsed.data.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          input: defaultParams || {},
+          context: {
+            chatId: "00000000-0000-0000-0000-000000000000",
+            requestId: "verify-endpoint",
+            userId: session.user.id,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "Unknown error");
+        return {
+          status: "error",
+          message: `Endpoint verification failed (${res.status}): ${text.slice(0, 100)}`,
+          fieldErrors: { endpoint: "Endpoint returned an error" },
+        };
+      }
+    } catch (err) {
+      return {
+        status: "error",
+        message: "Could not reach endpoint. Please ensure it is publicly accessible.",
+        fieldErrors: { endpoint: "Connection failed" },
+      };
+    }
+  }
+
   await createAITool({
     name: parsed.data.name,
     description: parsed.data.description,
