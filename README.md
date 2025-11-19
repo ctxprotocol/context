@@ -21,6 +21,7 @@ We believe the future of AI is not a single "Super App," but a collaborative net
 
 - **For Developers:** Don't build another chat UI. Build a **Skill**. Expose your unique data (crypto prices, prediction markets, proprietary analysis) and get paid in USDC every time an AI agent uses it.
 - **For Users:** Access a "God Mode" agent that has real-time access to the entire on-chain and off-chain world, without switching tabs.
+- **For The Future:** We are currently bootstrapping the economy with our own chat interface. Once liquidity is established, we will open the **Context Protocol API**, allowing *any* AI application to query our marketplace of tools.
 
 ## 🏗 Architecture
 
