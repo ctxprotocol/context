@@ -31,6 +31,14 @@ Because Context uses **Code Execution**, your skill can be composed with any oth
 - Your tiny, specific utility (like `wei-converter`) might be used thousands of times inside larger workflows.
 - You get paid every time your function is imported and run.
 
+### 🚦 The Verification Process
+
+Unlike HTTP Tools which are live instantly, Native Skills require a 2-step verification for security:
+
+1.  **Code Review:** The Context team reviews your PR on GitHub to ensure the code is safe and high-quality.
+2.  **Link Verification:** After merging, we verify that your Marketplace Listing points to the correct module path.
+3.  **Go Live:** Once both checks pass, an Admin clicks "Verify" and your tool becomes active in the global marketplace.
+
 ## 👩‍💻 How to Contribute Code
 
 1. **Fork** the [Context repository](https://github.com/ctxprotocol/context).
