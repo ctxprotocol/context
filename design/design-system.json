@@ -1,0 +1,283 @@
+{
+  "meta": {
+    "name": "Context Design System",
+    "version": "1.1.0",
+    "lastUpdated": "2025-11-19",
+    "sourceOfTruth": [
+      "app/globals.css (Tailwind v4 tokens, themes, utilities)",
+      "app/design-system/page.tsx (component usage and variants)",
+      "components/ui/* (primitive implementations)",
+      "Radix UI primitives + shadcn/ui composition"
+    ],
+    "purpose": "The absolute source of truth for generating 'World Class', 'Jonny Ive-level' UI. Defines strict rules for spacing, typography, motion, and interaction to ensure a premium, native-like feel."
+  },
+  "principles": {
+    "invisible": "Design should recede. Content is the hero. Remove unnecessary borders, shadows, and containers. Use whitespace to group content instead of lines where possible.",
+    "physics": "Interactions should feel physical. No linear transitions. Use springs or distinct ease-out curves. Things should feel like they have weight.",
+    "reduction": "Every element must have a purpose. If it can be removed without losing meaning, remove it. 'Less, but better.'",
+    "precision": "Align everything. exact pixel values matter. 1px off is broken."
+  },
+  "foundations": {
+    "typography": {
+      "families": {
+        "sans": "var(--font-geist)",
+        "mono": "var(--font-geist-mono)"
+      },
+      "scale": {
+        "xs": { "fontSize": "0.75rem", "lineHeight": "1rem", "tracking": "normal" },
+        "sm": { "fontSize": "0.875rem", "lineHeight": "1.25rem", "tracking": "normal" },
+        "base": { "fontSize": "1rem", "lineHeight": "1.5rem", "tracking": "normal" },
+        "lg": { "fontSize": "1.125rem", "lineHeight": "1.75rem", "tracking": "-0.01em" },
+        "xl": { "fontSize": "1.25rem", "lineHeight": "1.75rem", "tracking": "-0.015em" },
+        "2xl": { "fontSize": "1.5rem", "lineHeight": "2rem", "tracking": "-0.02em" },
+        "3xl": { "fontSize": "1.875rem", "lineHeight": "2.25rem", "tracking": "-0.02em" }
+      },
+      "weights": {
+        "regular": 400,
+        "medium": 500,
+        "semibold": 600,
+        "bold": 700
+      },
+      "defaults": {
+        "body": { "family": "sans", "size": "base", "weight": "regular" },
+        "label": { "family": "sans", "size": "sm", "weight": "medium" },
+        "button": { "family": "sans", "size": "sm", "weight": "medium" },
+        "title": { "family": "sans", "size": "2xl", "weight": "semibold", "tracking": "tight" },
+        "code": { "family": "mono", "size": "sm", "weight": "regular" }
+      }
+    },
+    "color": {
+      "tokens": {
+        "light": {
+          "background": "hsl(0 0% 100%)",
+          "foreground": "hsl(240 10% 3.9%)",
+          "card": "hsl(0 0% 100%)",
+          "card-foreground": "hsl(240 10% 3.9%)",
+          "popover": "hsl(0 0% 100%)",
+          "popover-foreground": "hsl(240 10% 3.9%)",
+          "primary": "hsl(240 5.9% 10%)",
+          "primary-foreground": "hsl(0 0% 98%)",
+          "secondary": "hsl(240 4.8% 95.9%)",
+          "secondary-foreground": "hsl(240 5.9% 10%)",
+          "muted": "hsl(240 4.8% 95.9%)",
+          "muted-foreground": "hsl(240 3.8% 46.1%)",
+          "accent": "hsl(240 4.8% 95.9%)",
+          "accent-foreground": "hsl(240 5.9% 10%)",
+          "destructive": "hsl(0 84.2% 60.2%)",
+          "destructive-foreground": "hsl(0 0% 98%)",
+          "border": "hsl(240 5.9% 90%)",
+          "input": "hsl(240 5.9% 90%)",
+          "ring": "hsl(240 10% 3.9%)",
+          "chart-1": "hsl(12 76% 61%)",
+          "chart-2": "hsl(173 58% 39%)",
+          "chart-3": "hsl(197 37% 24%)",
+          "chart-4": "hsl(43 74% 66%)",
+          "chart-5": "hsl(27 87% 67%)",
+          "sidebar-background": "hsl(0 0% 98%)",
+          "sidebar-foreground": "hsl(240 5.3% 26.1%)",
+          "sidebar-primary": "hsl(240 5.9% 10%)",
+          "sidebar-primary-foreground": "hsl(0 0% 98%)",
+          "sidebar-accent": "hsl(240 4.8% 95.9%)",
+          "sidebar-accent-foreground": "hsl(240 5.9% 10%)",
+          "sidebar-border": "hsl(220 13% 91%)",
+          "sidebar-ring": "hsl(217.2 91.2% 59.8%)"
+        },
+        "dark": {
+          "background": "hsl(240 10% 3.9%)",
+          "foreground": "hsl(0 0% 98%)",
+          "card": "hsl(240 10% 3.9%)",
+          "card-foreground": "hsl(0 0% 98%)",
+          "popover": "hsl(240 10% 3.9%)",
+          "popover-foreground": "hsl(0 0% 98%)",
+          "primary": "hsl(0 0% 98%)",
+          "primary-foreground": "hsl(240 5.9% 10%)",
+          "secondary": "hsl(240 3.7% 15.9%)",
+          "secondary-foreground": "hsl(0 0% 98%)",
+          "muted": "hsl(240 3.7% 15.9%)",
+          "muted-foreground": "hsl(240 5% 64.9%)",
+          "accent": "hsl(240 3.7% 15.9%)",
+          "accent-foreground": "hsl(0 0% 98%)",
+          "destructive": "hsl(0 62.8% 30.6%)",
+          "destructive-foreground": "hsl(0 0% 98%)",
+          "border": "hsl(240 3.7% 15.9%)",
+          "input": "hsl(240 3.7% 15.9%)",
+          "ring": "hsl(240 4.9% 83.9%)",
+          "chart-1": "hsl(220 70% 50%)",
+          "chart-2": "hsl(160 60% 45%)",
+          "chart-3": "hsl(30 80% 55%)",
+          "chart-4": "hsl(280 65% 60%)",
+          "chart-5": "hsl(340 75% 55%)",
+          "sidebar-background": "hsl(240 5.9% 10%)",
+          "sidebar-foreground": "hsl(240 4.8% 95.9%)",
+          "sidebar-primary": "hsl(224.3 76.3% 48%)",
+          "sidebar-primary-foreground": "hsl(0 0% 100%)",
+          "sidebar-accent": "hsl(240 3.7% 15.9%)",
+          "sidebar-accent-foreground": "hsl(240 4.8% 95.9%)",
+          "sidebar-border": "hsl(240 3.7% 15.9%)",
+          "sidebar-ring": "hsl(217.2 91.2% 59.8%)"
+        }
+      },
+      "usage": {
+        "backgrounds": ["bg-background", "bg-card", "bg-popover", "bg-sidebar"],
+        "text": ["text-foreground", "text-card-foreground", "text-popover-foreground", "text-muted-foreground", "text-sidebar-foreground"],
+        "interactive": {
+          "primary": ["bg-primary", "text-primary-foreground", "hover:bg-primary/90", "shadow-sm"],
+          "secondary": ["bg-secondary", "text-secondary-foreground", "hover:bg-secondary/80"],
+          "accent": ["hover:bg-accent", "hover:text-accent-foreground"],
+          "outline": ["border-input", "bg-background", "hover:bg-accent", "hover:text-accent-foreground", "shadow-sm"],
+          "destructive": ["bg-destructive", "text-destructive-foreground", "hover:bg-destructive/90", "shadow-sm"],
+          "ringFocus": ["focus-visible:ring-2", "focus-visible:ring-ring", "focus-visible:ring-offset-2", "ring-offset-background"]
+        },
+        "borders": ["border", "border-border", "border-input", "border-sidebar-border"],
+        "charts": ["--chart-1..5"],
+        "sidebar": {
+          "bg": "bg-sidebar",
+          "fg": "text-sidebar-foreground",
+          "accent": "bg-sidebar-accent text-sidebar-accent-foreground",
+          "primary": "bg-sidebar-primary text-sidebar-primary-foreground",
+          "ring": "ring-sidebar-ring"
+        }
+      }
+    },
+    "spacing": {
+      "scale": {
+        "0": "0px",
+        "0.5": "0.125rem",
+        "1": "0.25rem",
+        "1.5": "0.375rem",
+        "2": "0.5rem",
+        "2.5": "0.625rem",
+        "3": "0.75rem",
+        "3.5": "0.875rem",
+        "4": "1rem",
+        "5": "1.25rem",
+        "6": "1.5rem",
+        "7": "1.75rem",
+        "8": "2rem",
+        "10": "2.5rem",
+        "11": "2.75rem",
+        "12": "3rem",
+        "14": "3.5rem",
+        "16": "4rem",
+        "20": "5rem",
+        "24": "6rem"
+      },
+      "defaults": {
+        "controlHeight": "h-10 (40px) default; sm=h-9; lg=h-11",
+        "pageGutters": "p-4 to p-6 on containers; card p-6",
+        "inlineGap": "gap-2 between icon and label",
+        "stackGap": "space-y-2 (compact) | space-y-4 (comfortable)",
+        "sectionGap": "space-y-8"
+      }
+    },
+    "radii": {
+      "base": "var(--radius)=0.5rem",
+      "sm": "calc(var(--radius) - 4px)",
+      "md": "calc(var(--radius) - 2px)",
+      "lg": "var(--radius)",
+      "xl": "calc(var(--radius) + 4px)",
+      "full": "9999px",
+      "usage": {
+        "controls": "rounded-md",
+        "surfaces": "rounded-lg",
+        "menus": "rounded-md",
+        "dialogs": "rounded-xl"
+      }
+    },
+    "shadows": {
+      "levels": { "none": "none", "sm": "shadow-sm", "md": "shadow-md", "lg": "shadow-lg" },
+      "usage": {
+        "cards": "shadow-sm border",
+        "buttons": "shadow-sm (only on primary/outline)",
+        "floatingPanels": "shadow-lg border",
+        "menus": "shadow-md border"
+      }
+    },
+    "motion": {
+      "durations": {
+        "instant": "75ms",
+        "fast": "150ms",
+        "normal": "200ms",
+        "slow": "300ms"
+      },
+      "easing": "ease-out (default) | ease-in-out (panels)",
+      "patterns": [
+        "animate-in fade-in-0 zoom-in-95 duration-200 ease-out (modals/popovers)",
+        "data-[side=bottom]:slide-in-from-top-2 (dropdowns)",
+        "transition-all duration-200 ease-in-out (hover states)",
+        "animate-accordion-down (collapsibles)"
+      ]
+    }
+  },
+  "components": {
+    "Button": {
+      "base": [
+        "inline-flex items-center justify-center gap-2",
+        "whitespace-nowrap rounded-md text-sm font-medium",
+        "transition-colors ring-offset-background",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "disabled:pointer-events-none disabled:opacity-50",
+        "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
+      ],
+      "variants": {
+        "default": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
+        "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        "outline": "border border-input bg-background hover:bg-accent hover:text-accent-foreground shadow-sm",
+        "ghost": "hover:bg-accent hover:text-accent-foreground",
+        "link": "text-primary underline-offset-4 hover:underline",
+        "destructive": "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm"
+      },
+      "sizes": {
+        "sm": "h-9 rounded-md px-3",
+        "default": "h-10 px-4 py-2",
+        "lg": "h-11 rounded-md px-8",
+        "icon": "h-10 w-10"
+      }
+    },
+    "Card": {
+      "container": "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "header": "flex flex-col space-y-1.5 p-6",
+      "title": "text-2xl font-semibold leading-none tracking-tight",
+      "description": "text-sm text-muted-foreground",
+      "content": "p-6 pt-0",
+      "footer": "flex items-center p-6 pt-0"
+    },
+    "Input": {
+      "base": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+      "file": "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
+    },
+    "EmptyState": {
+      "container": "flex flex-col items-center justify-center p-8 text-center animate-in fade-in-50 zoom-in-95",
+      "icon": "h-12 w-12 text-muted-foreground/50 mb-4",
+      "title": "text-lg font-semibold text-foreground mb-2",
+      "description": "text-sm text-muted-foreground max-w-sm mb-6"
+    }
+  },
+  "patterns": {
+    "emptyStates": "Always provide a clear call to action in empty states. Use a muted icon, a clear heading, and a helpful description.",
+    "loading": "Use Skeletons for content loading. Use Spinners (Loader2) for action states. Never block the UI without feedback.",
+    "error": "Use destructuve color sparingly. Error messages should be helpful, not alarming. Use Alert or Toast components.",
+    "mobile": "Always verify layouts on mobile. Use 'flex-col' on mobile and 'flex-row' on desktop for forms and lists."
+  },
+  "guidelines": {
+    "do": [
+      "Use Tailwind utilities mapped to tokens (bg-background, text-foreground, etc.)",
+      "Honor .dark class for theming; never hardcode colors for core roles",
+      "Keep controls compact (h-10) and text-sm by default",
+      "Use rounded-md for controls, rounded-lg for surfaces",
+      "Pair focus-visible with ring and ring-offset helpers",
+      "Use Radix/shadcn primitives for menus, dialogs, and sheets",
+      "Respect spacing defaults (p-6 on surfaces, gap-2 for icon+label)",
+      "Use 'text-muted-foreground' for supporting text to create hierarchy",
+      "Use 'shadow-sm' on borders to add subtle depth, but avoid heavy shadows"
+    ],
+    "doNot": [
+      "Introduce new brand colors or gradients outside tokens",
+      "Remove visible focus outlines",
+      "Use oversized padding on core controls",
+      "Mix radii styles inconsistently (e.g., rounded-full on inputs)",
+      "Override tokens with hardcoded hex values for core roles",
+      "Use non-semantic ARIA roles or invalid aria-* attributes"
+    ]
+  }
+}

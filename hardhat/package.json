@@ -1,0 +1,31 @@
+{
+  "name": "context-contracts",
+  "version": "1.0.0",
+  "description": "Smart contracts for Context AI tool marketplace",
+  "main": "index.js",
+  "scripts": {
+    "test": "hardhat test",
+    "coverage": "hardhat coverage",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "deploy:base": "hardhat run scripts/deploy.ts --network baseMainnet",
+    "verify": "hardhat run scripts/verify.ts"
+  },
+  "keywords": [
+    "context",
+    "smart-contracts",
+    "hardhat",
+    "base"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.1.3",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@types/node": "^20.19.25",
+    "dotenv": "^17.2.3",
+    "hardhat": "^2.27.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}

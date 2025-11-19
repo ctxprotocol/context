@@ -31,6 +31,7 @@ import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
+import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
 
 export function Chat({
@@ -63,6 +64,7 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
+  const [isContextSidebarOpen, setIsContextSidebarOpen] = useState(false);
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
@@ -156,31 +158,38 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
-        <ChatHeader
-          chatId={id}
-          isReadonly={isReadonly}
-          selectedVisibilityType={initialVisibilityType}
-        />
+      <div className="flex h-dvh min-w-0 flex-col bg-background md:flex-row">
+        <div className="overscroll-behavior-contain relative flex min-w-0 flex-1 touch-pan-y flex-col bg-background">
+          <ChatHeader
+            chatId={id}
+            isReadonly={isReadonly}
+            onToggleContextSidebar={() =>
+              setIsContextSidebarOpen(!isContextSidebarOpen)
+            }
+            selectedVisibilityType={initialVisibilityType}
+          />
 
-        <Messages
-          chatId={id}
-          isArtifactVisible={isArtifactVisible}
-          isReadonly={isReadonly}
-          messages={messages}
-          regenerate={regenerate}
-          selectedModelId={initialChatModel}
-          setMessages={setMessages}
-          status={status}
-          votes={votes}
-        />
+          <Messages
+            chatId={id}
+            isArtifactVisible={isArtifactVisible}
+            isReadonly={isReadonly}
+            messages={messages}
+            regenerate={regenerate}
+            selectedModelId={initialChatModel}
+            setMessages={setMessages}
+            status={status}
+            votes={votes}
+          />
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
-          {!isReadonly && (
+          <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
             <MultimodalInput
               attachments={attachments}
               chatId={id}
               input={input}
+              isReadonly={isReadonly}
+              onToggleContextSidebar={() =>
+                setIsContextSidebarOpen(!isContextSidebarOpen)
+              }
               messages={messages}
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
@@ -193,8 +202,14 @@ export function Chat({
               stop={stop}
               usage={usage}
             />
-          )}
+          </div>
         </div>
+
+        <ContextSidebar
+          className="md:sticky md:top-0 md:h-dvh"
+          isOpen={isContextSidebarOpen}
+          onClose={() => setIsContextSidebarOpen(false)}
+        />
       </div>
 
       <Artifact
@@ -214,7 +229,6 @@ export function Chat({
         stop={stop}
         votes={votes}
       />
-
       <AlertDialog
         onOpenChange={setShowCreditCardAlert}
         open={showCreditCardAlert}

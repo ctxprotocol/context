@@ -14,6 +14,11 @@ const filePartSchema = z.object({
 
 const partSchema = z.union([textPartSchema, filePartSchema]);
 
+const toolInvocationSchema = z.object({
+  toolId: z.string().uuid(),
+  transactionHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+});
+
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
   message: z.object({
@@ -23,6 +28,7 @@ export const postRequestBodySchema = z.object({
   }),
   selectedChatModel: z.enum(["chat-model", "chat-model-reasoning"]),
   selectedVisibilityType: z.enum(["public", "private"]),
+  toolInvocations: z.array(toolInvocationSchema).max(5).optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

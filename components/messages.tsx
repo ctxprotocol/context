@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
+import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
@@ -31,7 +32,9 @@ function PureMessages({
   setMessages,
   regenerate,
   isReadonly,
-  selectedModelId,
+  // We currently don't need selectedModelId here,
+  // but keep it in the signature for future use.
+  selectedModelId: _selectedModelId,
 }: MessagesProps) {
   const {
     containerRef: messagesContainerRef,
@@ -42,6 +45,8 @@ function PureMessages({
   } = useMessages({
     status,
   });
+
+  const { stage, reset, setStage } = usePaymentStatus();
 
   useDataStream();
 
@@ -58,6 +63,25 @@ function PureMessages({
       });
     }
   }, [status, messagesContainerRef]);
+
+  // When we start streaming an AI response after querying the tool,
+  // promote the status to the generic "Thinking..." stage.
+  useEffect(() => {
+    if (status === "submitted" && stage === "querying-tool") {
+      setStage("thinking");
+    }
+  }, [setStage, stage, status]);
+
+  // When the AI response has finished and we were in the "thinking" stage,
+  // reset the payment status so the status bubble disappears.
+  useEffect(() => {
+    const isModelIdle = status !== "submitted" && status !== "streaming";
+    if (isModelIdle && stage === "thinking") {
+      reset();
+    }
+  }, [reset, stage, status]);
+
+  const shouldShowThinking = status === "submitted" || stage !== "idle";
 
   return (
     <div
@@ -92,7 +116,7 @@ function PureMessages({
           ))}
 
           <AnimatePresence mode="wait">
-            {status === "submitted" && <ThinkingMessage key="thinking" />}
+            {shouldShowThinking && <ThinkingMessage key="thinking" />}
           </AnimatePresence>
 
           <div

@@ -2,8 +2,10 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   boolean,
   foreignKey,
+  integer,
   json,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -15,8 +17,11 @@ import type { AppUsage } from "../usage";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
-  email: varchar("email", { length: 64 }).notNull(),
-  password: varchar("password", { length: 64 }),
+  email: varchar("email", { length: 64 }).unique(), // Make unique, but nullable
+  password: varchar("password", { length: 64 }), // Make nullable
+  privyDid: varchar("privyDid", { length: 255 }).unique(), // Add this line
+  walletAddress: varchar("wallet_address", { length: 42 }), // Ethereum address for quick lookup
+  isDeveloper: boolean("is_developer").notNull().default(false),
 });
 
 export type User = InferSelectModel<typeof user>;
@@ -171,3 +176,94 @@ export const stream = pgTable(
 );
 
 export type Stream = InferSelectModel<typeof stream>;
+
+export const aiTool = pgTable("AITool", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  developerId: uuid("developer_id")
+    .notNull()
+    .references(() => user.id),
+  developerWallet: varchar("developer_wallet", { length: 42 }).notNull(),
+  pricePerQuery: numeric("price_per_query", { precision: 18, scale: 6 })
+    .notNull()
+    .default("0.01"),
+  toolSchema: jsonb("tool_schema").notNull(),
+  apiEndpoint: text("api_endpoint").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  category: varchar("category", { length: 100 }),
+  iconUrl: text("icon_url"),
+
+  // Verification fields (use immediately)
+  isVerified: boolean("is_verified").notNull().default(false),
+  verifiedBy: uuid("verified_by").references(() => user.id),
+  verifiedAt: timestamp("verified_at"),
+
+  // Analytics & reputation (start collecting from day 1)
+  totalQueries: integer("total_queries").notNull().default(0),
+  totalRevenue: numeric("total_revenue", { precision: 18, scale: 6 })
+    .notNull()
+    .default("0"),
+  averageRating: numeric("average_rating", { precision: 3, scale: 2 }),
+  totalReviews: integer("total_reviews").notNull().default(0),
+
+  // Reliability metrics
+  uptimePercent: numeric("uptime_percent", { precision: 5, scale: 2 }).default(
+    "100"
+  ),
+  successRate: numeric("success_rate", { precision: 5, scale: 2 }).default(
+    "100"
+  ),
+
+  // Moderation
+  totalFlags: integer("total_flags").notNull().default(0),
+
+  // Future-proof placeholders (nullable, unused for MVP)
+  listingFee: numeric("listing_fee", { precision: 18, scale: 6 }),
+  totalStaked: numeric("total_staked", { precision: 18, scale: 6 }).default(
+    "0"
+  ),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type AITool = InferSelectModel<typeof aiTool>;
+
+export const toolQuery = pgTable("ToolQuery", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  toolId: uuid("tool_id")
+    .notNull()
+    .references(() => aiTool.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id),
+  chatId: uuid("chat_id").references(() => chat.id),
+  amountPaid: numeric("amount_paid", { precision: 18, scale: 6 }).notNull(),
+  transactionHash: varchar("transaction_hash", { length: 66 }).notNull(),
+  status: varchar("status", { enum: ["pending", "completed", "failed"] })
+    .notNull()
+    .default("pending"),
+  queryInput: jsonb("query_input"),
+  queryOutput: jsonb("query_output"),
+  executedAt: timestamp("executed_at").notNull().defaultNow(),
+});
+
+export type ToolQuery = InferSelectModel<typeof toolQuery>;
+
+export const toolReport = pgTable("ToolReport", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  toolId: uuid("tool_id")
+    .notNull()
+    .references(() => aiTool.id),
+  reporterId: uuid("reporter_id")
+    .notNull()
+    .references(() => user.id),
+  reason: text("reason").notNull(),
+  status: varchar("status", { enum: ["pending", "resolved"] })
+    .notNull()
+    .default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type ToolReport = InferSelectModel<typeof toolReport>;

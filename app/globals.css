@@ -1,10 +1,8 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 /* include utility classes in streamdown */
 @source '../node_modules/streamdown/dist/index.js';
-
-/* Add KaTeX CSS for math rendering */
-@import 'katex/dist/katex.min.css';
 
 /* custom variant for setting dark mode programmatically */
 @custom-variant dark (&:is(.dark, .dark *));
@@ -12,6 +10,46 @@
 /* include plugins */
 @plugin "tailwindcss-animate";
 @plugin "@tailwindcss/typography";
+
+/* Animated gradient status text for payment stages */
+@utility bg-size-200 {
+  /* Stretch the gradient so we can smoothly pan it horizontally */
+  background-size: 200% 100%;
+}
+
+@utility payment-status-gradient {
+  /* Use only existing design tokens: foreground + muted-foreground */
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--foreground) 25%,
+    var(--muted-foreground) 50%,
+    var(--foreground) 75%,
+    var(--muted-foreground) 100%
+  );
+}
+
+@utility ai-thinking-gradient {
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: var(--animate-text-shimmer);
+  background-image: linear-gradient(
+    90deg,
+    var(--foreground) 0%,
+    var(--muted-foreground) 25%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 75%,
+    var(--foreground) 100%
+  );
+}
+
+@utility text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
 /* define design tokens (light mode) */
 :root {
@@ -99,6 +137,30 @@
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
   --radius-sm: calc(var(--radius) - 4px);
+
+  /* Animated gradient for payment status - wave effect */
+  --animate-status-gradient: status-gradient 3s linear infinite;
+
+  @keyframes status-gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: -200% 50%;
+    }
+  }
+
+  /* AI Thinking Text Shimmer */
+  --animate-text-shimmer: text-shimmer 2.5s ease-in-out infinite;
+
+  @keyframes text-shimmer {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 200% 50%;
+    }
+  }
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);

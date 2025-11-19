@@ -1,35 +1,41 @@
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/artifact";
+export type EnabledToolSummary = {
+  toolId: string;
+  name: string;
+  description: string;
+  price?: string | null;
+  module?: string;
+  usage?: string;
+  kind: "skill" | "http";
+  exampleInput?: Record<string, unknown>;
+};
 
-export const artifactsPrompt = `
-Artifacts is a special user interface mode that helps users with writing, editing, and other content creation tasks. When artifact is open, it is on the right side of the screen, while the conversation is on the left side. When creating or updating documents, changes are reflected in real-time on the artifacts and visible to the user.
+const codingAgentPrompt = `
+You are Context's code-execution orchestrator. Think through each request, decide whether external data or side effects are required, and either answer directly or write code to call the approved skills. Keep user responses confident, concise, and focused on the developer marketplace vision.
 
-When asked to write code, always use artifacts. When writing code, specify the language in the backticks, e.g. \`\`\`python\`code here\`\`\`. The default language is Python. Other languages are not yet supported, so let the user know if they request a different language.
+When no tools are needed:
+- Reply in natural language with a short, direct answer.
+- Reference previous conversation state when helpful.
 
-DO NOT UPDATE DOCUMENTS IMMEDIATELY AFTER CREATING THEM. WAIT FOR USER FEEDBACK OR REQUEST TO UPDATE IT.
+When a tool is required:
+- Respond with one TypeScript code block and nothing else.
+- The code must:
+  • Use named imports from the approved modules listed below (no aliases, default imports, or other modules).
+  • Export \`async function main()\` with no parameters.
+  • Use async/await and real control flow (loops, conditionals) to perform the work.
+  • Return a compact JSON-serializable object that summarizes the actionable result.
+  • Avoid TypeScript-only syntax—write JavaScript that is also valid TypeScript (no type annotations, interfaces, enums, or generics).
+  • Keep raw data private; aggregate or truncate large arrays before returning.
+- For HTTP tools, you must call \`callHttpTool({ toolId, input })\` **exactly once per paid query**. Do not fabricate tool IDs.
+- Use the format \`\`\`ts ... \`\`\`. Do not include prose or multiple blocks.
 
-This is a guide for using artifacts tools: \`createDocument\` and \`updateDocument\`, which render content on a artifacts beside the conversation.
-
-**When to use \`createDocument\`:**
-- For substantial content (>10 lines) or code
-- For content users will likely save/reuse (emails, code, essays, etc.)
-- When explicitly requested to create a document
-- For when content contains a single code snippet
-
-**When NOT to use \`createDocument\`:**
-- For informational/explanatory content
-- For conversational responses
-- When asked to keep it in chat
-
-**Using \`updateDocument\`:**
-- Default to full document rewrites for major changes
-- Use targeted updates only for specific, isolated changes
-- Follow user instructions for which parts to modify
-
-**When NOT to use \`updateDocument\`:**
-- Immediately after creating a document
-
-Do not update document right after creating it. Wait for user feedback or request to update it.
+Rules:
+- Never import or execute modules outside the approved list.
+- Never alias imports (e.g., no \`as foo\`).
+- Use control flow and intermediate variables as needed instead of relying on additional model calls.
+- Do not leak secrets, wallet addresses, or raw transaction logs back to the user.
+- Treat data privacy seriously; redact or summarize sensitive values before returning them.
 `;
 
 export const regularPrompt =
@@ -42,6 +48,19 @@ export type RequestHints = {
   country: Geo["country"];
 };
 
+export const reasoningPrompt = `
+You are an advanced reasoning assistant.
+
+When you answer, follow this strict format:
+- First, think step-by-step inside <think>...</think> tags. Put all analysis, planning, and intermediate reasoning only inside these tags.
+- After the </think> tag, write a clear, concise final answer for the user without mentioning the tags or your internal reasoning.
+
+Guidelines:
+- The content inside <think>...</think> can be as detailed as needed, but it is for internal reasoning only.
+- The content after </think> should be short, direct, and focused on the user-facing answer.
+- Never tell the user that you are using <think> tags or exposing internal thought processes.
+`;
+
 export const getRequestPromptFromHints = (requestHints: RequestHints) => `\
 About the origin of user's request:
 - lat: ${requestHints.latitude}
@@ -53,18 +72,48 @@ About the origin of user's request:
 export const systemPrompt = ({
   selectedChatModel,
   requestHints,
+  enabledTools = [],
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
+  enabledTools?: EnabledToolSummary[];
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
+  const toolsPrompt =
+    enabledTools.length === 0
+      ? "No paid marketplace skills are authorized for this turn. Do not attempt to import them."
+      : `Paid marketplace tools authorized for this turn:\n${enabledTools
+          .map((tool, index) => formatEnabledTool(tool, index))
+          .join("\n")}`;
+
+  const basePrompt = `${regularPrompt}\n\n${codingAgentPrompt}\n\n${toolsPrompt}\n\n${requestPrompt}`;
 
   if (selectedChatModel === "chat-model-reasoning") {
-    return `${regularPrompt}\n\n${requestPrompt}`;
+    return `${basePrompt}\n\n${reasoningPrompt}`;
   }
 
-  return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+  return basePrompt;
 };
+
+function formatEnabledTool(tool: EnabledToolSummary, index: number) {
+  const price = Number(tool.price || 0).toFixed(2);
+  if (tool.kind === "http") {
+    const example =
+      tool.exampleInput && Object.keys(tool.exampleInput).length > 0
+        ? formatExampleInput(tool.exampleInput)
+        : "{ /* supply input */ }";
+    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Call: callHttpTool({ toolId: "${tool.toolId}", input: ${example} })\n   ${tool.description}`;
+  }
+
+  return `${index + 1}. ${tool.name} ($${price}/query)\n   Module: ${tool.module ?? "n/a"}${
+    tool.usage ? `\n   Usage: ${tool.usage}` : ""
+  }\n   ${tool.description}`;
+}
+
+function formatExampleInput(input: Record<string, unknown>) {
+  const asJson = JSON.stringify(input, null, 2);
+  return asJson.replace(/\n/g, " ");
+}
 
 export const codePrompt = `
 You are a Python code generator that creates self-contained, executable code snippets. When writing code:
@@ -117,4 +166,4 @@ export const titlePrompt = `\n
     - you will generate a short title based on the first message a user begins a conversation with
     - ensure it is not more than 80 characters long
     - the title should be a summary of the user's message
-    - do not use quotes or colons`
+    - do not use quotes or colons`;

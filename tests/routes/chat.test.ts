@@ -66,6 +66,31 @@ test.describe
       chatIdsCreatedByAda.push(chatId);
     });
 
+    test("Ada cannot invoke chat with an unknown paid tool", async ({
+      adaContext,
+    }) => {
+      const chatId = generateUUID();
+
+      const response = await adaContext.request.post("/api/chat", {
+        data: {
+          id: chatId,
+          message: TEST_PROMPTS.SKY.MESSAGE,
+          selectedChatModel: "chat-model",
+          selectedVisibilityType: "private",
+          toolInvocations: [
+            {
+              toolId: generateUUID(),
+              transactionHash: `0x${"0".repeat(64)}`,
+            },
+          ],
+        },
+      });
+
+      expect(response.status()).toBe(404);
+      const { code } = await response.json();
+      expect(code).toEqual("not_found:chat");
+    });
+
     test("Babbage cannot append message to Ada's chat", async ({
       babbageContext,
     }) => {

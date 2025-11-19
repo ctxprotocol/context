@@ -7,6 +7,7 @@ import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { Action, Actions } from "./elements/actions";
 import { CopyIcon, PencilEditIcon, ThumbDownIcon, ThumbUpIcon } from "./icons";
+import { parseToolContext } from "./tool-context";
 
 export function PureMessageActions({
   chatId,
@@ -40,7 +41,13 @@ export function PureMessageActions({
       return;
     }
 
-    await copyToClipboard(textFromParts);
+    // Strip tool context from user messages before copying
+    const textToCopy =
+      message.role === "user"
+        ? parseToolContext(textFromParts).userText
+        : textFromParts;
+
+    await copyToClipboard(textToCopy);
     toast.success("Copied to clipboard!");
   };
 

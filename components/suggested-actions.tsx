@@ -11,9 +11,14 @@ type SuggestedActionsProps = {
   chatId: string;
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   selectedVisibilityType: VisibilityType;
+  isReadonly: boolean;
 };
 
-function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
+function PureSuggestedActions({
+  chatId,
+  sendMessage,
+  isReadonly,
+}: SuggestedActionsProps) {
   const suggestedActions = [
     "What are the advantages of using Next.js?",
     "Write code to demonstrate Dijkstra's algorithm",
@@ -36,7 +41,9 @@ function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
         >
           <Suggestion
             className="h-auto w-full whitespace-normal p-3 text-left"
+            disabled={isReadonly}
             onClick={(suggestion) => {
+              if (isReadonly) return;
               window.history.replaceState({}, "", `/chat/${chatId}`);
               sendMessage({
                 role: "user",
@@ -60,6 +67,9 @@ export const SuggestedActions = memo(
       return false;
     }
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) {
+      return false;
+    }
+    if (prevProps.isReadonly !== nextProps.isReadonly) {
       return false;
     }
 

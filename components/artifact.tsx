@@ -336,6 +336,7 @@ function PureArtifact({
                     chatId={chatId}
                     className="bg-background dark:bg-muted"
                     input={input}
+                    isReadonly={isReadonly}
                     messages={messages}
                     selectedModelId={selectedModelId}
                     selectedVisibilityType={selectedVisibilityType}

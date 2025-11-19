@@ -11,6 +11,7 @@ import {
   inArray,
   lt,
   type SQL,
+  sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -20,6 +21,7 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
+  aiTool,
   type Chat,
   chat,
   type DBMessage,
@@ -28,6 +30,7 @@ import {
   type Suggestion,
   stream,
   suggestion,
+  toolQuery,
   type User,
   user,
   vote,
@@ -134,7 +137,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
       return { deletedCount: 0 };
     }
 
-    const chatIds = userChats.map(c => c.id);
+    const chatIds = userChats.map((c) => c.id);
 
     await db.delete(vote).where(inArray(vote.chatId, chatIds));
     await db.delete(message).where(inArray(message.chatId, chatIds));
@@ -589,5 +592,450 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
       "bad_request:database",
       "Failed to get stream ids by chat id"
     );
+  }
+}
+
+/**
+ * Finds a user by their Privy DID. If the user doesn't exist, it creates a new one.
+ * This is an "upsert" operation specific to our authentication flow.
+ * @param privyDid - The user's Decentralized Identifier from Privy.
+ * @param email - The user's email, if available from Privy.
+ * @returns The user record from the database.
+ */
+export async function findOrCreateUserByPrivyDid(
+  privyDid: string,
+  email?: string
+) {
+  try {
+    // First, try to find the user
+    const existingUsers = await db
+      .select()
+      .from(user)
+      .where(eq(user.privyDid, privyDid));
+    let dbUser = existingUsers[0];
+
+    // If the user does not exist, create them
+    if (!dbUser) {
+      const newUserResult = await db
+        .insert(user)
+        .values({
+          privyDid,
+          email,
+        })
+        .returning();
+      dbUser = newUserResult[0];
+    }
+
+    return dbUser;
+  } catch (error) {
+    console.error("Database error in findOrCreateUserByPrivyDid:", error);
+    return null;
+  }
+}
+
+// ============================================================================
+// AI TOOL MARKETPLACE QUERIES
+// ============================================================================
+
+/**
+ * Create a new AI tool listing
+ * Automatically marks the user as a developer on their first tool creation
+ */
+export async function createAITool({
+  name,
+  description,
+  developerId,
+  developerWallet,
+  pricePerQuery,
+  toolSchema,
+  apiEndpoint,
+  category,
+  iconUrl,
+}: {
+  name: string;
+  description: string;
+  developerId: string;
+  developerWallet: string;
+  pricePerQuery: string; // e.g., "0.01" for $0.01
+  toolSchema: Record<string, unknown>; // JSON schema for tool parameters
+  apiEndpoint: string;
+  category?: string;
+  iconUrl?: string;
+}) {
+  try {
+    // Create the tool
+    const [newTool] = await db
+      .insert(aiTool)
+      .values({
+        name,
+        description,
+        developerId,
+        developerWallet,
+        pricePerQuery,
+        toolSchema,
+        apiEndpoint,
+        category,
+        iconUrl,
+        isActive: true,
+      })
+      .returning();
+
+    // Mark user as developer if not already
+    await db
+      .update(user)
+      .set({ isDeveloper: true })
+      .where(eq(user.id, developerId));
+
+    return newTool;
+  } catch (error) {
+    console.error("Failed to create AI tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to create AI tool");
+  }
+}
+
+/**
+ * Get all active AI tools (for marketplace listing)
+ */
+export async function getActiveAITools() {
+  try {
+    return await db
+      .select()
+      .from(aiTool)
+      .where(eq(aiTool.isActive, true))
+      .orderBy(desc(aiTool.totalQueries));
+  } catch (error) {
+    console.error("Failed to get active AI tools:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get AI tools");
+  }
+}
+
+/**
+ * Get AI tool by ID
+ */
+export async function getAIToolById({ id }: { id: string }) {
+  try {
+    const tools = await db.select().from(aiTool).where(eq(aiTool.id, id));
+    return tools[0];
+  } catch (error) {
+    console.error("Failed to get AI tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get AI tool");
+  }
+}
+
+/**
+ * Get all tools created by a specific developer
+ */
+export async function getAIToolsByDeveloper({
+  developerId,
+}: {
+  developerId: string;
+}) {
+  try {
+    return await db
+      .select()
+      .from(aiTool)
+      .where(eq(aiTool.developerId, developerId))
+      .orderBy(desc(aiTool.createdAt));
+  } catch (error) {
+    console.error("Failed to get developer tools:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get developer tools"
+    );
+  }
+}
+
+/**
+ * Get all tools by developer wallet address
+ */
+export async function getAIToolsByWallet({
+  walletAddress,
+}: {
+  walletAddress: string;
+}) {
+  try {
+    return await db
+      .select()
+      .from(aiTool)
+      .where(eq(aiTool.developerWallet, walletAddress))
+      .orderBy(desc(aiTool.createdAt));
+  } catch (error) {
+    console.error("Failed to get tools by wallet:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get tools by wallet"
+    );
+  }
+}
+
+/**
+ * Update AI tool status (active/inactive)
+ */
+export async function updateAIToolStatus({
+  id,
+  isActive,
+}: {
+  id: string;
+  isActive: boolean;
+}) {
+  try {
+    return await db
+      .update(aiTool)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(aiTool.id, id));
+  } catch (error) {
+    console.error("Failed to update tool status:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update tool status"
+    );
+  }
+}
+
+/**
+ * Record a paid query execution
+ * Updates tool statistics (query count, revenue) and records the transaction
+ */
+export async function recordToolQuery({
+  toolId,
+  userId,
+  chatId,
+  amountPaid,
+  transactionHash,
+  queryInput,
+  queryOutput,
+  status = "completed",
+}: {
+  toolId: string;
+  userId: string;
+  chatId?: string;
+  amountPaid: string; // e.g., "0.01"
+  transactionHash: string;
+  queryInput?: Record<string, unknown>;
+  queryOutput?: Record<string, unknown>;
+  status?: "completed" | "failed" | "pending";
+}) {
+  try {
+    // Insert query record
+    const [query] = await db
+      .insert(toolQuery)
+      .values({
+        toolId,
+        userId,
+        chatId,
+        amountPaid,
+        transactionHash,
+        queryInput,
+        queryOutput,
+        status,
+        executedAt: new Date(),
+      })
+      .returning();
+
+    // Update tool statistics (only for completed queries)
+    if (status === "completed") {
+      await db
+        .update(aiTool)
+        .set({
+          totalQueries: sql`${aiTool.totalQueries} + 1`,
+          totalRevenue: sql`${aiTool.totalRevenue} + ${amountPaid}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(aiTool.id, toolId));
+    }
+
+    return query;
+  } catch (error) {
+    console.error("Failed to record tool query:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to record tool query"
+    );
+  }
+}
+
+/**
+ * Get query history for a specific tool
+ */
+export async function getToolQueryHistory({
+  toolId,
+  limit = 50,
+}: {
+  toolId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(toolQuery)
+      .where(eq(toolQuery.toolId, toolId))
+      .orderBy(desc(toolQuery.executedAt))
+      .limit(limit);
+  } catch (error) {
+    console.error("Failed to get tool query history:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get query history"
+    );
+  }
+}
+
+/**
+ * Get query history for a specific user
+ */
+export async function getUserQueryHistory({
+  userId,
+  limit = 50,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  try {
+    return await db
+      .select()
+      .from(toolQuery)
+      .where(eq(toolQuery.userId, userId))
+      .orderBy(desc(toolQuery.executedAt))
+      .limit(limit);
+  } catch (error) {
+    console.error("Failed to get user query history:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user query history"
+    );
+  }
+}
+
+/**
+ * Get total earnings for a developer (sum of all completed queries)
+ */
+export async function getDeveloperEarnings({
+  developerId,
+}: {
+  developerId: string;
+}) {
+  try {
+    const tools = await getAIToolsByDeveloper({ developerId });
+    const totalRevenue = tools.reduce(
+      (sum, tool) => sum + Number(tool.totalRevenue),
+      0
+    );
+    const totalQueries = tools.reduce(
+      (sum, tool) => sum + tool.totalQueries,
+      0
+    );
+
+    return {
+      totalRevenue: totalRevenue.toFixed(6),
+      totalQueries,
+      toolCount: tools.length,
+      tools: tools.map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        revenue: tool.totalRevenue,
+        queries: tool.totalQueries,
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get developer earnings:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get developer earnings"
+    );
+  }
+}
+
+/**
+ * Search AI tools by name or description
+ * Note: Currently returns all active tools
+ * TODO: Implement full-text search using PostgreSQL's ILIKE or tsvector
+ */
+export async function searchAITools() {
+  try {
+    // For MVP, return all active tools
+    // TODO: Add query parameter and WHERE clause with ILIKE for name/description search
+    return await db
+      .select()
+      .from(aiTool)
+      .where(eq(aiTool.isActive, true))
+      .limit(20);
+  } catch (error) {
+    console.error("Failed to search AI tools:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to search AI tools");
+  }
+}
+
+/**
+ * Get featured/verified AI tools
+ */
+export async function getFeaturedAITools({
+  limit = 10,
+}: {
+  limit?: number;
+} = {}) {
+  try {
+    return await db
+      .select()
+      .from(aiTool)
+      .where(and(eq(aiTool.isActive, true), eq(aiTool.isVerified, true)))
+      .orderBy(desc(aiTool.totalQueries))
+      .limit(limit);
+  } catch (error) {
+    console.error("Failed to get featured tools:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get featured tools"
+    );
+  }
+}
+
+/**
+ * Check if a transaction hash has already been used for a tool query
+ * Used to prevent double-spending
+ */
+export async function getToolQueryByTransactionHash({
+  transactionHash,
+}: {
+  transactionHash: string;
+}) {
+  try {
+    const queries = await db
+      .select()
+      .from(toolQuery)
+      .where(eq(toolQuery.transactionHash, transactionHash))
+      .limit(1);
+    return queries[0] || null;
+  } catch (error) {
+    console.error("Failed to get tool query by transaction hash:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to check transaction hash"
+    );
+  }
+}
+
+/**
+ * Verify an AI tool (admin function)
+ * Marks the tool as verified and records who verified it
+ */
+export async function verifyAITool({
+  toolId,
+  verifiedBy,
+}: {
+  toolId: string;
+  verifiedBy: string;
+}) {
+  try {
+    return await db
+      .update(aiTool)
+      .set({
+        isVerified: true,
+        verifiedBy,
+        verifiedAt: new Date(),
+      })
+      .where(eq(aiTool.id, toolId));
+  } catch (error) {
+    console.error("Failed to verify tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to verify tool");
   }
 }

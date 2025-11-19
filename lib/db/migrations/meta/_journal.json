@@ -57,6 +57,34 @@
       "when": 1757362773211,
       "tag": "0007_flowery_ben_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1762788840771,
+      "tag": "0008_long_randall_flagg",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1762841712790,
+      "tag": "0009_lowly_speedball",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1762880303048,
+      "tag": "0010_needy_genesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1762920285327,
+      "tag": "0011_cute_jack_power",
+      "breakpoints": true
     }
   ]
 }

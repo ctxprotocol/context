@@ -3,6 +3,10 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
+import {
+  getPaymentStatusMessage,
+  usePaymentStatus,
+} from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -23,6 +27,7 @@ import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import { parseToolContext, ToolContext } from "./tool-context";
 import { Weather } from "./weather";
 
 const PurePreviewMessage = ({
@@ -122,8 +127,14 @@ const PurePreviewMessage = ({
 
             if (type === "text") {
               if (mode === "view") {
+                // Parse tool context from user messages
+                const { userText, toolContext } =
+                  message.role === "user"
+                    ? parseToolContext(part.text)
+                    : { userText: part.text, toolContext: null };
+
                 return (
-                  <div key={key}>
+                  <div className="flex flex-col gap-2" key={key}>
                     <MessageContent
                       className={cn({
                         "w-fit break-words rounded-2xl px-3 py-2 text-right text-white":
@@ -138,8 +149,14 @@ const PurePreviewMessage = ({
                           : undefined
                       }
                     >
-                      <Response>{sanitizeText(part.text)}</Response>
+                      <Response>{sanitizeText(userText)}</Response>
                     </MessageContent>
+                    {toolContext && (
+                      <ToolContext
+                        data={toolContext.data}
+                        toolName={toolContext.toolName}
+                      />
+                    )}
                   </div>
                 );
               }
@@ -311,6 +328,8 @@ export const PreviewMessage = memo(
 
 export const ThinkingMessage = () => {
   const role = "assistant";
+  const { stage, toolName } = usePaymentStatus();
+  const statusMessage = getPaymentStatusMessage(stage, toolName);
 
   return (
     <motion.div
@@ -328,12 +347,11 @@ export const ThinkingMessage = () => {
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          <div className="p-0 text-muted-foreground text-sm">
-            Thinking...
+          <div className="payment-status-gradient animate-status-gradient bg-size-200 p-0 text-gradient text-sm">
+            {statusMessage}
           </div>
         </div>
       </div>
     </motion.div>
   );
 };
-
