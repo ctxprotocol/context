@@ -1,71 +1,85 @@
-<a href="https://chat.vercel.ai/">
-  <img alt="Next.js 14 and App Router-ready AI chatbot." src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chat SDK</h1>
-</a>
+<div align="center">
+  <img alt="Context Protocol" src="app/(chat)/opengraph-image.png" width="100%" style="border-radius: 12px; margin-bottom: 24px;" />
+  
+  # Context Protocol
 
-<p align="center">
-    Chat SDK is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
-</p>
+  **The decentralized marketplace for AI context.**
+  
+  [![License: BUSL 1.1](https://img.shields.io/badge/License-BUSL%201.1-blue.svg)](https://github.com/ctxprotocol/context/blob/main/LICENSE)
+  [![Twitter Follow](https://img.shields.io/twitter/follow/ctxprotocol?style=social)](https://twitter.com/ctxprotocol)
 
-<p align="center">
-  <a href="https://chat-sdk.dev"><strong>Read Docs</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+  <p align="center">
+    Context is an AI-native protocol that enables developers to monetize their data and APIs directly through LLM interactions.
+    We are replacing the fragmented world of "AI Wrappers" with a unified, permissionless marketplace where agents pay for the skills they need.
+  </p>
+</div>
 
-## Features
+---
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://ai-sdk.dev/docs/introduction)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports xAI (default), OpenAI, Fireworks, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+## 🌟 Vision
 
-## Model Providers
+We believe the future of AI is not a single "Super App," but a collaborative network of specialized agents and data sources.
 
-This template uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access multiple AI models through a unified interface. The default configuration includes [xAI](https://x.ai) models (`grok-2-vision-1212`, `grok-3-mini`) routed through the gateway.
+- **For Developers:** Don't build another chat UI. Build a **Skill**. Expose your unique data (crypto prices, prediction markets, proprietary analysis) and get paid in USDC every time an AI agent uses it.
+- **For Users:** Access a "God Mode" agent that has real-time access to the entire on-chain and off-chain world, without switching tabs.
 
-### AI Gateway Authentication
+## 🏗 Architecture
 
-**For Vercel deployments**: Authentication is handled automatically via OIDC tokens.
+Context is built on a **Code Execution** paradigm. Instead of rigid "tool calling" schemas, our Agent writes and executes TypeScript code to interact with the world.
 
-**For non-Vercel deployments**: You need to provide an AI Gateway API key by setting the `AI_GATEWAY_API_KEY` environment variable in your `.env.local` file.
+### 1. The Marketplace (Supply)
+Developers contribute **Skills** to the protocol.
+- **HTTP Tools:** Simple endpoints that return JSON. Permissionless and hosted by you.
+- **Native Skills:** Verified TypeScript modules that run inside our secure sandbox for high-performance logic.
 
-With the [AI SDK](https://ai-sdk.dev/docs/introduction), you can also switch to direct LLM providers like [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://ai-sdk.dev/providers/ai-sdk-providers) with just a few lines of code.
+### 2. The Agent (Demand)
+Users chat with the Context Agent. When a query requires specialized knowledge (e.g., "What's the gas price on Base?"), the Agent:
+1. **Plans** a solution.
+2. **Writes Code** to invoke the necessary paid Skills.
+3. **Executes** the code securely.
+4. **Pays** the developer via the `ContextRouter` smart contract.
+5. **Synthesizes** the answer.
 
-## Deploy Your Own
+### 3. The Protocol (Settlement)
+All value flows through `ContextRouter.sol` on Base. Payments are split instantly between the tool developer and the protocol treasury.
 
-You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
+## 🚀 Getting Started
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/templates/next.js/nextjs-ai-chatbot)
-
-## Running locally
-
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Next.js AI Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
-
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
+### Run the App Locally
 
 ```bash
+# 1. Clone the repo
+git clone https://github.com/ctxprotocol/context.git
+
+# 2. Install dependencies
 pnpm install
-pnpm db:migrate # Setup database or apply latest database changes
+
+# 3. Setup environment
+cp .env.example .env.local
+# (Fill in your keys for Privy, OpenAI/Anthropic, and Postgres)
+
+# 4. Run the dev server
 pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+### Contribute a Tool
+
+Want to earn revenue from your API?
+
+1. **Build an HTTP Endpoint:** It just needs to accept JSON and return JSON.
+2. **Register in the App:** Go to `/contribute` in the running app.
+3. **Set a Price:** Choose your fee per query (e.g., $0.01 USDC).
+4. **Earn:** Your tool is now instantly available to the global Context Agent.
+
+## 🛠 Advanced: Native Skills Registry
+
+For complex logic that requires high performance or verified execution, you can contribute directly to the core codebase.
+
+**[View the Community Skills Registry](./lib/ai/skills/community/README.md)**
+
+## 📄 License
+
+Context is open source but protected.
+Licensed under **BUSL 1.1** (Business Source License). You can use, copy, and modify the code for non-commercial or personal use. Production use that competes directly with the Context marketplace is restricted.
+
+See [LICENSE](./LICENSE) for details.
