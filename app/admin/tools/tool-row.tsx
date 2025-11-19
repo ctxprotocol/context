@@ -32,30 +32,42 @@ export function ToolRow({
     : (tool.toolSchema as any)?.skill?.module;
 
   return (
-    <TableRow>
-      <TableCell>
-        <Badge variant={tool.isVerified ? "default" : "secondary"}>
+    <TableRow className="hover:bg-muted/50 border-b border-border/50 last:border-none">
+      <TableCell className="pl-6">
+        <Badge 
+          variant={tool.isVerified ? "default" : "secondary"}
+          className="font-normal"
+        >
           {tool.isVerified ? "Verified" : "Pending"}
         </Badge>
       </TableCell>
-      <TableCell className="font-medium">{tool.name}</TableCell>
+      <TableCell className="font-medium text-sm text-foreground">
+        {tool.name}
+      </TableCell>
       <TableCell>
-        <Badge variant="outline">{kind}</Badge>
+        <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
+          {kind}
+        </Badge>
       </TableCell>
       <TableCell className="max-w-[300px] truncate font-mono text-xs text-muted-foreground">
         {endpoint}
       </TableCell>
-      <TableCell>{developerEmail || "Unknown"}</TableCell>
-      <TableCell className="text-right">${Number(tool.pricePerQuery).toFixed(2)}</TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-sm text-muted-foreground">
+        {developerEmail || "Unknown"}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm">
+        ${Number(tool.pricePerQuery).toFixed(2)}
+      </TableCell>
+      <TableCell className="text-right pr-6">
         <Button 
-          variant={tool.isVerified ? "destructive" : "default"} 
+          variant={tool.isVerified ? "ghost" : "default"} 
           size="sm"
           onClick={handleToggle}
           disabled={isLoading}
+          className={tool.isVerified ? "text-destructive hover:text-destructive hover:bg-destructive/10" : ""}
         >
           {isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : tool.isVerified ? (
             "Unverify"
           ) : (
