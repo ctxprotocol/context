@@ -47,5 +47,6 @@ Unlike HTTP Tools which are live instantly, Native Skills require a 2-step verif
 4. **Implement** your logic:
    - Define input schemas using `zod`.
    - Write clean, safe TypeScript code.
-   - **Note:** No `eval()`, no unrestricted network calls (use verified APIs only).
+   - **No `eval()`:** Arbitrary code execution is strictly forbidden for security.
+   - **Verified APIs Only:** Network calls must be to reputable, public endpoints (e.g., `api.uniswap.org`) or imports of other Registered Tools. We review every URL during the PR process.
 5. **Submit a Pull Request** to the main repository.
