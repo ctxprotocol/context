@@ -523,110 +523,111 @@ export async function POST(request: Request) {
             chatId: id,
           });
           const modulesUsed = findImportedModules(codeBlock);
+
           if (modulesUsed.length === 0) {
-            throw new ChatSDKError(
-              "bad_request:chat",
-              "Generated code did not import any approved skills."
+            console.warn(
+              "[chat-api] generated code did not import any approved skills; falling back to direct answer",
+              { chatId: id }
             );
-          }
+          } else {
+            const allowedModules = new Set<AllowedModule>();
+            const paidModulesUsed = new Set<PaidToolContext>();
 
-          const allowedModules = new Set<AllowedModule>();
-          const paidModulesUsed = new Set<PaidToolContext>();
-
-          for (const moduleName of modulesUsed) {
-            if (paidToolModuleMap.has(moduleName)) {
-              const contexts = paidToolModuleMap.get(moduleName);
-              if (contexts && contexts.length > 0) {
+            for (const moduleName of modulesUsed) {
+              if (paidToolModuleMap.has(moduleName)) {
+                const contexts = paidToolModuleMap.get(moduleName);
+                if (contexts && contexts.length > 0) {
+                  allowedModules.add(moduleName);
+                  contexts.forEach((context) => paidModulesUsed.add(context));
+                } else {
+                  throw new ChatSDKError(
+                    "bad_request:chat",
+                    `Module ${moduleName} is not available for this request.`
+                  );
+                }
+              } else if (BUILTIN_MODULE_SET.has(moduleName)) {
                 allowedModules.add(moduleName);
-                contexts.forEach((context) => paidModulesUsed.add(context));
               } else {
                 throw new ChatSDKError(
-                  "bad_request:chat",
-                  `Module ${moduleName} is not available for this request.`
+                  "forbidden:chat",
+                  `Module ${moduleName} is not authorized for this turn.`
                 );
               }
-            } else if (BUILTIN_MODULE_SET.has(moduleName)) {
-              allowedModules.add(moduleName);
+            }
+
+            if (allowedModules.size === 0) {
+              console.warn(
+                "[chat-api] no authorized skills found after filtering; falling back to direct answer",
+                { chatId: id }
+              );
             } else {
-              throw new ChatSDKError(
-                "forbidden:chat",
-                `Module ${moduleName} is not authorized for this turn.`
-              );
-            }
-          }
+              const verifiedSkillContexts: PaidToolContext[] = [];
+              for (const context of paidModulesUsed) {
+                const verification = await verifyPayment(
+                  context.transactionHash as `0x${string}`,
+                  context.tool.id,
+                  context.tool.developerWallet
+                );
+                if (!verification.isValid) {
+                  console.warn("[chat-api] payment verification failed", {
+                    chatId: id,
+                    toolId: context.tool.id,
+                    tx: context.transactionHash,
+                    error: verification.error,
+                  });
+                  throw new ChatSDKError(
+                    "bad_request:chat",
+                    verification.error || "Payment verification failed."
+                  );
+                }
+                if (context.kind === "skill") {
+                  verifiedSkillContexts.push(context);
+                }
+              }
 
-          if (allowedModules.size === 0) {
-            throw new ChatSDKError(
-              "bad_request:chat",
-              "No authorized skills were found in the generated code."
-            );
-          }
+              const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
 
-          const verifiedSkillContexts: PaidToolContext[] = [];
-          for (const context of paidModulesUsed) {
-            const verification = await verifyPayment(
-              context.transactionHash as `0x${string}`,
-              context.tool.id,
-              context.tool.developerWallet
-            );
-            if (!verification.isValid) {
-              console.warn("[chat-api] payment verification failed", {
+              console.log("[chat-api] executing skill code", {
                 chatId: id,
-                toolId: context.tool.id,
-                tx: context.transactionHash,
-                error: verification.error,
+                allowedModules: Array.from(allowedModules),
+                httpTools: Array.from(allowedToolMap.keys()),
               });
-              throw new ChatSDKError(
-                "bad_request:chat",
-                verification.error || "Payment verification failed."
-              );
-            }
-            if (context.kind === "skill") {
-              verifiedSkillContexts.push(context);
+
+              const execution = await executeSkillCode({
+                code: codeBlock,
+                allowedModules: Array.from(allowedModules),
+                runtime: {
+                  session,
+                  dataStream,
+                  requestId: id,
+                  chatId: id,
+                  allowedTools: allowedToolMap.size ? allowedToolMap : undefined,
+                },
+              });
+
+              for (const context of verifiedSkillContexts) {
+                await recordToolQuery({
+                  toolId: context.tool.id,
+                  userId: session.user.id,
+                  chatId: id,
+                  amountPaid: context.tool.pricePerQuery,
+                  transactionHash: context.transactionHash,
+                  queryOutput: execution.ok
+                    ? (execution.data as Record<string, unknown>)
+                    : undefined,
+                  status: execution.ok ? "completed" : "failed",
+                });
+              }
+
+              mediatorText = execution.ok
+                ? `Tool execution succeeded.\nModules used: ${Array.from(allowedModules).join(", ")}\nResult JSON:\n${formatExecutionData(execution.data)}`
+                : `Tool execution failed: ${execution.error}`;
+              console.log("[chat-api] execution finished", {
+                chatId: id,
+                ok: execution.ok,
+              });
             }
           }
-
-          const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
-
-          console.log("[chat-api] executing skill code", {
-            chatId: id,
-            allowedModules: Array.from(allowedModules),
-            httpTools: Array.from(allowedToolMap.keys()),
-          });
-
-          const execution = await executeSkillCode({
-            code: codeBlock,
-            allowedModules: Array.from(allowedModules),
-            runtime: {
-              session,
-              dataStream,
-              requestId: id,
-              chatId: id,
-              allowedTools: allowedToolMap.size ? allowedToolMap : undefined,
-            },
-          });
-
-          for (const context of verifiedSkillContexts) {
-            await recordToolQuery({
-              toolId: context.tool.id,
-              userId: session.user.id,
-              chatId: id,
-              amountPaid: context.tool.pricePerQuery,
-              transactionHash: context.transactionHash,
-              queryOutput: execution.ok
-                ? (execution.data as Record<string, unknown>)
-                : undefined,
-              status: execution.ok ? "completed" : "failed",
-            });
-          }
-
-          mediatorText = execution.ok
-            ? `Tool execution succeeded.\nModules used: ${Array.from(allowedModules).join(", ")}\nResult JSON:\n${formatExecutionData(execution.data)}`
-            : `Tool execution failed: ${execution.error}`;
-          console.log("[chat-api] execution finished", {
-            chatId: id,
-            ok: execution.ok,
-          });
         }
 
         const mediatorMessage: ChatMessage = {
