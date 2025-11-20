@@ -118,7 +118,7 @@ export function ContextSidebar({
                   </div>
                 </div>
                 <SidebarInput
-                  className="h-8"
+                  className="h-8 focus-visible:ring-ring"
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search tools..."
                   value={searchQuery}
