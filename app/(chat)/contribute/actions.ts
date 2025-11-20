@@ -26,6 +26,21 @@ export async function submitHttpTool(
     defaultParams: formData.get("defaultParams") || undefined,
   };
 
+  if (
+    !raw.developerWallet ||
+    typeof raw.developerWallet !== "string" ||
+    !/^0x[a-fA-F0-9]{40}$/.test(raw.developerWallet)
+  ) {
+    return {
+      status: "error",
+      message: "Connect your wallet before submitting a tool.",
+      fieldErrors: {
+        developerWallet: "Connect your wallet in the sidebar first.",
+      },
+      payload: raw as any,
+    };
+  }
+
   // We cast raw to any to satisfy the payload type which expects the validated types,
   // but for repopulating the form string values are actually better.
   const payload = raw as unknown as any;

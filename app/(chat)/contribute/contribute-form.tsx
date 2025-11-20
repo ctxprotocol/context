@@ -36,6 +36,7 @@ export function ContributeForm({
     contributeFormInitialState
   );
   const [kind, setKind] = useState("http");
+  const hasDeveloperWallet = Boolean(developerWallet);
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -228,18 +229,27 @@ export function ContributeForm({
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
               aria-invalid={developerWalletError ? true : undefined}
+              aria-readonly="true"
               className={cn(
-                "bg-muted",
+                hasDeveloperWallet ? "bg-muted" : "bg-muted text-muted-foreground",
                 developerWalletError &&
                   "border-destructive focus-visible:ring-destructive"
               )}
-              aria-readonly="true"
               defaultValue={developerWallet}
               id="developerWallet"
               name="developerWallet"
-              placeholder="0x..."
+              placeholder={
+                hasDeveloperWallet
+                  ? developerWallet
+                  : "Connect your wallet to register a tool"
+              }
               readOnly
             />
+            {!hasDeveloperWallet && !developerWalletError && (
+              <p className="text-muted-foreground text-xs">
+                Connect your wallet in the sidebar before submitting a tool.
+              </p>
+            )}
             <FieldError message={developerWalletError} />
           </div>
         </CardContent>
@@ -249,7 +259,7 @@ export function ContributeForm({
           </div>
           <Button
             className="w-full md:w-auto"
-            disabled={isPending}
+            disabled={isPending || !hasDeveloperWallet}
             type="submit"
           >
             {isPending ? (
