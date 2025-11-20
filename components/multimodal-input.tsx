@@ -701,7 +701,9 @@ function PureMultimodalInput({
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 &&
-        !isReadonly && (
+        !isReadonly &&
+        !isPaymentInProgress &&
+        !showPayDialog && (
           <SuggestedActions
             chatId={chatId}
             isReadonly={isReadonly}
