@@ -94,13 +94,13 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
                 <SelectTrigger>
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper">
                   <SelectItem value="Network">Network (Gas, RPC, Nodes)</SelectItem>
-                  <SelectItem value="DeFi">DeFi (Swap, Lending, Yield)</SelectItem>
-                  <SelectItem value="Data">Data (Prices, Sports, Weather, Analytics)</SelectItem>
-                  <SelectItem value="Social">Social (Identity, Social Media, Governance)</SelectItem>
-                  <SelectItem value="Utility">Utility (Search, Compute, Automation)</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                  <SelectItem value="DeFi">DeFi / Actions (Swaps, Lending, Execution)</SelectItem>
+                  <SelectItem value="Market Data">Market Data (Crypto, Stocks, Gas)</SelectItem>
+                  <SelectItem value="Real World">Real World (Weather, Sports, News)</SelectItem>
+                  <SelectItem value="Social">Social (Identity, Governance)</SelectItem>
+                  <SelectItem value="Utility">Utility (Search, Compute, Other)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
