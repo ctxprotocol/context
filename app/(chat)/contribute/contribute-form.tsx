@@ -70,8 +70,9 @@ export function ContributeForm({
             />
             <p className="text-muted-foreground text-xs">
               This is the <strong>Instruction Manual</strong> for the AI Agent.
-              Be extremely specific about <em>when</em> to use this tool and <em>how</em> to use its parameters.
-              The Agent reads this to decide if your tool is relevant to the user's question.
+              Be extremely specific about <em>when</em> to use this tool and{" "}
+              <em>how</em> to use its parameters. The Agent reads this to decide
+              if your tool is relevant to the user's question.
             </p>
             <FieldError message={state.fieldErrors?.description} />
           </div>
@@ -169,18 +170,32 @@ export function ContributeForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="defaultParams">Example input (JSON)</Label>
+            <Label htmlFor="defaultParams">
+              {kind === "http" ? "Example input (JSON)" : "Example input (JSON) - Optional"}
+            </Label>
             <Textarea
               className="font-mono text-xs"
               id="defaultParams"
               name="defaultParams"
-              placeholder={`{
+              placeholder={
+                kind === "http"
+                  ? `{
   "endpoint": "gas_price",
   "chainId": 8453,
   "confidence": 99
-}`}
+}`
+                  : `{
+  "query": "ETH price"
+}`
+              }
               rows={5}
             />
+            {kind === "skill" && (
+              <p className="text-muted-foreground text-xs">
+                For Native Skills, inputs are defined in your TypeScript schema (Zod).
+                You can leave this blank or provide a hint for the UI.
+              </p>
+            )}
             <FieldError message={state.fieldErrors?.defaultParams} />
           </div>
           <div className="space-y-2">
