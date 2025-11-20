@@ -25,22 +25,22 @@ We believe the future of AI is not a single "Super App," but a collaborative net
 
 ## 🏗 Architecture
 
-Context is built on a **Code Execution** paradigm. Instead of rigid "tool calling" schemas, our Agent writes and executes TypeScript code to interact with the world.
+Context is built on a **Code Execution** paradigm. Instead of rigid "tool calling" schemas, the Agent writes and executes TypeScript code to interact with the world.
 
 ### 1. The Marketplace (Supply)
-Developers contribute **Tools** to the protocol.
-- **HTTP Tools:** Simple endpoints that return JSON. Permissionless and hosted by you.
-- **Native Tools:** Verified TypeScript modules (Skills) that run inside our secure sandbox for high-performance logic.
+Developers register **Tools** (the paid product) which are powered by either:
+- **HTTP Tools:** Remote API endpoints hosted by you.
+- **Native Skills:** Verified TypeScript modules running on our platform.
 
 ### 2. The Agent (Demand)
-Users chat with the Context Agent (powered by any frontier model). When a query requires specialized knowledge (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
+When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
 1. **Plans** a solution using composability.
-2. **Writes Code** to invoke the necessary paid Tools (e.g., `uniswap-quoter` AND `aave-rates`).
-3. **Executes** the code securely.
-4. **Pays** both developers their respective fees instantly.
+2. **Writes Code** to invoke the necessary paid Tools (e.g., calling functions from the `uniswap` and `aave` modules).
+3. **Executes** the code securely in our sandbox.
+4. **Pays** both developers their respective fees instantly via `ContextRouter`.
 5. **Synthesizes** the answer.
 
-This **Composability** is the superpower of Context. Unlike rigid "plugins," the Model can stitch together any number of tools into a coherent workflow, creating infinite new use cases from your single API.
+This **Composability** is the superpower of Context. Any frontier model (like GPT-4o or Claude 3.5) can stitch together disparate tools into a coherent workflow, creating infinite new use cases from your single API.
 
 ### 3. The Protocol (Settlement)
 All value flows through `ContextRouter.sol` on Base. Payments are split instantly between the tool developer and the protocol treasury.
