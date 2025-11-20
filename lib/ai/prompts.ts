@@ -105,11 +105,9 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
     return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Call: callHttpTool({ toolId: "${tool.toolId}", input: ${example} })\n   ${tool.description}`;
   }
 
-  // For Native Skills, if module is available, we could ideally inject its signature.
-  // For now, we rely on the module path and description.
   return `${index + 1}. ${tool.name} ($${price}/query)\n   Module: ${tool.module ?? "n/a"}${
     tool.usage ? `\n   Usage: ${tool.usage}` : ""
-  }\n   ${tool.description}\n   (Native Skill: Import the named export from the module)`;
+  }\n   ${tool.description}\n   (Native Skill: The agent will infer the function signature from the module path and description.)`;
 }
 
 function formatExampleInput(input: Record<string, unknown>) {

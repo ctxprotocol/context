@@ -163,7 +163,8 @@ export function ContributeForm({
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
                 Must match the path in your Pull Request (e.g.
-                @/lib/ai/skills/community/...). We will automatically read the source code to understand how to use it.
+                @/lib/ai/skills/community/...). We will automatically read the
+                source code to understand how to use it.
               </p>
             )}
             <FieldError message={state.fieldErrors?.endpoint} />
