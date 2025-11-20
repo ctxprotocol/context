@@ -13,11 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  submitHttpTool,
-} from "./actions";
-import { contributeFormInitialState } from "./schema";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -26,8 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { submitHttpTool } from "./actions";
+import { contributeFormInitialState } from "./schema";
 
-export function ContributeForm({ developerWallet }: { developerWallet: string }) {
+export function ContributeForm({
+  developerWallet,
+}: {
+  developerWallet: string;
+}) {
   const [state, formAction] = useFormState(
     submitHttpTool,
     contributeFormInitialState
@@ -48,11 +50,11 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
+              defaultValue=""
               id="name"
               name="name"
               placeholder="Blocknative Gas (HTTP)"
               required
-              defaultValue=""
             />
             <FieldError message={state.fieldErrors?.name} />
           </div>
@@ -60,29 +62,36 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
+              maxLength={1000}
               name="description"
-              placeholder="Short summary of what your endpoint returns."
-              rows={4}
+              placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 'gas_price', 'chains', and 'oracles' endpoints."
               required
+              rows={4}
             />
+            <p className="text-muted-foreground text-xs">
+              This description is read by the AI Agent to determine when to use
+              your tool. Be specific about what it can do.
+            </p>
             <FieldError message={state.fieldErrors?.description} />
           </div>
-          
+
           <div className="space-y-2">
             <Label>Type</Label>
-            <RadioGroup 
-              name="kind" 
-              defaultValue="http" 
-              onValueChange={setKind}
+            <RadioGroup
               className="flex flex-row gap-4"
+              defaultValue="http"
+              name="kind"
+              onValueChange={setKind}
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="http" id="kind-http" />
+                <RadioGroupItem id="kind-http" value="http" />
                 <Label htmlFor="kind-http">HTTP Tool (External API)</Label>
               </div>
               <div className="flex items-center space-x-2">
-                <RadioGroupItem value="skill" id="kind-skill" />
-                <Label htmlFor="kind-skill">Native Skill (Internal Module)</Label>
+                <RadioGroupItem id="kind-skill" value="skill" />
+                <Label htmlFor="kind-skill">
+                  Native Skill (Internal Module)
+                </Label>
               </div>
             </RadioGroup>
           </div>
@@ -95,25 +104,25 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value="Network" className="text-sm">
+                  <SelectItem className="text-sm" value="Network">
                     Network (Gas, RPC, Nodes)
                   </SelectItem>
-                  <SelectItem value="Actions" className="text-sm">
+                  <SelectItem className="text-sm" value="Actions">
                     Actions (Swaps, Lending, Execution)
                   </SelectItem>
-                  <SelectItem value="Market Data" className="text-sm">
+                  <SelectItem className="text-sm" value="Market Data">
                     Market Data (Crypto, Stocks, Forex)
                   </SelectItem>
-                  <SelectItem value="Real World" className="text-sm">
+                  <SelectItem className="text-sm" value="Real World">
                     Real World (Weather, Sports, News)
                   </SelectItem>
-                  <SelectItem value="Social" className="text-sm">
+                  <SelectItem className="text-sm" value="Social">
                     Social (Identity, Governance)
                   </SelectItem>
-                  <SelectItem value="Utility" className="text-sm">
+                  <SelectItem className="text-sm" value="Utility">
                     Utility (Search, Compute)
                   </SelectItem>
-                  <SelectItem value="Other" className="text-sm">
+                  <SelectItem className="text-sm" value="Other">
                     Other
                   </SelectItem>
                 </SelectContent>
@@ -122,18 +131,18 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             <div className="space-y-2">
               <Label htmlFor="price">Price per query (USDC)</Label>
               <Input
-                id="price"
-                name="price"
-                type="number"
-                step="0.0001"
-                min="0"
                 defaultValue="0.01"
+                id="price"
+                min="0"
+                name="price"
                 required
+                step="0.0001"
+                type="number"
               />
               <FieldError message={state.fieldErrors?.price} />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="endpoint">
               {kind === "http" ? "HTTP Endpoint" : "Module Path"}
@@ -141,17 +150,18 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             <Input
               id="endpoint"
               name="endpoint"
-              type={kind === "http" ? "url" : "text"}
               placeholder={
-                kind === "http" 
+                kind === "http"
                   ? "https://your-domain.com/context/blocknative"
                   : "@/lib/ai/skills/community/my-skill"
               }
               required
+              type={kind === "http" ? "url" : "text"}
             />
             {kind === "skill" && (
-              <p className="text-xs text-muted-foreground">
-                Must match the path in your Pull Request (e.g. @/lib/ai/skills/community/...)
+              <p className="text-muted-foreground text-xs">
+                Must match the path in your Pull Request (e.g.
+                @/lib/ai/skills/community/...)
               </p>
             )}
             <FieldError message={state.fieldErrors?.endpoint} />
@@ -160,32 +170,35 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
           <div className="space-y-2">
             <Label htmlFor="defaultParams">Example input (JSON)</Label>
             <Textarea
+              className="font-mono text-xs"
               id="defaultParams"
               name="defaultParams"
-              placeholder={`{"endpoint":"gas_price","chainId":8453,"confidence":99}
-{"endpoint":"chains"}
-{"endpoint":"oracles","chainId":8453}`}
-              rows={4}
+              placeholder={`{
+  "endpoint": "gas_price",
+  "chainId": 8453,
+  "confidence": 99
+}`}
+              rows={5}
             />
             <FieldError message={state.fieldErrors?.defaultParams} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
+              defaultValue={developerWallet}
               id="developerWallet"
               name="developerWallet"
               placeholder="0x..."
               required
-              defaultValue={developerWallet}
             />
             <FieldError message={state.fieldErrors?.developerWallet} />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-sm">
             On-chain payments are routed automatically via ContextRouter.
           </div>
-          <Button type="submit" className="w-full md:w-auto">
+          <Button className="w-full md:w-auto" type="submit">
             Submit tool
           </Button>
         </CardFooter>
@@ -209,5 +222,5 @@ function FieldError({ message }: { message?: string }) {
   if (!message) {
     return null;
   }
-  return <p className="text-sm text-destructive">{message}</p>;
+  return <p className="text-destructive text-sm">{message}</p>;
 }

@@ -8,7 +8,7 @@ export type ContributeFormState = {
 
 export const contributeFormSchema = z.object({
   name: z.string().min(1).max(255),
-  description: z.string().min(1),
+  description: z.string().min(1).max(1000),
   category: z.string().optional(),
   kind: z.enum(["http", "skill"]).default("http"),
   endpoint: z.string().min(1).optional(), // URL for http, module path for skill
