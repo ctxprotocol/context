@@ -97,10 +97,12 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
                 <SelectContent position="popper">
                   <SelectItem value="Network">Network (Gas, RPC, Nodes)</SelectItem>
                   <SelectItem value="Actions">Actions (DeFi Swaps, Lending, Execution)</SelectItem>
-                  <SelectItem value="Market Data">Market Data (Crypto, Stocks, Gas)</SelectItem>
+                  <SelectItem value="Market Data">Market Data (Crypto, Stocks, Forex)</SelectItem>
                   <SelectItem value="Real World">Real World (Weather, Sports, News)</SelectItem>
                   <SelectItem value="Social">Social (Identity, Governance)</SelectItem>
-                  <SelectItem value="Utility">Utility (Search, Compute, Other)</SelectItem>
+                  <SelectItem value="Utility">Utility (Search, Compute)</SelectItem>
+                  <SelectItem value="Data">Data (Prices, Sports, Weather, Analytics)</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
