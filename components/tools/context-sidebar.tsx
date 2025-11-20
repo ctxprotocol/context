@@ -9,6 +9,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInput,
   SidebarMenu,
@@ -128,9 +129,7 @@ export function ContextSidebar({
           <SidebarContent>
             {loading ? (
               <SidebarGroup>
-                <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                  Tools
-                </div>
+                <SidebarGroupLabel>Tools</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <div className="flex flex-col">
                     {[44, 32, 28, 64, 52].map((item) => {
@@ -176,9 +175,7 @@ export function ContextSidebar({
                 }
                 return (
                   <SidebarGroup key={category}>
-                    <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                      {category}
-                    </div>
+                    <SidebarGroupLabel>{category}</SidebarGroupLabel>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {categoryTools.map((tool) => (
