@@ -35,7 +35,7 @@ You will notice an "Example Input (JSON)" field in the `/contribute` form.
 **For HTTP Tools:** This is **Required**. The Agent needs to know the exact JSON structure to send to your API.
 
 **For Native Skills:** This field is **Hidden**.
-*   **Why?** Because Native Skills are code. The Agent will automatically infer how to use your function by reading the module signature (or implied interface) from the platform's runtime environment. You don't need to provide a JSON example—your TypeScript code is the documentation.
+*   **Why?** Because Native Skills are code. The Agent will automatically infer how to use your function by reading the module signature (or implied interface) from the platform's runtime environment. You don't need to provide a JSON example your TypeScript code is the documentation.
 
 ## 💰 How to Monetize Your Skill
 
