@@ -163,45 +163,29 @@ export function ContributeForm({
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
                 Must match the path in your Pull Request (e.g.
-                @/lib/ai/skills/community/...)
+                @/lib/ai/skills/community/...). We will automatically read the source code to understand how to use it.
               </p>
             )}
             <FieldError message={state.fieldErrors?.endpoint} />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="defaultParams">
-              {kind === "http"
-                ? "Example input (JSON)"
-                : "Example input (JSON)"}
-            </Label>
-            <Textarea
-              className="font-mono text-xs"
-              id="defaultParams"
-              name="defaultParams"
-              placeholder={
-                kind === "http"
-                  ? `{
+          {kind === "http" && (
+            <div className="space-y-2">
+              <Label htmlFor="defaultParams">Example input (JSON)</Label>
+              <Textarea
+                className="font-mono text-xs"
+                id="defaultParams"
+                name="defaultParams"
+                placeholder={`{
   "endpoint": "gas_price",
   "chainId": 8453,
   "confidence": 99
-}`
-                  : `{
-  "endpoint": "gas_price",
-  "chainId": 8453
-}`
-              }
-              rows={5}
-            />
-            {kind === "skill" && (
-              <p className="text-muted-foreground text-xs">
-                For Native Skills, this "cheat sheet" is critical for the Agent
-                to understand your function arguments without reading the full
-                source code.
-              </p>
-            )}
-            <FieldError message={state.fieldErrors?.defaultParams} />
-          </div>
+}`}
+                rows={5}
+              />
+              <FieldError message={state.fieldErrors?.defaultParams} />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
