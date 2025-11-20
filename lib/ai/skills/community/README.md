@@ -28,6 +28,16 @@ When a user asks a question (e.g., *"Is gas cheap on Base right now?"*), the Age
 If your description says *"Fetches gas prices"*, the Agent knows to pick it.
 If it says *"Supports 'gas_price' endpoint which returns standard, fast, and rapid estimates"*, the Agent knows **exactly** what parameter to send (`endpoint: "gas_price"`) and what kind of data to expect back.
 
+## 💡 Example Input: The Cheat Sheet
+
+You will notice an "Example Input (JSON)" field in the `/contribute` form.
+
+**For HTTP Tools:** This is **Required**. The Agent needs to know the exact JSON structure to send to your API.
+
+**For Native Skills:** This is **Highly Recommended** (but technically optional).
+*   **Why recommended?** It gives the Agent a "cheat sheet" on how to call your function without needing to read your entire source code file. This saves tokens and improves accuracy.
+*   **Why optional?** Technically, your code (Zod schema) is the source of truth. If your function is very simple (e.g. `getWeather(city: string)`), the Agent might guess it correctly from the description alone. But why take the risk? **Always provide an example.**
+
 ## 💰 How to Monetize Your Skill
 
 Just submitting code doesn't get you paid. You must also create a **Marketplace Listing**.
