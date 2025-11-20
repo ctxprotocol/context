@@ -68,7 +68,7 @@ pnpm dev
 
 Want to earn revenue from your API?
 
-1. **Build an HTTP Endpoint:** It just needs to accept JSON and return JSON.
+1. **Build an HTTP Endpoint:** It just needs to accept JSON and return JSON. You can use our [Context SDK](https://github.com/ctxprotocol/sdk) for a type-safe experience.
 2. **Register in the App:** Go to `/contribute` in the running app.
 3. **Set a Price:** Choose your fee per query (e.g., $0.01 USDC).
 4. **Earn:** Your tool is now instantly available to the global Context Agent.

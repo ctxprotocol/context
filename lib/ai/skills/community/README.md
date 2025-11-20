@@ -24,6 +24,8 @@ Just submitting code doesn't get you paid. You must also create a **Marketplace 
 
 Once your PR is merged and your Tool is registered, the two will be linked. Users will see your tool in the sidebar, and when they pay to use it, the Agent will execute your high-performance code.
 
+> **Note:** For HTTP Tools, you can simply register your endpoint URL directly in the `/contribute` page. You can also use our [Context SDK](https://github.com/ctxprotocol/sdk) to easily build type-safe endpoints.
+
 ### 🧩 The Power of Composability
 
 Because Context uses **Code Execution**, your skill can be composed with any other skill in the marketplace. 
