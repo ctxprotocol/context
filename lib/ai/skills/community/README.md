@@ -92,4 +92,9 @@ This keeps the User Interface clean (one tool to toggle) while giving the Agent 
    - Write clean, safe TypeScript code.
    - **No `eval()`:** Arbitrary code execution is strictly forbidden for security.
    - **Verified APIs Only:** Network calls must be to reputable, public endpoints (e.g., `api.uniswap.org`) or imports of other Registered Tools. We review every URL during the PR process.
-5. **Submit a Pull Request** to the main repository.
+5. **Register your export:** Open `index.ts` in this directory and add your export:
+   ```typescript
+   export * as uniswap from "./uniswap-quoter";
+   ```
+   **Crucial:** If you skip this step, the AI agent won't be able to find your code!
+6. **Submit a Pull Request** to the main repository.

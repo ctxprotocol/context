@@ -4,17 +4,32 @@ import * as documentSkills from "@/lib/ai/skills/document";
 import * as suggestionSkills from "@/lib/ai/skills/suggestions";
 import * as httpToolSkills from "@/lib/ai/skills/http-tool";
 import * as weatherSkills from "@/lib/ai/skills/weather";
+import * as communitySkills from "@/lib/ai/skills/community";
 
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 const NAMED_IMPORT_REGEX =
   /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
 
-const AVAILABLE_MODULES = {
+// 1. Built-in modules
+const BUILTIN_MODULES_MAP = {
   "@/lib/ai/skills/document": documentSkills,
   "@/lib/ai/skills/suggestions": suggestionSkills,
   "@/lib/ai/skills/weather": weatherSkills,
   "@/lib/ai/skills/http-tool": httpToolSkills,
 } as const;
+
+// 2. Community modules (from the index barrel file)
+// We map each export from the barrel file to a module path.
+// e.g. communitySkills.uniswap -> "@/lib/ai/skills/community/uniswap"
+const COMMUNITY_MODULES_MAP: Record<string, unknown> = {};
+for (const [key, module] of Object.entries(communitySkills)) {
+  COMMUNITY_MODULES_MAP[`@/lib/ai/skills/community/${key}`] = module;
+}
+
+const AVAILABLE_MODULES = {
+  ...BUILTIN_MODULES_MAP,
+  ...COMMUNITY_MODULES_MAP,
+};
 
 export type AllowedModule = keyof typeof AVAILABLE_MODULES;
 export const REGISTERED_SKILL_MODULES = Object.keys(
@@ -108,7 +123,11 @@ function buildExecutionContext(
   runtime: SkillRuntime
 ) {
   const allowedImportEntries = Array.from(allowedMap.entries()).map(
-    ([moduleId, specifier]) => [moduleId, AVAILABLE_MODULES[specifier]]
+    ([moduleId, specifier]) => {
+      // @ts-expect-error - Dynamic module map access
+      const mod = AVAILABLE_MODULES[specifier];
+      return [moduleId, mod];
+    }
   );
   const allowedImports = Object.fromEntries(allowedImportEntries);
 
@@ -143,6 +162,7 @@ export async function executeSkillCode({
   try {
     const allowedMap = new Map<string, AllowedModule>();
     for (const moduleId of allowedModules) {
+      // @ts-expect-error - Dynamic module map access
       if (!AVAILABLE_MODULES[moduleId]) {
         throw new Error(`Module "${moduleId}" is not registered as a skill.`);
       }
