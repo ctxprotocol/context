@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useFormState } from "react-dom";
+import { useState, useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,7 +29,7 @@ export function ContributeForm({
 }: {
   developerWallet: string;
 }) {
-  const [state, formAction] = useFormState(
+  const [state, formAction] = useActionState(
     submitHttpTool,
     contributeFormInitialState
   );
