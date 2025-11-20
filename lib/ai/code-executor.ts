@@ -1,6 +1,5 @@
 import vm from "node:vm";
 import { setSkillRuntime, type SkillRuntime } from "@/lib/ai/skills/runtime";
-import * as blocknative from "@/lib/ai/skills/blocknative";
 import * as documentSkills from "@/lib/ai/skills/document";
 import * as suggestionSkills from "@/lib/ai/skills/suggestions";
 import * as httpToolSkills from "@/lib/ai/skills/http-tool";
@@ -11,7 +10,6 @@ const NAMED_IMPORT_REGEX =
   /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
 
 const AVAILABLE_MODULES = {
-  "@/lib/ai/skills/blocknative": blocknative,
   "@/lib/ai/skills/document": documentSkills,
   "@/lib/ai/skills/suggestions": suggestionSkills,
   "@/lib/ai/skills/weather": weatherSkills,
@@ -85,7 +83,9 @@ function transformImports(code: string, allowedMap: Map<string, AllowedModule>) 
         throw new Error("Empty import specifier list is not allowed.");
       }
 
-      return `const { ${specifiers.join(", ")} } = __skillImports["${trimmedModule}"];`;
+      return `const { ${specifiers.join(
+        ", "
+      )} } = __skillImports["${trimmedModule}"];`;
     }
   );
 }
@@ -104,7 +104,8 @@ function stripExports(code: string) {
 
 function buildExecutionContext(
   allowedMap: Map<string, AllowedModule>,
-  logs: string[]
+  logs: string[],
+  runtime: SkillRuntime
 ) {
   const allowedImportEntries = Array.from(allowedMap.entries()).map(
     ([moduleId, specifier]) => [moduleId, AVAILABLE_MODULES[specifier]]
@@ -126,6 +127,7 @@ function buildExecutionContext(
   return vm.createContext({
     console: consoleProxy,
     __skillImports: allowedImports,
+    __skillRuntime: runtime,
   });
 }
 
@@ -155,7 +157,7 @@ export async function executeSkillCode({
     scriptSource = transformImports(scriptSource, allowedMap);
     scriptSource = stripExports(scriptSource);
 
-    const context = buildExecutionContext(allowedMap, logs);
+    const context = buildExecutionContext(allowedMap, logs, runtime);
     const script = new vm.Script(
       `${scriptSource}\n;globalThis.__skillMain = typeof main === "function" ? main : undefined;`
     );
@@ -192,5 +194,3 @@ export async function executeSkillCode({
     setSkillRuntime(null);
   }
 }
-
-
