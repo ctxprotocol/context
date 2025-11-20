@@ -7,6 +7,7 @@ export type AllowedToolContext = {
   tool: AITool;
   transactionHash: string;
   kind: "skill" | "http";
+  hasExecuted?: boolean;
 };
 
 export type SkillRuntime = {

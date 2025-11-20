@@ -498,6 +498,11 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         const baseModelMessages = convertToModelMessages(uiMessages);
+        console.log("[chat-api] starting planning step", {
+          chatId: id,
+          toolInvocationsCount: toolInvocations.length,
+          enabledToolIds: enabledToolSummaries.map((t) => t.toolId),
+        });
         const planningResponse = await generateText({
           model: myProvider.languageModel(selectedChatModel),
           system: systemInstructions,
@@ -505,11 +510,18 @@ export async function POST(request: Request) {
         });
 
         const planningText = planningResponse.text.trim();
+        console.log("[chat-api] planning response (truncated)", {
+          chatId: id,
+          preview: planningText.slice(0, 400),
+        });
         const codeBlock = extractCodeBlock(planningText);
 
         let mediatorText =
           "No tool execution was required for this turn. Respond directly to the user.";
         if (codeBlock) {
+          console.log("[chat-api] extracted code block, analyzing imports", {
+            chatId: id,
+          });
           const modulesUsed = findImportedModules(codeBlock);
           if (modulesUsed.length === 0) {
             throw new ChatSDKError(
@@ -558,6 +570,12 @@ export async function POST(request: Request) {
               context.tool.developerWallet
             );
             if (!verification.isValid) {
+              console.warn("[chat-api] payment verification failed", {
+                chatId: id,
+                toolId: context.tool.id,
+                tx: context.transactionHash,
+                error: verification.error,
+              });
               throw new ChatSDKError(
                 "bad_request:chat",
                 verification.error || "Payment verification failed."
@@ -569,6 +587,12 @@ export async function POST(request: Request) {
           }
 
           const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
+
+          console.log("[chat-api] executing skill code", {
+            chatId: id,
+            allowedModules: Array.from(allowedModules),
+            httpTools: Array.from(allowedToolMap.keys()),
+          });
 
           const execution = await executeSkillCode({
             code: codeBlock,
@@ -599,6 +623,10 @@ export async function POST(request: Request) {
           mediatorText = execution.ok
             ? `Tool execution succeeded.\nModules used: ${Array.from(allowedModules).join(", ")}\nResult JSON:\n${formatExecutionData(execution.data)}`
             : `Tool execution failed: ${execution.error}`;
+          console.log("[chat-api] execution finished", {
+            chatId: id,
+            ok: execution.ok,
+          });
         }
 
         const mediatorMessage: ChatMessage = {
