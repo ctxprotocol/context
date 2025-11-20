@@ -1,16 +1,19 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
-import { useMemo } from "react";
+import type { ConnectedWallet } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useEffect, useMemo, useState } from "react";
 
 type UsePrivyReturn = ReturnType<typeof usePrivy>;
 type PrivyUser = UsePrivyReturn["user"];
 type PrivyWallet = NonNullable<PrivyUser>["wallet"];
+type WalletUnion = PrivyWallet | ConnectedWallet;
+
 type PrivyHookWithWallets = UsePrivyReturn & {
   wallets?: PrivyWallet[];
 };
 
-function inferWalletClientType(wallet: PrivyWallet | undefined) {
+function inferWalletClientType(wallet: WalletUnion | undefined) {
   if (!wallet) {
     return;
   }
@@ -37,26 +40,75 @@ function inferWalletClientType(wallet: PrivyWallet | undefined) {
 export function useWalletIdentity() {
   const privy = usePrivy() as PrivyHookWithWallets;
   const { user } = privy;
+  const { wallets: connectedWallets = [] } = useWallets();
+  const [preferenceKey, setPreferenceKey] = useState(0);
 
-  const wallets =
-    privy.wallets ?? (user?.wallet ? [user.wallet] : ([] as PrivyWallet[]));
+  useEffect(() => {
+    const handlePreferenceChange = () => setPreferenceKey((prev) => prev + 1);
+    window.addEventListener(
+      "privy-wallet-preference-changed",
+      handlePreferenceChange
+    );
+    return () =>
+      window.removeEventListener(
+        "privy-wallet-preference-changed",
+        handlePreferenceChange
+      );
+  }, []);
+
+  const wallets: WalletUnion[] =
+    connectedWallets.length > 0
+      ? connectedWallets
+      : user?.wallet
+        ? [user.wallet]
+        : [];
 
   const activeWallet = useMemo(() => {
+    // Touch preferenceKey to ensure re-calculation when it changes
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _ = preferenceKey;
+
     if (wallets.length === 0) {
       return user?.wallet;
     }
 
     const smartWallet = wallets.find((wallet) => {
       const clientType = inferWalletClientType(wallet);
-      return clientType === "smart_wallet" || clientType === "coinbase_smart_wallet";
+      return (
+        clientType === "smart_wallet" || clientType === "coinbase_smart_wallet"
+      );
     });
 
     if (smartWallet) {
       return smartWallet;
     }
 
+    // Check for stored preference
+    if (typeof window !== "undefined") {
+      const storedAddress = window.localStorage.getItem(
+        "privy_wallet_preference"
+      );
+      if (storedAddress) {
+        const matchedWallet = wallets.find(
+          (w) => w?.address?.toLowerCase() === storedAddress.toLowerCase()
+        );
+        if (matchedWallet) {
+          return matchedWallet;
+        }
+      }
+    }
+
+    const externalWallet = wallets.find((wallet) => {
+      const clientType = inferWalletClientType(wallet);
+      return clientType !== "embedded" && clientType !== "privy";
+    });
+
+    if (externalWallet) {
+      return externalWallet;
+    }
+
     return user?.wallet ?? wallets[0];
-  }, [user, wallets]);
+  }, [user, wallets, preferenceKey]);
 
   const embeddedWallet = useMemo(
     () =>

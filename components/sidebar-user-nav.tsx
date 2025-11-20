@@ -1,6 +1,7 @@
 "use client";
 
 import { useLinkAccount, useLogin, usePrivy } from "@privy-io/react-auth";
+import { useSetActiveWallet } from "@privy-io/wagmi";
 import { ChevronUp } from "lucide-react";
 import Image from "next/image";
 import { signOut, useSession } from "next-auth/react";
@@ -13,6 +14,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
@@ -34,12 +38,13 @@ export function SidebarUserNav() {
     logout,
     exportWallet,
   } = usePrivy();
+  const { setActiveWallet } = useSetActiveWallet();
 
   const isConnected = authenticated;
   const userEmail = privyUser?.email?.address;
   const [copied, setCopied] = useState(false);
   const [isLinkingWallet, setIsLinkingWallet] = useState(false);
-  const { isEmbeddedWallet, embeddedWallet, activeWallet } =
+  const { isEmbeddedWallet, embeddedWallet, activeWallet, wallets } =
     useWalletIdentity();
 
   const walletAddress = activeWallet?.address;
@@ -67,6 +72,26 @@ export function SidebarUserNav() {
   });
 
   const { linkWallet } = useLinkAccount();
+
+  const handleSwitchWallet = async (address: string) => {
+    const wallet = wallets.find((w) => w.address === address);
+    if (!wallet) return;
+
+    try {
+      await setActiveWallet(wallet);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("privy_wallet_preference", wallet.address);
+        window.dispatchEvent(new Event("privy-wallet-preference-changed"));
+      }
+      toast({ type: "success", description: "Switched active wallet" });
+    } catch (error) {
+      console.error("Switch wallet error:", error);
+      toast({
+        type: "error",
+        description: "Failed to switch wallet.",
+      });
+    }
+  };
 
   const handleSignOut = async () => {
     if (ready && authenticated) {
@@ -218,6 +243,27 @@ export function SidebarUserNav() {
                 <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">
                   Current wallet: {isEmbeddedWallet ? "Embedded" : "External"}
                 </DropdownMenuLabel>
+                {wallets.length > 1 && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Switch Wallet</DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      {wallets.map((wallet) => {
+                        const isCurrent = wallet.address === walletAddress;
+                        return (
+                          <DropdownMenuItem
+                            key={wallet.address}
+                            onSelect={() => handleSwitchWallet(wallet.address)}
+                          >
+                            <span className="flex w-full items-center justify-between gap-2">
+                              <span>{formatWalletAddress(wallet.address)}</span>
+                              {isCurrent && <CheckIcon size={14} />}
+                            </span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
                 <DropdownMenuItem
                   className="cursor-pointer"
                   data-testid="user-nav-item-copy"

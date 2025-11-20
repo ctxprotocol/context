@@ -86,6 +86,27 @@ export function usePrivyWalletSync() {
       return smartWallet;
     }
 
+    // Check for stored preference
+    if (typeof window !== "undefined") {
+      const storedAddress = window.localStorage.getItem("privy_wallet_preference");
+      if (storedAddress) {
+        const matchedWallet = connectedWallets.find(
+          (w) => normalizeAddress(w.address) === normalizeAddress(storedAddress)
+        );
+        if (matchedWallet) {
+          return matchedWallet;
+        }
+      }
+    }
+
+    // Prioritize external wallets (non-embedded, non-smart)
+    const externalWallet = connectedWallets.find(
+      (wallet) => !isEmbeddedWallet(wallet)
+    );
+    if (externalWallet) {
+      return externalWallet;
+    }
+
     if (user?.wallet) {
       const matchedWallet = connectedWallets.find(
         (wallet) =>

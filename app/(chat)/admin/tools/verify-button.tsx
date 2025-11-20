@@ -27,7 +27,13 @@ export function VerifyButton({ toolId, isVerified }: { toolId: string; isVerifie
   if (isVerified) return null;
 
   return (
-    <Button size="sm" variant="outline" onClick={handleVerify} disabled={loading}>
+    <Button 
+      size="sm" 
+      variant="default" 
+      onClick={handleVerify} 
+      disabled={loading}
+      className="h-8 shadow-sm"
+    >
       {loading ? "Verifying..." : "Verify"}
     </Button>
   );
