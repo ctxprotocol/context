@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { submitHttpTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
@@ -35,6 +36,14 @@ export function ContributeForm({
     contributeFormInitialState
   );
   const [kind, setKind] = useState("http");
+
+  const nameError = state.fieldErrors?.name;
+  const descriptionError = state.fieldErrors?.description;
+  const categoryError = state.fieldErrors?.category;
+  const priceError = state.fieldErrors?.price;
+  const endpointError = state.fieldErrors?.endpoint;
+  const defaultParamsError = state.fieldErrors?.defaultParams;
+  const developerWalletError = state.fieldErrors?.developerWallet;
 
   return (
     <form action={formAction}>
@@ -55,8 +64,13 @@ export function ContributeForm({
               name="name"
               placeholder="Blocknative Gas (HTTP)"
               required
+              aria-invalid={nameError ? true : undefined}
+              className={cn(
+                nameError &&
+                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+              )}
             />
-            <FieldError message={state.fieldErrors?.name} />
+            <FieldError message={nameError} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -67,13 +81,18 @@ export function ContributeForm({
               placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 'gas_price', 'chains', and 'oracles' endpoints."
               required
               rows={4}
+              aria-invalid={descriptionError ? true : undefined}
+              className={cn(
+                descriptionError &&
+                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+              )}
             />
             <p className="text-muted-foreground text-xs">
               This is the <strong>Instruction Manual</strong> for both the AI
               Agent and the User. Be extremely specific about <em>when</em> to
               use this tool and <em>how</em> to use its parameters.
             </p>
-            <FieldError message={state.fieldErrors?.description} />
+            <FieldError message={descriptionError} />
           </div>
 
           <div className="space-y-2">
@@ -101,7 +120,14 @@ export function ContributeForm({
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Select name="category">
-                <SelectTrigger className="h-10 px-3 text-sm">
+                <SelectTrigger
+                  aria-invalid={categoryError ? true : undefined}
+                  className={cn(
+                  "h-10 px-3 text-sm",
+                    categoryError &&
+                      "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+                  )}
+                >
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent position="popper">
@@ -128,6 +154,7 @@ export function ContributeForm({
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={categoryError} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="price">Price per query (USDC)</Label>
@@ -139,8 +166,13 @@ export function ContributeForm({
                 required
                 step="0.0001"
                 type="number"
+                aria-invalid={priceError ? true : undefined}
+                className={cn(
+                  priceError &&
+                    "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+                )}
               />
-              <FieldError message={state.fieldErrors?.price} />
+              <FieldError message={priceError} />
             </div>
           </div>
 
@@ -158,6 +190,11 @@ export function ContributeForm({
               }
               required
               type={kind === "http" ? "url" : "text"}
+              aria-invalid={endpointError ? true : undefined}
+              className={cn(
+                endpointError &&
+                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+              )}
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
@@ -166,7 +203,7 @@ export function ContributeForm({
                 source code to understand how to use it.
               </p>
             )}
-            <FieldError message={state.fieldErrors?.endpoint} />
+            <FieldError message={endpointError} />
           </div>
 
           {kind === "http" && (
@@ -183,7 +220,7 @@ export function ContributeForm({
 }`}
                 rows={5}
               />
-              <FieldError message={state.fieldErrors?.defaultParams} />
+              <FieldError message={defaultParamsError} />
             </div>
           )}
           <div className="space-y-2">
@@ -194,8 +231,13 @@ export function ContributeForm({
               name="developerWallet"
               placeholder="0x..."
               required
+              aria-invalid={developerWalletError ? true : undefined}
+              className={cn(
+                developerWalletError &&
+                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+              )}
             />
-            <FieldError message={state.fieldErrors?.developerWallet} />
+            <FieldError message={developerWalletError} />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
