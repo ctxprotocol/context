@@ -171,7 +171,9 @@ export function ContributeForm({
 
           <div className="space-y-2">
             <Label htmlFor="defaultParams">
-              {kind === "http" ? "Example input (JSON)" : "Example input (JSON) - Optional"}
+              {kind === "http"
+                ? "Example input (JSON)"
+                : "Example input (JSON) - Optional"}
             </Label>
             <Textarea
               className="font-mono text-xs"
@@ -192,8 +194,8 @@ export function ContributeForm({
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
-                For Native Skills, inputs are defined in your TypeScript schema (Zod).
-                You can leave this blank or provide a hint for the UI.
+                For Native Skills, inputs are defined in your TypeScript schema
+                (Zod). You can leave this blank or provide a hint for the UI.
               </p>
             )}
             <FieldError message={state.fieldErrors?.defaultParams} />
