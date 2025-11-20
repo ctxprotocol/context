@@ -91,18 +91,31 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
               <Select name="category">
-                <SelectTrigger>
+                <SelectTrigger className="h-10 px-3 text-sm">
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
                 <SelectContent position="popper">
-                  <SelectItem value="Network">Network (Gas, RPC, Nodes)</SelectItem>
-                  <SelectItem value="Actions">Actions (DeFi Swaps, Lending, Execution)</SelectItem>
-                  <SelectItem value="Market Data">Market Data (Crypto, Stocks, Forex)</SelectItem>
-                  <SelectItem value="Real World">Real World (Weather, Sports, News)</SelectItem>
-                  <SelectItem value="Social">Social (Identity, Governance)</SelectItem>
-                  <SelectItem value="Utility">Utility (Search, Compute)</SelectItem>
-                  <SelectItem value="Data">Data (Prices, Sports, Weather, Analytics)</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                  <SelectItem value="Network" className="text-sm">
+                    Network (Gas, RPC, Nodes)
+                  </SelectItem>
+                  <SelectItem value="Actions" className="text-sm">
+                    Actions (Swaps, Lending, Execution)
+                  </SelectItem>
+                  <SelectItem value="Market Data" className="text-sm">
+                    Market Data (Crypto, Stocks, Forex)
+                  </SelectItem>
+                  <SelectItem value="Real World" className="text-sm">
+                    Real World (Weather, Sports, News)
+                  </SelectItem>
+                  <SelectItem value="Social" className="text-sm">
+                    Social (Identity, Governance)
+                  </SelectItem>
+                  <SelectItem value="Utility" className="text-sm">
+                    Utility (Search, Compute)
+                  </SelectItem>
+                  <SelectItem value="Other" className="text-sm">
+                    Other
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
