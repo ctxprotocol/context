@@ -285,11 +285,11 @@ function PureMultimodalInput({
         !isReadonly &&
         (selectedTool || activeTools.length > 0)
       ) {
-        setShowPayDialog(true);
-        return;
-      }
+      setShowPayDialog(true);
+      return;
+    }
 
-      window.history.pushState({}, "", `/chat/${chatId}`);
+    window.history.pushState({}, "", `/chat/${chatId}`);
 
       const textValue = hasText ? input : (toolInvocation?.fallbackText ?? "");
 
@@ -299,18 +299,18 @@ function PureMultimodalInput({
 
       const messagePayload = {
         role: "user" as const,
-        parts: [
-          ...attachments.map((attachment) => ({
-            type: "file" as const,
-            url: attachment.url,
-            name: attachment.name,
-            mediaType: attachment.contentType,
-          })),
-          {
+      parts: [
+        ...attachments.map((attachment) => ({
+          type: "file" as const,
+          url: attachment.url,
+          name: attachment.name,
+          mediaType: attachment.contentType,
+        })),
+        {
             type: "text" as const,
             text: textValue,
-          },
-        ],
+        },
+      ],
       };
 
       const sendOptions = toolInvocation
@@ -323,28 +323,28 @@ function PureMultimodalInput({
 
       sendMessage(messagePayload, sendOptions);
 
-      setAttachments([]);
-      setLocalStorageInput("");
-      resetHeight();
-      setInput("");
+    setAttachments([]);
+    setLocalStorageInput("");
+    resetHeight();
+    setInput("");
 
-      if (width && width > 768) {
-        textareaRef.current?.focus();
-      }
+    if (width && width > 768) {
+      textareaRef.current?.focus();
+    }
     },
     [
-      input,
-      attachments,
-      sendMessage,
-      setAttachments,
-      setLocalStorageInput,
+    input,
+    attachments,
+    sendMessage,
+    setAttachments,
+    setLocalStorageInput,
       resetHeight,
       setInput,
-      width,
-      chatId,
-      isReadonly,
-      selectedTool,
-      activeTools.length,
+    width,
+    chatId,
+    isReadonly,
+    selectedTool,
+    activeTools.length,
     ]
   );
 
@@ -474,20 +474,20 @@ function PureMultimodalInput({
   // After execute success: verify + execute tool server-side and then send the augmented message
   useEffect(() => {
     if (!isExecSuccess || !lastExecutedTx || !executingTool) {
-      return;
-    }
+        return;
+      }
 
     setStage("thinking", executingTool.name);
     submitForm({
-      toolId: executingTool.id,
-      transactionHash: lastExecutedTx,
+            toolId: executingTool.id,
+            transactionHash: lastExecutedTx,
       fallbackText: `Using ${executingTool.name}`,
-    });
+        });
 
-    setIsPaying(false);
-    setShowPayDialog(false);
-    setLastExecutedTx(undefined);
-    setExecutingTool(null);
+        setIsPaying(false);
+        setShowPayDialog(false);
+        setLastExecutedTx(undefined);
+        setExecutingTool(null);
   }, [executingTool, isExecSuccess, lastExecutedTx, setStage, submitForm]);
 
   const handleSwitchNetwork = useCallback(async () => {

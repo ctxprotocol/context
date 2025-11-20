@@ -1,14 +1,13 @@
 import vm from "node:vm";
-import { setSkillRuntime, type SkillRuntime } from "@/lib/ai/skills/runtime";
-import * as documentSkills from "@/lib/ai/skills/document";
-import * as suggestionSkills from "@/lib/ai/skills/suggestions";
-import * as httpToolSkills from "@/lib/ai/skills/http-tool";
-import * as weatherSkills from "@/lib/ai/skills/weather";
 import * as communitySkills from "@/lib/ai/skills/community";
+import * as documentSkills from "@/lib/ai/skills/document";
+import * as httpToolSkills from "@/lib/ai/skills/http-tool";
+import { type SkillRuntime, setSkillRuntime } from "@/lib/ai/skills/runtime";
+import * as suggestionSkills from "@/lib/ai/skills/suggestions";
+import * as weatherSkills from "@/lib/ai/skills/weather";
 
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
-const NAMED_IMPORT_REGEX =
-  /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
+const NAMED_IMPORT_REGEX = /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
 
 // 1. Built-in modules
 const BUILTIN_MODULES_MAP = {
@@ -82,7 +81,10 @@ function sanitizeImportSpecifiers(specifiersRaw: string) {
     });
 }
 
-function transformImports(code: string, allowedMap: Map<string, AllowedModule>) {
+function transformImports(
+  code: string,
+  allowedMap: Map<string, AllowedModule>
+) {
   return code.replace(
     NAMED_IMPORT_REGEX,
     (_match, importsRaw: string, moduleId: string) => {
