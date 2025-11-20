@@ -19,6 +19,13 @@ import {
 } from "./actions";
 import { contributeFormInitialState } from "./schema";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function ContributeForm({ developerWallet }: { developerWallet: string }) {
   const [state, formAction] = useFormState(
@@ -83,11 +90,19 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <Input
-                id="category"
-                name="category"
-                placeholder="e.g. Network, Trading, On-chain"
-              />
+              <Select name="category">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Network">Network (Gas, RPC, Nodes)</SelectItem>
+                  <SelectItem value="DeFi">DeFi (Swap, Lending, Yield)</SelectItem>
+                  <SelectItem value="Data">Data (Prices, Analytics, Real-world)</SelectItem>
+                  <SelectItem value="Social">Social (Identity, Governance)</SelectItem>
+                  <SelectItem value="Utility">Utility (Search, Compute, Automation)</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="price">Price per query (USDC)</Label>
@@ -179,5 +194,3 @@ function FieldError({ message }: { message?: string }) {
   }
   return <p className="text-sm text-destructive">{message}</p>;
 }
-
-

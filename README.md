@@ -7,10 +7,10 @@
   [![License: BUSL 1.1](https://img.shields.io/badge/License-BUSL%201.1-blue.svg)](https://github.com/ctxprotocol/context/blob/main/LICENSE)
   [![Twitter Follow](https://img.shields.io/twitter/follow/ctxprotocol?style=social)](https://twitter.com/ctxprotocol)
 
-  <p align="center">
+<p align="center">
     Context is an AI-native protocol that enables developers to monetize their data and APIs directly through LLM interactions.
     We are replacing the fragmented world of "AI Wrappers" with a unified, permissionless marketplace where agents pay for the skills they need.
-  </p>
+</p>
 </div>
 
 ---
@@ -19,7 +19,7 @@
 
 We believe the future of AI is not a single "Super App," but a collaborative network of specialized agents and data sources.
 
-- **For Developers:** Don't build another chat UI. Build a **Skill**. Expose your unique data (crypto prices, prediction markets, proprietary analysis) and get paid in USDC every time an AI agent uses it.
+- **For Developers:** Don't build another chat UI. Build a **Skill**. Expose your unique data (crypto, stocks, weather, sports, anything) and get paid in USDC every time an AI agent uses it.
 - **For Users:** Access a "God Mode" agent that has real-time access to the entire on-chain and off-chain world, without switching tabs.
 - **For The Future:** We are currently bootstrapping the economy with our own chat interface. Once liquidity is established, we will open the **Context Protocol API**, allowing *any* AI application to query our marketplace of tools.
 
