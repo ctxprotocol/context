@@ -119,8 +119,6 @@ async function wipeAllUsersAndData() {
     // Any tools owned or verified by users (if any exist)
     await db.execute(sql`
       DELETE FROM "AITool"
-      WHERE "developer_id" IN (SELECT "id" FROM "User")
-         OR "verified_by" IN (SELECT "id" FROM "User");
     `);
 
     // Finally delete the users themselves
