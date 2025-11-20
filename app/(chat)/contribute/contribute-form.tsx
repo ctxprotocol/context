@@ -194,8 +194,10 @@ export function ContributeForm({
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
-                For Native Skills, inputs are defined in your TypeScript schema
-                (Zod). You can leave this blank or provide a hint for the UI.
+                For Native Skills, providing an example input is{" "}
+                <strong>highly recommended</strong>. It gives the AI Agent a
+                "cheat sheet" on how to call your function without needing to
+                read the full source code, saving tokens and improving accuracy.
               </p>
             )}
             <FieldError message={state.fieldErrors?.defaultParams} />
