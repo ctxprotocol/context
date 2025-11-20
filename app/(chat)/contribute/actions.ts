@@ -26,6 +26,10 @@ export async function submitHttpTool(
     defaultParams: formData.get("defaultParams") || undefined,
   };
 
+  // We cast raw to any to satisfy the payload type which expects the validated types,
+  // but for repopulating the form string values are actually better.
+  const payload = raw as unknown as any;
+
   const parsed = contributeFormSchema.safeParse(raw);
 
   if (!parsed.success) {
@@ -40,6 +44,7 @@ export async function submitHttpTool(
       status: "error",
       message: "Please correct the highlighted fields.",
       fieldErrors,
+      payload,
     };
   }
 
@@ -81,6 +86,7 @@ export async function submitHttpTool(
         fieldErrors: {
           endpoint: "This endpoint or module is already registered.",
         },
+        payload,
       };
     }
   }
@@ -97,23 +103,25 @@ export async function submitHttpTool(
         status: "error",
         message: "defaultParams must be valid JSON",
         fieldErrors: { defaultParams: "Enter a valid JSON object" },
+        payload,
       };
     }
   }
 
-  const toolSchema = parsed.data.kind === "http" 
-    ? {
-        kind: "http",
-        endpoint: parsed.data.endpoint,
-        defaultParams,
-      }
-    : {
-        kind: "skill",
-        skill: {
-          module: parsed.data.endpoint,
-        },
-        defaultParams,
-      };
+  const toolSchema =
+    parsed.data.kind === "http"
+      ? {
+          kind: "http",
+          endpoint: parsed.data.endpoint,
+          defaultParams,
+        }
+      : {
+          kind: "skill",
+          skill: {
+            module: parsed.data.endpoint,
+          },
+          defaultParams,
+        };
 
   if (parsed.data.kind === "http" && parsed.data.endpoint) {
     try {
@@ -134,15 +142,21 @@ export async function submitHttpTool(
         const text = await res.text().catch(() => "Unknown error");
         return {
           status: "error",
-          message: `Endpoint verification failed (${res.status}): ${text.slice(0, 100)}`,
+          message: `Endpoint verification failed (${res.status}): ${text.slice(
+            0,
+            100
+          )}`,
           fieldErrors: { endpoint: "Endpoint returned an error" },
+          payload,
         };
       }
     } catch (err) {
       return {
         status: "error",
-        message: "Could not reach endpoint. Please ensure it is publicly accessible.",
+        message:
+          "Could not reach endpoint. Please ensure it is publicly accessible.",
         fieldErrors: { endpoint: "Connection failed" },
+        payload,
       };
     }
   }
@@ -163,6 +177,6 @@ export async function submitHttpTool(
   return {
     status: "success",
     message: "Tool submitted! It will appear in the sidebar shortly.",
+    // No payload returned on success, form clears naturally
   };
 }
-

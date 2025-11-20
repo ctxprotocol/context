@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { submitHttpTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
@@ -59,7 +60,10 @@ export function ContributeForm({
             <Label htmlFor="name">Name</Label>
             <Input
               aria-invalid={nameError ? true : undefined}
-              defaultValue=""
+              className={cn(
+                nameError && "border-destructive focus-visible:ring-destructive"
+              )}
+              defaultValue={state.payload?.name || ""}
               id="name"
               name="name"
               placeholder="Blocknative Gas (HTTP)"
@@ -70,6 +74,11 @@ export function ContributeForm({
             <Label htmlFor="description">Description</Label>
             <Textarea
               aria-invalid={descriptionError ? true : undefined}
+              className={cn(
+                descriptionError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
+              defaultValue={state.payload?.description || ""}
               id="description"
               maxLength={1000}
               name="description"
@@ -88,7 +97,7 @@ export function ContributeForm({
             <Label>Type</Label>
             <RadioGroup
               className="flex flex-row gap-4"
-              defaultValue="http"
+              defaultValue={state.payload?.kind || "http"}
               name="kind"
               onValueChange={setKind}
             >
@@ -108,10 +117,17 @@ export function ContributeForm({
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="category">Category</Label>
-              <Select name="category">
+              <Select
+                defaultValue={state.payload?.category || ""}
+                name="category"
+              >
                 <SelectTrigger
                   aria-invalid={categoryError ? true : undefined}
-                  className="h-10 px-3 text-sm"
+                  className={cn(
+                    "h-10 px-3 text-sm",
+                    categoryError &&
+                      "border-destructive focus-visible:ring-destructive"
+                  )}
                 >
                   <SelectValue placeholder="Select a category" />
                 </SelectTrigger>
@@ -145,7 +161,11 @@ export function ContributeForm({
               <Label htmlFor="price">Price per query (USDC)</Label>
               <Input
                 aria-invalid={priceError ? true : undefined}
-                defaultValue="0.01"
+                className={cn(
+                  priceError &&
+                    "border-destructive focus-visible:ring-destructive"
+                )}
+                defaultValue={state.payload?.price || "0.01"}
                 id="price"
                 min="0"
                 name="price"
@@ -162,6 +182,11 @@ export function ContributeForm({
             </Label>
             <Input
               aria-invalid={endpointError ? true : undefined}
+              className={cn(
+                endpointError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
+              defaultValue={state.payload?.endpoint || ""}
               id="endpoint"
               name="endpoint"
               placeholder={
@@ -186,6 +211,7 @@ export function ContributeForm({
               <Label htmlFor="defaultParams">Example input (JSON)</Label>
               <Textarea
                 className="font-mono text-xs"
+                defaultValue={state.payload?.defaultParams || ""}
                 id="defaultParams"
                 name="defaultParams"
                 placeholder={`{
@@ -202,7 +228,11 @@ export function ContributeForm({
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
               aria-invalid={developerWalletError ? true : undefined}
-              defaultValue={developerWallet}
+              className={cn(
+                developerWalletError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
+              defaultValue={state.payload?.developerWallet || developerWallet}
               id="developerWallet"
               name="developerWallet"
               placeholder="0x..."

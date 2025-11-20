@@ -4,6 +4,7 @@ export type ContributeFormState = {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Record<string, string>;
+  payload?: Partial<z.infer<typeof contributeFormSchema>>;
 };
 
 export const contributeFormSchema = z
