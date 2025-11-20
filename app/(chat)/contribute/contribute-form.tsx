@@ -59,33 +59,31 @@ export function ContributeForm({
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
+              aria-invalid={nameError ? true : undefined}
+              className={cn(
+                nameError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
               defaultValue=""
               id="name"
               name="name"
               placeholder="Blocknative Gas (HTTP)"
-              required
-              aria-invalid={nameError ? true : undefined}
-              className={cn(
-                nameError &&
-                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
-              )}
             />
             <FieldError message={nameError} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
+              aria-invalid={descriptionError ? true : undefined}
+              className={cn(
+                descriptionError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
               id="description"
               maxLength={1000}
               name="description"
               placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 'gas_price', 'chains', and 'oracles' endpoints."
-              required
               rows={4}
-              aria-invalid={descriptionError ? true : undefined}
-              className={cn(
-                descriptionError &&
-                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
-              )}
             />
             <p className="text-muted-foreground text-xs">
               This is the <strong>Instruction Manual</strong> for both the AI
@@ -123,9 +121,9 @@ export function ContributeForm({
                 <SelectTrigger
                   aria-invalid={categoryError ? true : undefined}
                   className={cn(
-                  "h-10 px-3 text-sm",
+                    "h-10 px-3 text-sm",
                     categoryError &&
-                      "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
+                      "border-destructive focus-visible:ring-destructive"
                   )}
                 >
                   <SelectValue placeholder="Select a category" />
@@ -159,18 +157,17 @@ export function ContributeForm({
             <div className="space-y-2">
               <Label htmlFor="price">Price per query (USDC)</Label>
               <Input
+                aria-invalid={priceError ? true : undefined}
+                className={cn(
+                  priceError &&
+                    "border-destructive focus-visible:ring-destructive"
+                )}
                 defaultValue="0.01"
                 id="price"
                 min="0"
                 name="price"
-                required
                 step="0.0001"
                 type="number"
-                aria-invalid={priceError ? true : undefined}
-                className={cn(
-                  priceError &&
-                    "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
-                )}
               />
               <FieldError message={priceError} />
             </div>
@@ -181,6 +178,11 @@ export function ContributeForm({
               {kind === "http" ? "HTTP Endpoint" : "Module Path"}
             </Label>
             <Input
+              aria-invalid={endpointError ? true : undefined}
+              className={cn(
+                endpointError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
               id="endpoint"
               name="endpoint"
               placeholder={
@@ -188,13 +190,7 @@ export function ContributeForm({
                   ? "https://your-domain.com/context/blocknative"
                   : "@/lib/ai/skills/community/my-skill"
               }
-              required
               type={kind === "http" ? "url" : "text"}
-              aria-invalid={endpointError ? true : undefined}
-              className={cn(
-                endpointError &&
-                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
-              )}
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
@@ -226,16 +222,15 @@ export function ContributeForm({
           <div className="space-y-2">
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
+              aria-invalid={developerWalletError ? true : undefined}
+              className={cn(
+                developerWalletError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
               defaultValue={developerWallet}
               id="developerWallet"
               name="developerWallet"
               placeholder="0x..."
-              required
-              aria-invalid={developerWalletError ? true : undefined}
-              className={cn(
-                developerWalletError &&
-                  "border-destructive focus-visible:ring-2 focus-visible:ring-destructive"
-              )}
             />
             <FieldError message={developerWalletError} />
           </div>
