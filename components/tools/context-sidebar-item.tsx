@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { AITool } from "@/lib/db/schema";
 import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
+import { Zap } from "lucide-react";
 
 const PureContextSidebarItem = ({
   tool,
@@ -15,6 +16,8 @@ const PureContextSidebarItem = ({
     ? Number(tool.pricePerQuery).toFixed(2)
     : "0.00";
 
+  const isNative = (tool.toolSchema as any)?.kind === "skill";
+
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
@@ -23,7 +26,12 @@ const PureContextSidebarItem = ({
         onClick={() => onToggle(tool.id)}
         type="button"
       >
-        <span className="truncate">{tool.name}</span>
+        <div className="flex items-center gap-2 truncate">
+          <span className="truncate">{tool.name}</span>
+          {isNative && (
+            <Zap className="h-3 w-3 text-amber-500 fill-amber-500" aria-label="Native Skill" />
+          )}
+        </div>
         <span className="text-sidebar-foreground/50 text-xs">
           ${formattedPrice}
         </span>

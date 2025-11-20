@@ -39,6 +39,22 @@ Unlike HTTP Tools which are live instantly, Native Skills require a 2-step verif
 2.  **Link Verification:** After merging, we verify that your Marketplace Listing points to the correct module path.
 3.  **Go Live:** Once both checks pass, an Admin clicks "Verify" and your tool becomes active in the global marketplace.
 
+### 🔄 How to Bundle Multiple Endpoints (e.g., Coingecko)
+
+If you are a large data provider (like Coingecko) with 50+ endpoints, you do **not** need to register 50 separate tools.
+
+1.  **Register ONE Tool:** Call it "Coingecko Pro" ($0.01).
+2.  **Submit ONE Native Skill Module:** `lib/ai/skills/community/coingecko.ts`.
+3.  **Export Multiple Functions:** Inside your file, export as many functions as you like:
+    ```typescript
+    export async function getPrice(...) { ... }
+    export async function getHistory(...) { ... }
+    export async function getMarketChart(...) { ... }
+    ```
+4.  **The Result:** The Agent sees all these functions attached to the "Coingecko Pro" tool. When a user pays the $0.01 query fee, the Agent picks the correct function to call.
+
+This keeps the User Interface clean (one tool to toggle) while giving the Agent maximum power.
+
 ## 👩‍💻 How to Contribute Code
 
 1. **Fork** the [Context repository](https://github.com/ctxprotocol/context).
