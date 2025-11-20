@@ -24,13 +24,41 @@
         "mono": "var(--font-geist-mono)"
       },
       "scale": {
-        "xs": { "fontSize": "0.75rem", "lineHeight": "1rem", "tracking": "normal" },
-        "sm": { "fontSize": "0.875rem", "lineHeight": "1.25rem", "tracking": "normal" },
-        "base": { "fontSize": "1rem", "lineHeight": "1.5rem", "tracking": "normal" },
-        "lg": { "fontSize": "1.125rem", "lineHeight": "1.75rem", "tracking": "-0.01em" },
-        "xl": { "fontSize": "1.25rem", "lineHeight": "1.75rem", "tracking": "-0.015em" },
-        "2xl": { "fontSize": "1.5rem", "lineHeight": "2rem", "tracking": "-0.02em" },
-        "3xl": { "fontSize": "1.875rem", "lineHeight": "2.25rem", "tracking": "-0.02em" }
+        "xs": {
+          "fontSize": "0.75rem",
+          "lineHeight": "1rem",
+          "tracking": "normal"
+        },
+        "sm": {
+          "fontSize": "0.875rem",
+          "lineHeight": "1.25rem",
+          "tracking": "normal"
+        },
+        "base": {
+          "fontSize": "1rem",
+          "lineHeight": "1.5rem",
+          "tracking": "normal"
+        },
+        "lg": {
+          "fontSize": "1.125rem",
+          "lineHeight": "1.75rem",
+          "tracking": "-0.01em"
+        },
+        "xl": {
+          "fontSize": "1.25rem",
+          "lineHeight": "1.75rem",
+          "tracking": "-0.015em"
+        },
+        "2xl": {
+          "fontSize": "1.5rem",
+          "lineHeight": "2rem",
+          "tracking": "-0.02em"
+        },
+        "3xl": {
+          "fontSize": "1.875rem",
+          "lineHeight": "2.25rem",
+          "tracking": "-0.02em"
+        }
       },
       "weights": {
         "regular": 400,
@@ -42,7 +70,12 @@
         "body": { "family": "sans", "size": "base", "weight": "regular" },
         "label": { "family": "sans", "size": "sm", "weight": "medium" },
         "button": { "family": "sans", "size": "sm", "weight": "medium" },
-        "title": { "family": "sans", "size": "2xl", "weight": "semibold", "tracking": "tight" },
+        "title": {
+          "family": "sans",
+          "size": "2xl",
+          "weight": "semibold",
+          "tracking": "tight"
+        },
         "code": { "family": "mono", "size": "sm", "weight": "regular" }
       }
     },
@@ -119,16 +152,52 @@
       },
       "usage": {
         "backgrounds": ["bg-background", "bg-card", "bg-popover", "bg-sidebar"],
-        "text": ["text-foreground", "text-card-foreground", "text-popover-foreground", "text-muted-foreground", "text-sidebar-foreground"],
+        "text": [
+          "text-foreground",
+          "text-card-foreground",
+          "text-popover-foreground",
+          "text-muted-foreground",
+          "text-sidebar-foreground"
+        ],
         "interactive": {
-          "primary": ["bg-primary", "text-primary-foreground", "hover:bg-primary/90", "shadow-sm"],
-          "secondary": ["bg-secondary", "text-secondary-foreground", "hover:bg-secondary/80"],
+          "primary": [
+            "bg-primary",
+            "text-primary-foreground",
+            "hover:bg-primary/90",
+            "shadow-sm"
+          ],
+          "secondary": [
+            "bg-secondary",
+            "text-secondary-foreground",
+            "hover:bg-secondary/80"
+          ],
           "accent": ["hover:bg-accent", "hover:text-accent-foreground"],
-          "outline": ["border-input", "bg-background", "hover:bg-accent", "hover:text-accent-foreground", "shadow-sm"],
-          "destructive": ["bg-destructive", "text-destructive-foreground", "hover:bg-destructive/90", "shadow-sm"],
-          "ringFocus": ["focus-visible:ring-2", "focus-visible:ring-ring", "focus-visible:ring-offset-2", "ring-offset-background"]
+          "outline": [
+            "border-input",
+            "bg-background",
+            "hover:bg-accent",
+            "hover:text-accent-foreground",
+            "shadow-sm"
+          ],
+          "destructive": [
+            "bg-destructive",
+            "text-destructive-foreground",
+            "hover:bg-destructive/90",
+            "shadow-sm"
+          ],
+          "ringFocus": [
+            "focus-visible:ring-2",
+            "focus-visible:ring-ring",
+            "focus-visible:ring-offset-2",
+            "ring-offset-background"
+          ]
         },
-        "borders": ["border", "border-border", "border-input", "border-sidebar-border"],
+        "borders": [
+          "border",
+          "border-border",
+          "border-input",
+          "border-sidebar-border"
+        ],
         "charts": ["--chart-1..5"],
         "sidebar": {
           "bg": "bg-sidebar",
@@ -185,7 +254,12 @@
       }
     },
     "shadows": {
-      "levels": { "none": "none", "sm": "shadow-sm", "md": "shadow-md", "lg": "shadow-lg" },
+      "levels": {
+        "none": "none",
+        "sm": "shadow-sm",
+        "md": "shadow-md",
+        "lg": "shadow-lg"
+      },
       "usage": {
         "cards": "shadow-sm border",
         "buttons": "shadow-sm (only on primary/outline)",
@@ -255,7 +329,7 @@
   },
   "patterns": {
     "emptyStates": "Always provide a clear call to action in empty states. Use a muted icon, a clear heading, and a helpful description.",
-    "loading": "Use Skeletons for content loading. Use Spinners (Loader2) for action states. Never block the UI without feedback.",
+    "loading": "Use Skeletons for content loading. Use Spinners (Loader2 with animate-spin) for action states. Buttons must show a spinner when submitting. Never block the UI without feedback.",
     "error": "Use destructuve color sparingly. Error messages should be helpful, not alarming. Use Alert or Toast components.",
     "mobile": "Always verify layouts on mobile. Use 'flex-col' on mobile and 'flex-row' on desktop for forms and lists."
   },

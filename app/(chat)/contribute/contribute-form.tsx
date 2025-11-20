@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { Loader2 } from "lucide-react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,7 +30,7 @@ export function ContributeForm({
 }: {
   developerWallet: string;
 }) {
-  const [state, formAction] = useActionState(
+  const [state, formAction, isPending] = useActionState(
     submitHttpTool,
     contributeFormInitialState
   );
@@ -201,8 +202,19 @@ export function ContributeForm({
           <div className="text-muted-foreground text-sm">
             On-chain payments are routed automatically via ContextRouter.
           </div>
-          <Button className="w-full md:w-auto" type="submit">
-            Submit tool
+          <Button
+            className="w-full md:w-auto"
+            disabled={isPending}
+            type="submit"
+          >
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit tool"
+            )}
           </Button>
         </CardFooter>
         {state.message && (
