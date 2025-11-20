@@ -16,7 +16,7 @@ This directory contains **Verified Native Skills** submitted by the community.
 
 When you register your tool (Native or HTTP), the **Description** field is the single most important piece of metadata.
 
-*   **Who reads it?** The LLM (e.g., GPT-4o, Claude 3.5 Sonnet).
+*   **Who reads it?** The LLM (e.g., GPT-5, Claude 4.5 Sonnet).
 *   **When?** During the "Planning" phase of a chat.
 *   **How is it used?**
 
