@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { useActionState, useState } from "react";
+import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,17 +27,13 @@ import { cn } from "@/lib/utils";
 import { submitHttpTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
-export function ContributeForm({
-  developerWallet,
-}: {
-  developerWallet: string;
-}) {
+export function ContributeForm() {
   const [state, formAction, isPending] = useActionState(
     submitHttpTool,
     contributeFormInitialState
   );
   const [kind, setKind] = useState("http");
-  const hasDeveloperWallet = Boolean(developerWallet);
+  const { address: walletAddress, isConnected } = useAccount();
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -45,6 +42,8 @@ export function ContributeForm({
   const endpointError = state.fieldErrors?.endpoint;
   const defaultParamsError = state.fieldErrors?.defaultParams;
   const developerWalletError = state.fieldErrors?.developerWallet;
+
+  const connectedWallet = walletAddress || "";
 
   return (
     <form action={formAction}>
@@ -229,27 +228,26 @@ export function ContributeForm({
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
               aria-invalid={developerWalletError ? true : undefined}
-              aria-readonly="true"
               className={cn(
-                hasDeveloperWallet ? "bg-muted" : "bg-muted text-muted-foreground",
+                "cursor-not-allowed bg-muted opacity-50",
                 developerWalletError &&
                   "border-destructive focus-visible:ring-destructive"
               )}
-              defaultValue={developerWallet}
-              id="developerWallet"
-              name="developerWallet"
+              defaultValue=""
+              disabled
+              id="display-wallet"
               placeholder={
-                hasDeveloperWallet
-                  ? developerWallet
-                  : "Connect your wallet to register a tool"
+                isConnected
+                  ? connectedWallet
+                  : "Please connect your wallet to continue"
               }
-              readOnly
+              value={isConnected ? connectedWallet : ""}
             />
-            {!hasDeveloperWallet && !developerWalletError && (
-              <p className="text-muted-foreground text-xs">
-                Connect your wallet in the sidebar before submitting a tool.
-              </p>
-            )}
+            <input
+              name="developerWallet"
+              type="hidden"
+              value={connectedWallet}
+            />
             <FieldError message={developerWalletError} />
           </div>
         </CardContent>
@@ -259,7 +257,7 @@ export function ContributeForm({
           </div>
           <Button
             className="w-full md:w-auto"
-            disabled={isPending || !hasDeveloperWallet}
+            disabled={isPending || !isConnected}
             type="submit"
           >
             {isPending ? (
