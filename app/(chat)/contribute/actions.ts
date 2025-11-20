@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { createAITool } from "@/lib/db/queries";
+import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
 import { contributeFormSchema, type ContributeFormState } from "./schema";
 
 export async function submitHttpTool(
@@ -41,6 +41,48 @@ export async function submitHttpTool(
       message: "Please correct the highlighted fields.",
       fieldErrors,
     };
+  }
+
+  // Prevent duplicate tools for the same developer and endpoint/module
+  const existingTools = await getAIToolsByDeveloper({
+    developerId: session.user.id,
+  });
+
+  const normalizedEndpoint =
+    typeof parsed.data.endpoint === "string"
+      ? parsed.data.endpoint.trim()
+      : undefined;
+
+  if (normalizedEndpoint) {
+    const isDuplicate = existingTools.some((tool) => {
+      const schema = tool.toolSchema as Record<string, unknown> | null;
+      if (!schema || typeof schema !== "object") {
+        return false;
+      }
+
+      const kind = (schema as { kind?: unknown }).kind;
+
+      if (parsed.data.kind === "http" && kind === "http") {
+        return (schema as { endpoint?: unknown }).endpoint === normalizedEndpoint;
+      }
+
+      if (parsed.data.kind === "skill" && kind === "skill") {
+        const skill = (schema as { skill?: { module?: unknown } }).skill;
+        return skill && skill.module === normalizedEndpoint;
+      }
+
+      return false;
+    });
+
+    if (isDuplicate) {
+      return {
+        status: "error",
+        message: "You already have a tool registered with this endpoint/module.",
+        fieldErrors: {
+          endpoint: "This endpoint or module is already registered.",
+        },
+      };
+    }
   }
 
   let defaultParams: Record<string, unknown> | undefined;
