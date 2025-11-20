@@ -26,7 +26,16 @@ const PureContextSidebarItem = ({
         isActive={isActive}
         onClick={() => onToggle(tool.id)}
         type="button"
-        tooltip={tool.description || tool.name}
+        tooltip={{
+          children: (
+            <div className="flex flex-col gap-1 max-w-xs p-1">
+              <p className="font-semibold text-sm">{tool.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {tool.description || "No description available."}
+              </p>
+            </div>
+          ),
+        }}
       >
         <div className="flex min-w-0 flex-col items-start gap-1 text-left">
           <div className="flex w-full items-center gap-2">

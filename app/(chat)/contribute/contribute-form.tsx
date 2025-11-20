@@ -69,10 +69,8 @@ export function ContributeForm({
               rows={4}
             />
             <p className="text-muted-foreground text-xs">
-              This is the <strong>Instruction Manual</strong> for the AI Agent.
-              Be extremely specific about <em>when</em> to use this tool and{" "}
-              <em>how</em> to use its parameters. The Agent reads this to decide
-              if your tool is relevant to the user's question.
+              This is the <strong>Instruction Manual</strong> for both the AI Agent and the User.
+              Be extremely specific about <em>when</em> to use this tool and <em>how</em> to use its parameters.
             </p>
             <FieldError message={state.fieldErrors?.description} />
           </div>
