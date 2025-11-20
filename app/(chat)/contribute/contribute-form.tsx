@@ -162,7 +162,9 @@ export function ContributeForm({ developerWallet }: { developerWallet: string })
             <Textarea
               id="defaultParams"
               name="defaultParams"
-              placeholder='{"endpoint":"gas_price","chainId":8453,"confidence":90}'
+              placeholder={`{"endpoint":"gas_price","chainId":8453,"confidence":99}
+{"endpoint":"chains"}
+{"endpoint":"oracles","chainId":8453}`}
               rows={4}
             />
             <FieldError message={state.fieldErrors?.defaultParams} />
