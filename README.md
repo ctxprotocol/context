@@ -71,9 +71,9 @@ Want to earn revenue from your API?
 1. **Build an HTTP Endpoint:** It just needs to accept JSON and return JSON. You can use our [Context SDK](https://github.com/ctxprotocol/sdk) for a type-safe experience.
 2. **Register in the App:** Go to `/contribute` in the running app.
 3. **Set a Price:** Choose your fee per query (e.g., $0.01 USDC).
-4. **Earn:** Your tool is now instantly available to the global Context Agent.
+4. **Earn:** Your tool is now instantly available on the **decentralized marketplace**, accessible by the Context chat app and eventually the public API.
 
-## 🛠 Advanced: Native Skills Registry
+#### 🛠 Advanced: Native Skills Registry
 
 For complex logic that requires high performance or verified execution, you can contribute directly to the core codebase.
 
