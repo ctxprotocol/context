@@ -171,9 +171,7 @@ export function ContributeForm({
 
           <div className="space-y-2">
             <Label htmlFor="defaultParams">
-              {kind === "http"
-                ? "Example input (JSON)"
-                : "Example input (JSON) - Optional"}
+              {kind === "http" ? "Example input (JSON)" : "Example input (JSON)"}
             </Label>
             <Textarea
               className="font-mono text-xs"
@@ -187,17 +185,15 @@ export function ContributeForm({
   "confidence": 99
 }`
                   : `{
-  "query": "ETH price"
+  "endpoint": "gas_price",
+  "chainId": 8453
 }`
               }
               rows={5}
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
-                For Native Skills, providing an example input is{" "}
-                <strong>highly recommended</strong>. It gives the AI Agent a
-                "cheat sheet" on how to call your function without needing to
-                read the full source code, saving tokens and improving accuracy.
+                For Native Skills, this "cheat sheet" is critical for the Agent to understand your function arguments without reading the full source code.
               </p>
             )}
             <FieldError message={state.fieldErrors?.defaultParams} />
