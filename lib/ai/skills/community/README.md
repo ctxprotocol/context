@@ -12,6 +12,22 @@ This directory contains **Verified Native Skills** submitted by the community.
 | **Verification** | Permissionless | Requires Pull Request Review |
 | **Best For** | Private APIs, Rapid Prototyping | High-performance Data, Aggregators |
 
+## 📝 The Description Field: Your Instruction Manual
+
+When you register your tool (Native or HTTP), the **Description** field is the single most important piece of metadata.
+
+*   **Who reads it?** The LLM (e.g., GPT-4o, Claude 3.5 Sonnet).
+*   **When?** During the "Planning" phase of a chat.
+*   **How is it used?**
+
+When a user asks a question (e.g., *"Is gas cheap on Base right now?"*), the Agent scans the list of available tools. It reads your description to decide:
+1.  *"Is this tool relevant to the user's question?"*
+2.  *"How do I use this tool to get the answer?"*
+
+**Example:**
+If your description says *"Fetches gas prices"*, the Agent knows to pick it.
+If it says *"Supports 'gas_price' endpoint which returns standard, fast, and rapid estimates"*, the Agent knows **exactly** what parameter to send (`endpoint: "gas_price"`) and what kind of data to expect back.
+
 ## 💰 How to Monetize Your Skill
 
 Just submitting code doesn't get you paid. You must also create a **Marketplace Listing**.
@@ -28,7 +44,7 @@ Once your PR is merged and your Tool is registered, the two will be linked. User
 
 ### 🧩 The Power of Composability
 
-Because Context uses **Code Execution**, your skill can be composed with any other skill in the marketplace. 
+Because Context uses **Code Execution**, your skill can be composed with any other skill in the marketplace.
 - An Agent might combine your **Prediction Market** skill with a **Weather** skill to forecast crop futures.
 - Your tiny, specific utility (like `wei-converter`) might be used thousands of times inside larger workflows.
 - You get paid every time your function is imported and run.
