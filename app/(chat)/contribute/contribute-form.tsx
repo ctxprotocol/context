@@ -43,7 +43,6 @@ export function ContributeForm({
   const priceError = state.fieldErrors?.price;
   const endpointError = state.fieldErrors?.endpoint;
   const defaultParamsError = state.fieldErrors?.defaultParams;
-  const developerWalletError = state.fieldErrors?.developerWallet;
 
   return (
     <form action={formAction}>
@@ -227,17 +226,16 @@ export function ContributeForm({
           <div className="space-y-2">
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input
-              aria-invalid={developerWalletError ? true : undefined}
-              className={cn(
-                developerWalletError &&
-                  "border-destructive focus-visible:ring-destructive"
-              )}
-              defaultValue={state.payload?.developerWallet || developerWallet}
+              className="cursor-not-allowed bg-muted"
+              disabled
               id="developerWallet"
               name="developerWallet"
-              placeholder="0x..."
+              readOnly
+              value={developerWallet}
             />
-            <FieldError message={developerWalletError} />
+            <p className="text-muted-foreground text-xs">
+              Payments will be sent to your connected wallet address.
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
