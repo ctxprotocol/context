@@ -1,13 +1,13 @@
-import { Zap, Info } from "lucide-react";
+import { Info, Zap } from "lucide-react";
 import { memo } from "react";
-import type { AITool } from "@/lib/db/schema";
-import { cn } from "@/lib/utils";
-import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import type { AITool } from "@/lib/db/schema";
+import { cn } from "@/lib/utils";
+import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 
 const PureContextSidebarItem = ({
   tool,
@@ -63,20 +63,20 @@ const PureContextSidebarItem = ({
             />
           </div>
         </SidebarMenuButton>
-        <HoverCard openDelay={200} closeDelay={100}>
+        <HoverCard closeDelay={100} openDelay={200}>
           <HoverCardTrigger asChild>
             <button
-              type="button"
-              className="flex h-full shrink-0 items-center justify-center px-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Tool details"
+              className="flex h-full shrink-0 items-center justify-center px-2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              type="button"
             >
               <Info className="h-4 w-4 opacity-50 hover:opacity-100" />
             </button>
           </HoverCardTrigger>
           <HoverCardContent
-            side="right"
             align="start"
             className="w-80 p-4 shadow-lg"
+            side="right"
           >
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -93,7 +93,9 @@ const PureContextSidebarItem = ({
               </p>
               <div className="flex items-center justify-between border-t pt-3">
                 <span className="text-muted-foreground text-xs">Price</span>
-                <span className="font-medium text-sm">${formattedPrice}/query</span>
+                <span className="font-medium text-sm">
+                  ${formattedPrice}/query
+                </span>
               </div>
             </div>
           </HoverCardContent>
