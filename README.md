@@ -40,7 +40,7 @@ When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs A
 4. **Pays** both developers their respective fees instantly via `ContextRouter`.
 5. **Synthesizes** the answer.
 
-This **Composability** is the superpower of Context. Any frontier model (like GPT-4o or Claude 3.5) can stitch together disparate tools into a coherent workflow, creating infinite new use cases from your single API.
+This **Composability** is the superpower of Context. Any frontier model can stitch together disparate tools into a coherent workflow, creating infinite new use cases from your single API.
 
 ### 3. The Protocol (Settlement)
 All value flows through `ContextRouter.sol` on Base. Payments are split instantly between the tool developer and the protocol treasury.

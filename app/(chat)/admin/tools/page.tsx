@@ -38,31 +38,31 @@ export default async function AdminToolsPage() {
           </p>
         </div>
 
-        <Card>
+      <Card>
           <CardHeader className="px-6 py-4 border-b">
             <CardTitle className="text-base font-medium">Submissions</CardTitle>
-          </CardHeader>
+        </CardHeader>
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
+          <Table>
+            <TableHeader>
                 <TableRow className="hover:bg-transparent border-b border-border/50">
                   <TableHead className="w-[150px] pl-6">Status</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
                   <TableHead className="max-w-[300px]">Endpoint / Module</TableHead>
-                  <TableHead>Queries</TableHead>
+                <TableHead>Queries</TableHead>
                   <TableHead className="text-right pr-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tools.map((tool) => {
-                  const schema = tool.toolSchema as Record<string, any>;
-                  const isHttp = schema.kind === "http";
-                  const endpoint = isHttp 
-                    ? (schema.endpoint as string) 
-                    : (schema.skill?.module as string);
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tools.map((tool) => {
+                const schema = tool.toolSchema as Record<string, any>;
+                const isHttp = schema.kind === "http";
+                const endpoint = isHttp 
+                  ? (schema.endpoint as string) 
+                  : (schema.skill?.module as string);
 
-                  return (
+                return (
                     <TableRow key={tool.id} className="hover:bg-muted/50 border-b border-border/50 last:border-none">
                       <TableCell className="pl-6">
                         {tool.isVerified ? (
@@ -72,25 +72,25 @@ export default async function AdminToolsPage() {
                         )}
                       </TableCell>
                       <TableCell className="font-medium text-sm text-foreground">{tool.name}</TableCell>
-                      <TableCell>
+                    <TableCell>
                         <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
-                          {isHttp ? "HTTP" : "Native"}
-                        </Badge>
-                      </TableCell>
+                        {isHttp ? "HTTP" : "Native"}
+                      </Badge>
+                    </TableCell>
                       <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground font-mono">
-                        {endpoint}
-                      </TableCell>
+                      {endpoint}
+                    </TableCell>
                       <TableCell className="text-sm font-mono">{tool.totalQueries}</TableCell>
                       <TableCell className="text-right pr-6">
-                        <VerifyButton toolId={tool.id} isVerified={tool.isVerified} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      <VerifyButton toolId={tool.id} isVerified={tool.isVerified} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
       </div>
     </div>
   );
