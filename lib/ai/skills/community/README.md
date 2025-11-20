@@ -34,9 +34,8 @@ You will notice an "Example Input (JSON)" field in the `/contribute` form.
 
 **For HTTP Tools:** This is **Required**. The Agent needs to know the exact JSON structure to send to your API.
 
-**For Native Skills:** This is **Highly Recommended** (but technically optional).
-*   **Why recommended?** It gives the Agent a "cheat sheet" on how to call your function without needing to read your entire source code file. This saves tokens and improves accuracy.
-*   **Why optional?** Technically, your code (Zod schema) is the source of truth. If your function is very simple (e.g. `getWeather(city: string)`), the Agent might guess it correctly from the description alone. But why take the risk? **Always provide an example.**
+**For Native Skills:** This field is **Hidden**.
+Since Native Skills are part of the codebase, the AI Agent will automatically be given the function signatures and TypeScript definitions (Zod schemas) from your submitted code. You do not need to provide manual examples.
 
 ## 💰 How to Monetize Your Skill
 

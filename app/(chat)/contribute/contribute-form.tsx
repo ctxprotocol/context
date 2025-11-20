@@ -171,7 +171,9 @@ export function ContributeForm({
 
           <div className="space-y-2">
             <Label htmlFor="defaultParams">
-              {kind === "http" ? "Example input (JSON)" : "Example input (JSON)"}
+              {kind === "http"
+                ? "Example input (JSON)"
+                : "Example input (JSON)"}
             </Label>
             <Textarea
               className="font-mono text-xs"
@@ -193,7 +195,9 @@ export function ContributeForm({
             />
             {kind === "skill" && (
               <p className="text-muted-foreground text-xs">
-                For Native Skills, this "cheat sheet" is critical for the Agent to understand your function arguments without reading the full source code.
+                For Native Skills, this "cheat sheet" is critical for the Agent
+                to understand your function arguments without reading the full
+                source code.
               </p>
             )}
             <FieldError message={state.fieldErrors?.defaultParams} />
