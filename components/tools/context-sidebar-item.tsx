@@ -75,7 +75,7 @@ const PureContextSidebarItem = ({
           </HoverCardTrigger>
           <HoverCardContent
             align="start"
-            className="w-80 p-4 shadow-lg"
+            className="w-96 p-4 shadow-lg"
             side="right"
           >
             <div className="space-y-3">
@@ -88,9 +88,9 @@ const PureContextSidebarItem = ({
                   </span>
                 )}
               </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">
+              <div className="max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
                 {tool.description || "No description provided."}
-              </p>
+              </div>
               <div className="flex items-center justify-between border-t pt-3">
                 <span className="text-muted-foreground text-xs">Price</span>
                 <span className="font-medium text-sm">

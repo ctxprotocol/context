@@ -41,6 +41,7 @@ export function ContributeForm() {
   const priceError = state.fieldErrors?.price;
   const endpointError = state.fieldErrors?.endpoint;
   const defaultParamsError = state.fieldErrors?.defaultParams;
+  const outputSchemaError = state.fieldErrors?.outputSchema;
   const developerWalletError = state.fieldErrors?.developerWallet;
 
   const connectedWallet = walletAddress || "";
@@ -221,9 +222,47 @@ export function ContributeForm() {
 }`}
                 rows={5}
               />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Provide a valid JSON object representing a typical request.
+                Include common parameters like <code>chainId</code> or{" "}
+                <code>network</code> to guide the AI.
+              </p>
               <FieldError message={defaultParamsError} />
             </div>
           )}
+
+          {kind === "http" && (
+            <div className="space-y-2">
+              <Label htmlFor="outputSchema">Example Output (JSON)</Label>
+              <Textarea
+                className="font-mono text-xs"
+                defaultValue={state.payload?.outputSchema || ""}
+                id="outputSchema"
+                name="outputSchema"
+                placeholder={`{
+  "data": {
+    "estimates": [
+      { "confidence": 99, "maxFeePerGasGwei": 0.1 }
+    ],
+    "chains": [
+      { "chainId": 1, "network": "mainnet" }
+    ]
+  }
+}`}
+                rows={8}
+              />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                <strong>CRITICAL:</strong> Provide a precise, real-world example
+                of your API's JSON response. The AI Agent uses this schema to
+                write code that parses your data. If this example is inaccurate,
+                the agent will guess the structure and likely fail to retrieve
+                data, causing your tool to be rated poorly. Include examples for
+                all supported endpoints if possible.
+              </p>
+              <FieldError message={outputSchemaError} />
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="developerWallet">Developer wallet</Label>
             <Input

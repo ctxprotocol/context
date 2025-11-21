@@ -167,6 +167,22 @@ function getToolUsage(tool: AITool) {
   return typeof usage === "string" ? usage : undefined;
 }
 
+function getOutputSchema(tool: AITool) {
+  const schema = tool.toolSchema;
+  if (!schema || typeof schema !== "object") {
+    return;
+  }
+  const outputSchema = (schema as Record<string, unknown>).outputSchema;
+  if (
+    outputSchema &&
+    typeof outputSchema === "object" &&
+    !Array.isArray(outputSchema)
+  ) {
+    return outputSchema as Record<string, unknown>;
+  }
+  return;
+}
+
 const getTokenlensCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
     try {
@@ -299,6 +315,8 @@ export async function POST(request: Request) {
         exampleInput:
           entry.kind === "http" ? getDefaultHttpInput(entry.tool) : undefined,
         usage: getToolUsage(entry.tool),
+        outputSchema:
+          entry.kind === "http" ? getOutputSchema(entry.tool) : undefined,
       });
     }
 
@@ -323,9 +341,9 @@ export async function POST(request: Request) {
           // Let's try to read the file content for known community skills.
 
           if (tool.module.startsWith("@/lib/ai/skills/community/")) {
-             // This would require fs.readFileSync which might fail in Vercel Edge/Serverless if not bundled assets.
-             // So we will skip actual file reading for safety and rely on the robust "Instruction Manual" description
-             // we just enforced in the UI.
+            // This would require fs.readFileSync which might fail in Vercel Edge/Serverless if not bundled assets.
+            // So we will skip actual file reading for safety and rely on the robust "Instruction Manual" description
+            // we just enforced in the UI.
           }
         } catch (e) {
           console.warn(`Failed to load module content for ${tool.module}`, e);
@@ -619,9 +637,23 @@ export async function POST(request: Request) {
                 });
               }
 
+              if (!execution.ok) {
+                console.error("[chat-api] skill execution failed", {
+                  chatId: id,
+                  error: execution.error,
+                  logs: execution.logs,
+                });
+              }
+
               mediatorText = execution.ok
-                ? `Tool execution succeeded.\nModules used: ${Array.from(allowedModules).join(", ")}\nResult JSON:\n${formatExecutionData(execution.data)}`
-                : `Tool execution failed: ${execution.error}`;
+                ? `Tool execution succeeded.\nModules used: ${Array.from(
+                    allowedModules
+                  ).join(", ")}\nResult JSON:\n${formatExecutionData(
+                    execution.data
+                  )}`
+                : `Tool execution failed: ${execution.error}\nLogs:\n${execution.logs.join(
+                    "\n"
+                  )}`;
               console.log("[chat-api] execution finished", {
                 chatId: id,
                 ok: execution.ok,

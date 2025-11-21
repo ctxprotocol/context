@@ -24,22 +24,8 @@ export async function submitHttpTool(
     price: formData.get("price"),
     developerWallet: formData.get("developerWallet"),
     defaultParams: formData.get("defaultParams") || undefined,
+    outputSchema: formData.get("outputSchema") || undefined,
   };
-
-  if (
-    !raw.developerWallet ||
-    typeof raw.developerWallet !== "string" ||
-    !/^0x[a-fA-F0-9]{40}$/.test(raw.developerWallet)
-  ) {
-    return {
-      status: "error",
-      message: "Connect your wallet before submitting a tool.",
-      fieldErrors: {
-        developerWallet: "Connect your wallet in the sidebar first.",
-      },
-      payload: raw as any,
-    };
-  }
 
   // We cast raw to any to satisfy the payload type which expects the validated types,
   // but for repopulating the form string values are actually better.
@@ -123,12 +109,30 @@ export async function submitHttpTool(
     }
   }
 
+  let outputSchema: Record<string, unknown> | undefined;
+  if (parsed.data.outputSchema) {
+    try {
+      outputSchema = JSON.parse(parsed.data.outputSchema);
+      if (!outputSchema || typeof outputSchema !== "object") {
+        throw new Error("outputSchema must be a JSON object");
+      }
+    } catch (error) {
+      return {
+        status: "error",
+        message: "outputSchema must be valid JSON",
+        fieldErrors: { outputSchema: "Enter a valid JSON object" },
+        payload,
+      };
+    }
+  }
+
   const toolSchema =
     parsed.data.kind === "http"
       ? {
           kind: "http",
           endpoint: parsed.data.endpoint,
           defaultParams,
+          outputSchema,
         }
       : {
           kind: "skill",
@@ -136,6 +140,7 @@ export async function submitHttpTool(
             module: parsed.data.endpoint,
           },
           defaultParams,
+          // Native skills have output schema in code
         };
 
   if (parsed.data.kind === "http" && parsed.data.endpoint) {

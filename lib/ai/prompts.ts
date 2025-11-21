@@ -9,6 +9,7 @@ export type EnabledToolSummary = {
   usage?: string;
   kind: "skill" | "http";
   exampleInput?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
 };
 
 const codingAgentPrompt = `
@@ -105,7 +106,11 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
       tool.exampleInput && Object.keys(tool.exampleInput).length > 0
         ? formatExampleInput(tool.exampleInput)
         : "{ /* supply input */ }";
-    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Import: import { callHttpTool } from "@/lib/ai/skills/http-tool";\n   Call: await callHttpTool({ toolId: "${tool.toolId}", input: ${example} })\n   ${tool.description}`;
+    const output =
+      tool.outputSchema && Object.keys(tool.outputSchema).length > 0
+        ? `\n   Output Schema: ${formatExampleInput(tool.outputSchema)}`
+        : "";
+    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Import: import { callHttpTool } from "@/lib/ai/skills/http-tool";\n   Call: await callHttpTool({ toolId: "${tool.toolId}", input: ${example} })${output}\n   ${tool.description}`;
   }
 
   return `${index + 1}. ${tool.name} ($${price}/query)\n   Module: ${tool.module ?? "n/a"}${
@@ -115,7 +120,11 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
 
 function formatExampleInput(input: Record<string, unknown>) {
   const asJson = JSON.stringify(input, null, 2);
-  return asJson.replace(/\n/g, " ");
+  // Collapse small objects to single line, but keep larger ones readable
+  if (asJson.length < 50) {
+    return asJson.replace(/\n/g, " ");
+  }
+  return asJson;
 }
 
 export const codePrompt = `
