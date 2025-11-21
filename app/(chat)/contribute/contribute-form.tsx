@@ -83,7 +83,7 @@ export function ContributeForm() {
               id="description"
               maxLength={1000}
               name="description"
-              placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 'gas_price', 'chains', and 'oracles' endpoints."
+              placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 3 endpoints: 'gas_price' (requires chainId), 'chains' (no params), and 'oracles' (requires system/network). Optional params: confidence."
               rows={4}
             />
             <p className="text-muted-foreground text-xs">
@@ -246,10 +246,13 @@ export function ContributeForm() {
     ],
     "chains": [
       { "chainId": 1, "network": "mainnet" }
+    ],
+    "oracles": [
+      { "name": "Chainlink", "system": "ethereum" }
     ]
   }
 }`}
-                rows={8}
+                rows={10}
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
                 <strong>CRITICAL:</strong> Provide a precise, real-world example
