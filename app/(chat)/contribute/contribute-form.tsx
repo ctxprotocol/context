@@ -46,6 +46,25 @@ export function ContributeForm() {
 
   const connectedWallet = walletAddress || "";
 
+  const httpDescriptionPlaceholder = `Fetch real-time gas prices, supported chains, or oracle metadata.
+
+Endpoints:
+- "chains": Returns valid chainIds, systems, and networks. CALL THIS FIRST to resolve names (e.g. "Base") to IDs.
+- "gas_price": Requires "chainId" (from "chains"). Optional: "confidence" (1-99).
+- "oracles": Requires "chainId" OR ("system" + "network"). Use "chains" to find these.
+
+Example intent: "Gas on Base" -> 1. Call "chains" -> find Base is chainId 8453. 2. Call "gas_price" with chainId=8453.`;
+
+  const skillDescriptionPlaceholder = `This module exports functions to interact with Blocknative data.
+
+Exports:
+- getGasPrice({ chainId, confidence }): Returns gas estimates.
+- getChains(): Returns list of supported networks.
+- getOracles({ chainId, system, network }): Returns oracle data.
+
+Usage:
+The agent will automatically import this module and call the appropriate function based on the user's request. Use 'getChains' to resolve network names to chain IDs first.`;
+
   return (
     <form action={formAction}>
       <Card className="border shadow-sm">
@@ -67,31 +86,9 @@ export function ContributeForm() {
               defaultValue={state.payload?.name || ""}
               id="name"
               name="name"
-              placeholder="Blocknative Gas (HTTP)"
+              placeholder="Blocknative Gas"
             />
             <FieldError message={nameError} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              aria-invalid={descriptionError ? true : undefined}
-              className={cn(
-                descriptionError &&
-                  "border-destructive focus-visible:ring-destructive"
-              )}
-              defaultValue={state.payload?.description || ""}
-              id="description"
-              maxLength={1000}
-              name="description"
-              placeholder="Fetch real-time gas prices, supported chains, or oracle metadata. Supports 3 endpoints: 'gas_price' (requires chainId), 'chains' (no params), and 'oracles' (requires system/network). Optional params: confidence."
-              rows={4}
-            />
-            <p className="text-muted-foreground text-xs">
-              This is the <strong>Instruction Manual</strong> for both the AI
-              Agent and the User. Be extremely specific about <em>when</em> to
-              use this tool and <em>how</em> to use its parameters.
-            </p>
-            <FieldError message={descriptionError} />
           </div>
 
           <div className="space-y-2">
@@ -113,6 +110,33 @@ export function ContributeForm() {
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              aria-invalid={descriptionError ? true : undefined}
+              className={cn(
+                descriptionError &&
+                  "border-destructive focus-visible:ring-destructive"
+              )}
+              defaultValue={state.payload?.description || ""}
+              id="description"
+              maxLength={1000}
+              name="description"
+              placeholder={
+                kind === "http"
+                  ? httpDescriptionPlaceholder
+                  : skillDescriptionPlaceholder
+              }
+              rows={11}
+            />
+            <p className="text-muted-foreground text-xs">
+              This is the <strong>Instruction Manual</strong> for both the AI
+              Agent and the User. Be extremely specific about <em>when</em> to
+              use this tool and <em>how</em> to use its parameters.
+            </p>
+            <FieldError message={descriptionError} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -252,7 +276,7 @@ export function ContributeForm() {
     ]
   }
 }`}
-                rows={10}
+                rows={8}
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
                 <strong>CRITICAL:</strong> Provide a precise, real-world example
