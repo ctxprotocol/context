@@ -29,8 +29,8 @@ Context is built on a **Code Execution** paradigm. Instead of rigid "tool callin
 
 ### 1. The Marketplace (Supply)
 Developers register **Tools** (the paid product) which are powered by either:
-- **HTTP Tools:** Remote API endpoints hosted by you.
-- **Native Skills:** Verified TypeScript modules running on our platform.
+- **HTTP Tools:** Remote API endpoints hosted by you. You provide JSON examples so the Agent knows the wire format.
+- **Native Skills:** Verified TypeScript modules running on our platform. The Agent reads your code signatures directly.
 
 ### 2. The Agent (Demand)
 When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
@@ -75,7 +75,7 @@ Want to earn revenue from your API?
 
 #### 🛠 Advanced: Native Skills Registry
 
-For complex logic that requires high performance or verified execution, you can contribute directly to the core codebase.
+For complex logic that requires high performance or verified execution, you can contribute directly to the core codebase via Pull Request.
 
 **[View the Community Skills Registry](./lib/ai/skills/community/README.md)**
 
