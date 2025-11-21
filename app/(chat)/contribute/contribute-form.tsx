@@ -2,7 +2,6 @@
 
 import { Loader2 } from "lucide-react";
 import { useActionState, useState } from "react";
-import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { cn } from "@/lib/utils";
 import { submitHttpTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
@@ -33,7 +33,9 @@ export function ContributeForm() {
     contributeFormInitialState
   );
   const [kind, setKind] = useState("http");
-  const { address: walletAddress, isConnected } = useAccount();
+  const { activeWallet } = useWalletIdentity();
+  const walletAddress = activeWallet?.address;
+  const isConnected = !!walletAddress;
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;

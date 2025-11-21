@@ -56,12 +56,31 @@ export function useWalletIdentity() {
       );
   }, []);
 
-  const wallets: WalletUnion[] =
-    connectedWallets.length > 0
-      ? connectedWallets
-      : user?.wallet
+  const wallets: WalletUnion[] = useMemo(() => {
+    if (!user) {
+      return connectedWallets;
+    }
+
+    const linkedAddresses = new Set(
+      user.linkedAccounts
+        ?.filter((account) => account.type === "wallet")
+        .map((account) => account.address.toLowerCase()) || []
+    );
+
+    if (user.wallet) {
+      linkedAddresses.add(user.wallet.address.toLowerCase());
+    }
+
+    const linkedConnectedWallets = connectedWallets.filter((wallet) =>
+      linkedAddresses.has(wallet.address.toLowerCase())
+    );
+
+    return linkedConnectedWallets.length > 0
+      ? linkedConnectedWallets
+      : user.wallet
         ? [user.wallet]
         : [];
+  }, [user, connectedWallets]);
 
   const activeWallet = useMemo(() => {
     // Touch preferenceKey to ensure re-calculation when it changes

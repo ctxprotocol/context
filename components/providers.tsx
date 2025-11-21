@@ -27,10 +27,29 @@ const selectWalletForWagmi: SetActiveWalletForWagmiType = ({ wallets, user }) =>
     return undefined;
   }
 
+  // Filter out wallets that are not linked to the user's account
+  const linkedAddresses = new Set(
+    user?.linkedAccounts
+      ?.filter((account) => account.type === "wallet")
+      .map((account) => account.address.toLowerCase()) || []
+  );
+
+  if (user?.wallet) {
+    linkedAddresses.add(user.wallet.address.toLowerCase());
+  }
+
+  const availableWallets = wallets.filter((wallet) =>
+    linkedAddresses.has(wallet.address.toLowerCase())
+  );
+
+  if (!availableWallets.length) {
+    return undefined;
+  }
+
   const resolvedUserWallet = user?.wallet as ConnectedWallet | undefined;
 
   if (resolvedUserWallet) {
-    const matchedWallet = wallets.find(
+    const matchedWallet = availableWallets.find(
       (wallet) =>
         normalizeAddress(wallet.address) ===
           normalizeAddress(resolvedUserWallet.address) &&
@@ -42,13 +61,23 @@ const selectWalletForWagmi: SetActiveWalletForWagmiType = ({ wallets, user }) =>
     }
 
     if (!isEmbeddedWallet(resolvedUserWallet)) {
-      return resolvedUserWallet;
+      // Only return if it's in availableWallets
+      const availableUserWallet = availableWallets.find(
+        (w) =>
+          normalizeAddress(w.address) ===
+          normalizeAddress(resolvedUserWallet.address)
+      );
+      if (availableUserWallet) {
+        return availableUserWallet;
+      }
     }
   }
 
-  const embeddedWallet = wallets.find((wallet) => isEmbeddedWallet(wallet));
+  const embeddedWallet = availableWallets.find((wallet) =>
+    isEmbeddedWallet(wallet)
+  );
 
-  return embeddedWallet ?? wallets[0];
+  return embeddedWallet ?? availableWallets[0];
 };
 
 // Client component that hosts the sync hook

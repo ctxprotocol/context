@@ -122,9 +122,11 @@ function PureMultimodalInput({
   const { fundWallet } = useFundWallet();
 
   // Wallet and contract addresses
-  const { address, chain } = useAccount();
+  // Rename address to wagmiAddress to avoid confusion
+  const { address: wagmiAddress, chain } = useAccount();
   const chainId = chain?.id; // Use the actual connected chain, not the configured one
-  const walletAddress = address as `0x${string}` | undefined;
+  // Use activeWallet.address as the source of truth for the UI
+  const walletAddress = activeWallet?.address as `0x${string}` | undefined;
   const { switchChainAsync } = useSwitchChain();
   const routerAddress =
     (process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`) ||
@@ -140,9 +142,9 @@ function PureMultimodalInput({
   // different Privy user. In that case, we should not fire on-chain
   // transactions from this session.
   const hasWalletMismatch =
-    Boolean(activeWallet?.address) &&
-    Boolean(address) &&
-    activeWallet?.address.toLowerCase() !== address.toLowerCase();
+    Boolean(walletAddress) &&
+    Boolean(wagmiAddress) &&
+    walletAddress?.toLowerCase() !== wagmiAddress?.toLowerCase();
 
   // USDC balance check
   const { refetch: refetchBalance } = useReadContract({

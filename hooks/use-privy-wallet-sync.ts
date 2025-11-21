@@ -69,11 +69,27 @@ export function usePrivyWalletSync() {
       : user?.wallet
         ? [user.wallet]
         : [];
-    if (!connectedWallets.length) {
+
+    // Filter out wallets that are not linked to the user's account
+    const linkedAddresses = new Set(
+      user.linkedAccounts
+        ?.filter((account) => account.type === "wallet")
+        .map((account) => account.address.toLowerCase()) || []
+    );
+
+    if (user.wallet) {
+      linkedAddresses.add(user.wallet.address.toLowerCase());
+    }
+
+    const linkedConnectedWallets = connectedWallets.filter((wallet) =>
+      linkedAddresses.has(wallet.address.toLowerCase())
+    );
+
+    if (!linkedConnectedWallets.length) {
       return undefined;
     }
 
-    const smartWallet = connectedWallets.find((wallet) => {
+    const smartWallet = linkedConnectedWallets.find((wallet) => {
       const walletLike = wallet as WalletLike;
       return (
         walletLike.type === "smart_wallet" ||
@@ -90,7 +106,7 @@ export function usePrivyWalletSync() {
     if (typeof window !== "undefined") {
       const storedAddress = window.localStorage.getItem("privy_wallet_preference");
       if (storedAddress) {
-        const matchedWallet = connectedWallets.find(
+        const matchedWallet = linkedConnectedWallets.find(
           (w) => normalizeAddress(w.address) === normalizeAddress(storedAddress)
         );
         if (matchedWallet) {
@@ -100,7 +116,7 @@ export function usePrivyWalletSync() {
     }
 
     // Prioritize external wallets (non-embedded, non-smart)
-    const externalWallet = connectedWallets.find(
+    const externalWallet = linkedConnectedWallets.find(
       (wallet) => !isEmbeddedWallet(wallet)
     );
     if (externalWallet) {
@@ -108,7 +124,7 @@ export function usePrivyWalletSync() {
     }
 
     if (user?.wallet) {
-      const matchedWallet = connectedWallets.find(
+      const matchedWallet = linkedConnectedWallets.find(
         (wallet) =>
           normalizeAddress(wallet.address) ===
             normalizeAddress(user.wallet?.address) &&
@@ -124,8 +140,8 @@ export function usePrivyWalletSync() {
       }
     }
 
-    const embeddedWallet = connectedWallets.find(isEmbeddedWallet);
-    return embeddedWallet ?? connectedWallets[0];
+    const embeddedWallet = linkedConnectedWallets.find(isEmbeddedWallet);
+    return embeddedWallet ?? linkedConnectedWallets[0];
   }, [ready, authenticated, user, wallets]);
 
   useEffect(() => {
