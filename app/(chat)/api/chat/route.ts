@@ -140,6 +140,7 @@ function buildAllowedToolRuntimeMap(paidTools: PaidToolContext[]) {
         tool: context.tool,
         transactionHash: context.transactionHash,
         kind: "http",
+        executionCount: 0,
       });
     }
   }
@@ -540,6 +541,21 @@ export async function POST(request: Request) {
           console.log("[chat-api] extracted code block, analyzing imports", {
             chatId: id,
           });
+
+          // Signal execution status
+          dataStream.write({
+            type: "data-tool-status",
+            data: { status: "executing" },
+          });
+
+          dataStream.write({
+            type: "debugCode",
+            data: codeBlock,
+          });
+
+          // Force a tiny delay to ensure the chunk is flushed before blocking execution
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
           const modulesUsed = findImportedModules(codeBlock);
 
           if (modulesUsed.length === 0) {
@@ -556,7 +572,9 @@ export async function POST(request: Request) {
                 const contexts = paidToolModuleMap.get(moduleName);
                 if (contexts && contexts.length > 0) {
                   allowedModules.add(moduleName);
-                  contexts.forEach((context) => paidModulesUsed.add(context));
+                  for (const context of contexts) {
+                    paidModulesUsed.add(context);
+                  }
                 } else {
                   throw new ChatSDKError(
                     "bad_request:chat",
@@ -619,8 +637,15 @@ export async function POST(request: Request) {
                   dataStream,
                   requestId: id,
                   chatId: id,
-                  allowedTools: allowedToolMap.size ? allowedToolMap : undefined,
+                  allowedTools: allowedToolMap.size
+                    ? allowedToolMap
+                    : undefined,
                 },
+              });
+
+              dataStream.write({
+                type: "debugResult",
+                data: formatExecutionData(execution.data),
               });
 
               for (const context of verifiedSkillContexts) {
@@ -642,6 +667,7 @@ export async function POST(request: Request) {
                   chatId: id,
                   error: execution.error,
                   logs: execution.logs,
+                  code: codeBlock,
                 });
               }
 
@@ -658,6 +684,13 @@ export async function POST(request: Request) {
                 chatId: id,
                 ok: execution.ok,
               });
+
+              // Signal thinking status for final response
+              dataStream.write({
+                type: "data-tool-status",
+                data: { status: "thinking" },
+              });
+              await new Promise((resolve) => setTimeout(resolve, 10));
             }
           }
         }

@@ -222,8 +222,19 @@ function PureMultimodalInput({
       setShowPayDialog(false);
       resetExecute(); // Clear the error from Wagmi
       resetPaymentStatus(); // Reset payment status
+      setLastExecutedTx(undefined); // Ensure we don't reuse a failed tx
     }
   }, [executeError, isPaying, resetExecute, setMessages, resetPaymentStatus]);
+
+  // Clear executed tx on successful submit or error to prevent reuse
+  useEffect(() => {
+    // This effect ensures we don't hold onto a used TX hash if the submission fails at the chat level
+    // or if the user navigates away.
+    if (status === "submitted" || status === "streaming") {
+      setLastExecutedTx(undefined);
+      setExecutingTool(null);
+    }
+  }, [status]);
 
   const adjustHeight = useCallback(() => {
     if (textareaRef.current) {
@@ -287,11 +298,11 @@ function PureMultimodalInput({
         !isReadonly &&
         (selectedTool || activeTools.length > 0)
       ) {
-      setShowPayDialog(true);
-      return;
-    }
+        setShowPayDialog(true);
+        return;
+      }
 
-    window.history.pushState({}, "", `/chat/${chatId}`);
+      window.history.pushState({}, "", `/chat/${chatId}`);
 
       const textValue = hasText ? input : (toolInvocation?.fallbackText ?? "");
 
@@ -301,18 +312,18 @@ function PureMultimodalInput({
 
       const messagePayload = {
         role: "user" as const,
-      parts: [
-        ...attachments.map((attachment) => ({
-          type: "file" as const,
-          url: attachment.url,
-          name: attachment.name,
-          mediaType: attachment.contentType,
-        })),
-        {
+        parts: [
+          ...attachments.map((attachment) => ({
+            type: "file" as const,
+            url: attachment.url,
+            name: attachment.name,
+            mediaType: attachment.contentType,
+          })),
+          {
             type: "text" as const,
             text: textValue,
-        },
-      ],
+          },
+        ],
       };
 
       const sendOptions = toolInvocation
@@ -325,28 +336,28 @@ function PureMultimodalInput({
 
       sendMessage(messagePayload, sendOptions);
 
-    setAttachments([]);
-    setLocalStorageInput("");
-    resetHeight();
-    setInput("");
+      setAttachments([]);
+      setLocalStorageInput("");
+      resetHeight();
+      setInput("");
 
-    if (width && width > 768) {
-      textareaRef.current?.focus();
-    }
+      if (width && width > 768) {
+        textareaRef.current?.focus();
+      }
     },
     [
-    input,
-    attachments,
-    sendMessage,
-    setAttachments,
-    setLocalStorageInput,
+      input,
+      attachments,
+      sendMessage,
+      setAttachments,
+      setLocalStorageInput,
       resetHeight,
       setInput,
-    width,
-    chatId,
-    isReadonly,
-    selectedTool,
-    activeTools.length,
+      width,
+      chatId,
+      isReadonly,
+      selectedTool,
+      activeTools.length,
     ]
   );
 
@@ -476,21 +487,29 @@ function PureMultimodalInput({
   // After execute success: verify + execute tool server-side and then send the augmented message
   useEffect(() => {
     if (!isExecSuccess || !lastExecutedTx || !executingTool) {
-        return;
-      }
+      return;
+    }
 
-    setStage("thinking", executingTool.name);
+    setStage("planning", executingTool.name);
     submitForm({
-            toolId: executingTool.id,
-            transactionHash: lastExecutedTx,
+      toolId: executingTool.id,
+      transactionHash: lastExecutedTx,
       fallbackText: `Using ${executingTool.name}`,
-        });
+    });
 
-        setIsPaying(false);
-        setShowPayDialog(false);
-        setLastExecutedTx(undefined);
-        setExecutingTool(null);
-  }, [executingTool, isExecSuccess, lastExecutedTx, setStage, submitForm]);
+    setIsPaying(false);
+    setShowPayDialog(false);
+    setLastExecutedTx(undefined);
+    setExecutingTool(null);
+    resetExecute();
+  }, [
+    executingTool,
+    isExecSuccess,
+    lastExecutedTx,
+    setStage,
+    submitForm,
+    resetExecute,
+  ]);
 
   const handleSwitchNetwork = useCallback(async () => {
     try {

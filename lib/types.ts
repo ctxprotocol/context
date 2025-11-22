@@ -43,6 +43,8 @@ export type CustomUIDataTypes = {
   clear: null;
   finish: null;
   usage: AppUsage;
+  debugCode: string;
+  debugResult: string;
 };
 
 export type ChatMessage = UIMessage<

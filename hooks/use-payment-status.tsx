@@ -13,6 +13,8 @@ export type PaymentStage =
   | "setting-cap"
   | "confirming-payment"
   | "querying-tool"
+  | "planning"
+  | "executing"
   | "thinking";
 
 type PaymentStatusContextType = {
@@ -76,6 +78,10 @@ export function getPaymentStatusMessage(
         : "Confirming payment...";
     case "querying-tool":
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
+    case "planning":
+      return "Coding...";
+    case "executing":
+      return "Executing...";
     case "thinking":
       return "Thinking...";
     default:

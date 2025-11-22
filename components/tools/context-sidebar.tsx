@@ -26,12 +26,16 @@ type ContextSidebarProps = {
   isOpen: boolean;
   className?: string;
   onClose?: () => void;
+  isDebugMode: boolean;
+  onToggleDebugMode: () => void;
 };
 
 export function ContextSidebar({
   isOpen,
   className,
   onClose,
+  isDebugMode,
+  onToggleDebugMode,
 }: ContextSidebarProps) {
   const { setOpenMobile } = useSidebar();
   const { tools, loading, activeToolIds, activeTools, totalCost, toggleTool } =
@@ -195,6 +199,26 @@ export function ContextSidebar({
           </SidebarContent>
           <SidebarFooter className="border-t">
             <div className="flex flex-col gap-1 px-2 py-2 text-sidebar-foreground/70 text-xs">
+              <div className="flex items-center justify-between py-1">
+                <span>Developer Mode</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isDebugMode}
+                  onClick={onToggleDebugMode}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+                    isDebugMode ? "bg-primary" : "bg-input"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                      isDebugMode ? "translate-x-4" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
               <div>
                 {activeTools.length}{" "}
                 {activeTools.length === 1 ? "tool" : "tools"} active

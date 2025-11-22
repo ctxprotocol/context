@@ -7,7 +7,8 @@ type CallHttpToolParams = {
   input: Record<string, unknown>;
 };
 
-const HTTP_TIMEOUT_MS = 8_000;
+const HTTP_TIMEOUT_MS = 10_000; // Increased timeout
+const MAX_REQUESTS_PER_TURN = 5; // Allow multiple calls for discovery patterns
 
 export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
   const runtime = getSkillRuntime();
@@ -23,9 +24,9 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
     throw new Error("callHttpTool can only be used with HTTP tools.");
   }
 
-  if (toolContext.hasExecuted) {
+  if (toolContext.executionCount >= MAX_REQUESTS_PER_TURN) {
     throw new Error(
-      "This HTTP tool has already been executed in this response. Create a new message to call it again."
+      `This HTTP tool has reached its limit of ${MAX_REQUESTS_PER_TURN} calls per turn.`
     );
   }
 
@@ -36,6 +37,9 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
   const chatId = runtime.chatId ?? runtime.requestId;
 
   try {
+    console.log(
+      `[http-tool] Calling ${endpoint} for tool ${toolContext.tool.name}`
+    );
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -59,9 +63,21 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
       );
     }
 
-    const payload = await safeReadJson(response);
+    const rawPayload = await safeReadJson(response);
 
-    toolContext.hasExecuted = true;
+    toolContext.executionCount++;
+
+    // Unwrap Context SDK standard response envelope ({ data: ..., meta: ... })
+    // to provide the agent with the direct result it expects.
+    let payload = rawPayload;
+    if (
+      rawPayload &&
+      typeof rawPayload === "object" &&
+      "data" in rawPayload &&
+      "meta" in rawPayload
+    ) {
+      payload = rawPayload.data;
+    }
 
     await recordToolQuery({
       toolId,
@@ -76,7 +92,9 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
 
     return payload;
   } catch (error) {
-    toolContext.hasExecuted = true;
+    // Only increment count on success? No, failures should also count to prevent infinite failure loops.
+    toolContext.executionCount++;
+
     await recordToolQuery({
       toolId,
       userId: runtime.session.user.id,
@@ -94,7 +112,8 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
 
 function extractHttpEndpoint(tool: AITool): string {
   const schema = tool.toolSchema as Record<string, unknown> | null;
-  const endpoint = schema && typeof schema === "object" ? schema["endpoint"] : undefined;
+  const endpoint =
+    schema && typeof schema === "object" ? schema["endpoint"] : undefined;
 
   if (typeof endpoint !== "string") {
     throw new Error(
@@ -120,4 +139,3 @@ async function safeReadJson(response: Response) {
     throw new Error("HTTP tool returned an invalid JSON response.");
   }
 }
-

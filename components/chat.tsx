@@ -20,6 +20,8 @@ import {
 import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
+import { useDebugMode } from "@/hooks/use-debug-mode";
+import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -58,6 +60,8 @@ export function Chat({
 
   const { mutate } = useSWRConfig();
   const { setDataStream } = useDataStream();
+  const { setStage } = usePaymentStatus();
+  const { isDebugMode, toggleDebugMode } = useDebugMode();
 
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
@@ -102,6 +106,16 @@ export function Chat({
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data);
+      }
+      // Handle custom protocol messages
+      const part = dataPart as any;
+      if (part.type === "data-tool-status" && typeof part.data === "object") {
+        const statusValue = part.data.status;
+        if (statusValue === "executing") {
+          setStage("executing");
+        } else if (statusValue === "thinking") {
+          setStage("thinking");
+        }
       }
     },
     onFinish: () => {
@@ -179,6 +193,7 @@ export function Chat({
             setMessages={setMessages}
             status={status}
             votes={votes}
+            isDebugMode={isDebugMode}
           />
 
           <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
@@ -187,11 +202,11 @@ export function Chat({
               chatId={id}
               input={input}
               isReadonly={isReadonly}
+              messages={messages}
+              onModelChange={setCurrentModelId}
               onToggleContextSidebar={() =>
                 setIsContextSidebarOpen(!isContextSidebarOpen)
               }
-              messages={messages}
-              onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
               sendMessage={sendMessage}
@@ -209,6 +224,8 @@ export function Chat({
           className="md:sticky md:top-0 md:h-dvh"
           isOpen={isContextSidebarOpen}
           onClose={() => setIsContextSidebarOpen(false)}
+          isDebugMode={isDebugMode}
+          onToggleDebugMode={toggleDebugMode}
         />
       </div>
 

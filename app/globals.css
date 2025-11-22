@@ -265,14 +265,10 @@
     @apply bg-background text-foreground;
     overflow-x: hidden;
     position: relative;
-    /* Force scrollbar to be always visible to prevent layout shift */
-    overflow-y: scroll;
   }
 
   html {
     overflow-x: hidden;
-    /* Force scrollbar to be always visible to prevent layout shift */
-    overflow-y: scroll;
   }
 }
 

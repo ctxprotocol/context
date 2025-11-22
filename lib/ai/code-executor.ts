@@ -204,6 +204,7 @@ export async function executeSkillCode({
       durationMs: Date.now() - start,
     };
   } catch (error) {
+    console.error("VM execution error raw:", error); // NEW: Log raw error
     const message =
       error instanceof Error ? error.message : "Skill execution failed";
     return {

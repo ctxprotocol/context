@@ -46,6 +46,21 @@ const selectWalletForWagmi: SetActiveWalletForWagmiType = ({ wallets, user }) =>
     return undefined;
   }
 
+  // Check for stored preference first
+  if (typeof window !== "undefined") {
+    const storedAddress = window.localStorage.getItem(
+      "privy_wallet_preference"
+    );
+    if (storedAddress) {
+      const matchedWallet = availableWallets.find(
+        (w) => normalizeAddress(w.address) === normalizeAddress(storedAddress)
+      );
+      if (matchedWallet) {
+        return matchedWallet;
+      }
+    }
+  }
+
   const resolvedUserWallet = user?.wallet as ConnectedWallet | undefined;
 
   if (resolvedUserWallet) {
