@@ -76,10 +76,10 @@ export function getPaymentStatusMessage(
       return toolName
         ? `Confirming payment for ${toolName}...`
         : "Confirming payment...";
+    case "planning":
+      return "Planning...";
     case "querying-tool":
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
-    case "planning":
-      return "Coding...";
     case "executing":
       return "Executing...";
     case "thinking":

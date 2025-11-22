@@ -8,10 +8,10 @@ import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
+import { CodeBlock } from "./elements/code-block";
 import { Conversation, ConversationContent } from "./elements/conversation";
 import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
-import { CodeBlock } from "./elements/code-block";
 
 type MessagesProps = {
   chatId: string;
@@ -81,13 +81,12 @@ function PureMessages({
       // Only reset to idle if we actually have text content from the assistant.
       // The 'status' can be 'streaming' just because we received data parts (like debugCode/toolStatus),
       // so we must check if text has started to arrive.
-      const lastMessage = messages[messages.length - 1];
+      const lastMessage = messages.at(-1);
       const hasTextContent =
         lastMessage?.role === "assistant" &&
-        ((lastMessage.content && lastMessage.content.length > 0) ||
-          lastMessage.parts?.some(
-            (p) => p.type === "text" && p.text.length > 0
-          ));
+        lastMessage.parts?.some(
+          (p) => p.type === "text" && p.text && p.text.length > 0
+        );
 
       if (hasTextContent) {
         // Once we start receiving text delta, we are done executing/planning and back to "Thinking"
@@ -109,15 +108,32 @@ function PureMessages({
 
   const shouldShowThinking = status === "submitted" || stage !== "idle";
 
+  if (process.env.NODE_ENV === "development") {
+    // Lightweight client-side debug for message list evolution.
+    // eslint-disable-next-line no-console
+    console.log("[chat-client] messages snapshot", {
+      status,
+      stage,
+      count: messages.length,
+      lastMessage: messages.length
+        ? {
+            id: messages.at(-1)?.id,
+            role: messages.at(-1)?.role,
+            partTypes: messages.at(-1)?.parts?.map((part) => part.type),
+          }
+        : null,
+    });
+  }
+
   // Helper to find latest debug info
   const lastDebugCode = dataStream
     .slice()
     .reverse()
-    .find((p) => p.type === "debugCode")?.data;
+    .find((p) => p.type === "data-debugCode")?.data;
   const lastDebugResult = dataStream
     .slice()
     .reverse()
-    .find((p) => p.type === "debugResult")?.data;
+    .find((p) => p.type === "data-debugResult")?.data;
 
   return (
     <div
@@ -137,16 +153,26 @@ function PureMessages({
             const isGhost =
               isLast &&
               message.role === "assistant" &&
-              (message.content === undefined || message.content.length === 0) &&
               (!message.parts ||
                 message.parts.length === 0 ||
                 (message.parts.length === 1 &&
                   message.parts[0].type === "text" &&
-                  message.parts[0].text === ""));
+                  (!message.parts[0].text ||
+                    message.parts[0].text.length === 0)));
 
-            if (shouldShowThinking && isGhost) {
+            const hasOnlyDataParts =
+              message.role === "assistant" &&
+              message.parts &&
+              message.parts.length > 0 &&
+              message.parts.every((part) => part.type.startsWith("data-"));
+
+            // Never render pure data-only assistant messages or empty "ghost" messages.
+            if (isGhost || hasOnlyDataParts) {
               return null;
             }
+
+            const isLastAssistant =
+              message.role === "assistant" && index === messages.length - 1;
 
             return (
               <PreviewMessage
@@ -157,6 +183,11 @@ function PureMessages({
                 isReadonly={isReadonly}
                 key={message.id}
                 message={message}
+                isDebugMode={isDebugMode}
+                debugCode={isLastAssistant ? (lastDebugCode as string) : undefined}
+                debugResult={
+                  isLastAssistant ? (lastDebugResult as string) : undefined
+                }
                 regenerate={regenerate}
                 requiresScrollPadding={
                   hasSentMessage && index === messages.length - 1
@@ -170,35 +201,6 @@ function PureMessages({
               />
             );
           })}
-
-          {/* Debug Mode Rendering */}
-          {isDebugMode && shouldShowThinking && (
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 rounded-lg border bg-muted/50 p-4 text-xs font-mono">
-              {lastDebugCode && (
-                <div className="flex flex-col gap-1">
-                  <div className="font-semibold text-muted-foreground">
-                    Generated Code:
-                  </div>
-                  <div className="max-h-60 overflow-y-auto rounded bg-background p-2">
-                    <CodeBlock
-                      language="typescript"
-                      value={lastDebugCode as string}
-                    />
-                  </div>
-                </div>
-              )}
-              {lastDebugResult && (
-                <div className="flex flex-col gap-1 border-t pt-2">
-                  <div className="font-semibold text-muted-foreground">
-                    Execution Result:
-                  </div>
-                  <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded bg-background p-2">
-                    {lastDebugResult as string}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
 
           <AnimatePresence mode="wait">
             {shouldShowThinking && <ThinkingMessage key="thinking" />}

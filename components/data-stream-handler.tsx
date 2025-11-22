@@ -15,10 +15,32 @@ export function DataStreamHandler() {
       return;
     }
 
-    const newDeltas = dataStream.slice();
-    setDataStream([]);
+    // Only consume artifact-related stream parts here.
+    // Leave other events (e.g. data-debugCode/data-debugResult, data-toolStatus, data-usage)
+    // in the shared dataStream so developer-mode UIs and other consumers
+    // can still access them.
+    const artifactTypes = new Set([
+      "data-id",
+      "data-title",
+      "data-kind",
+      "data-clear",
+      "data-finish",
+    ] as const);
 
-    for (const delta of newDeltas) {
+    const artifactDeltas = dataStream.filter((delta) =>
+      artifactTypes.has(delta.type as (typeof artifactTypes extends Set<infer T> ? T : never))
+    );
+
+    if (!artifactDeltas.length) {
+      return;
+    }
+
+    const remainingDeltas = dataStream.filter(
+      (delta) => !artifactTypes.has(delta.type as (typeof artifactTypes extends Set<infer T> ? T : never))
+    );
+    setDataStream(remainingDeltas);
+
+    for (const delta of artifactDeltas) {
       const artifactDefinition = artifactDefinitions.find(
         (currentArtifactDefinition) =>
           currentArtifactDefinition.kind === artifact.kind

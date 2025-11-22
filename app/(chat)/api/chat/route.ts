@@ -2,7 +2,6 @@ import { geolocation } from "@vercel/functions";
 import {
   convertToModelMessages,
   createUIMessageStream,
-  generateText,
   JsonToSseTransformStream,
   smoothStream,
   stepCountIs,
@@ -29,6 +28,7 @@ import type { ChatModel } from "@/lib/ai/models";
 import {
   type EnabledToolSummary,
   type RequestHints,
+  regularPrompt,
   systemPrompt,
 } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
@@ -508,260 +508,326 @@ export async function POST(request: Request) {
     }
 
     // Branch 2: at least one paid tool selected → full two-step agentic loop with code execution.
-    const systemInstructions = systemPrompt({
-      selectedChatModel,
-      requestHints,
-      enabledTools: enabledToolSummaries,
-    });
-
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
-        const baseModelMessages = convertToModelMessages(uiMessages);
-        console.log("[chat-api] starting planning step", {
-          chatId: id,
-          toolInvocationsCount: toolInvocations.length,
-          enabledToolIds: enabledToolSummaries.map((t) => t.toolId),
-        });
-        const planningResponse = await generateText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: systemInstructions,
-          messages: baseModelMessages,
-        });
-
-        const planningText = planningResponse.text.trim();
-        console.log("[chat-api] planning response (truncated)", {
-          chatId: id,
-          preview: planningText.slice(0, 400),
-        });
-        const codeBlock = extractCodeBlock(planningText);
-
-        let mediatorText =
-          "No tool execution was required for this turn. Respond directly to the user.";
-        if (codeBlock) {
-          console.log("[chat-api] extracted code block, analyzing imports", {
+        try {
+          const baseModelMessages = convertToModelMessages(uiMessages);
+          console.log("[chat-api] starting planning step", {
             chatId: id,
+            toolInvocationsCount: toolInvocations.length,
+            enabledToolIds: enabledToolSummaries.map((t) => t.toolId),
+          });
+          const planningSystemInstructions = systemPrompt({
+            selectedChatModel,
+            requestHints,
+            enabledTools: enabledToolSummaries,
           });
 
-          // Signal execution status
-          dataStream.write({
-            type: "data-tool-status",
-            data: { status: "executing" },
+          // STREAMING PLANNER:
+          // Use streamText so dev mode can see the code "as it's being written".
+          const planningResult = streamText({
+            model: myProvider.languageModel(selectedChatModel),
+            system: planningSystemInstructions,
+            messages: baseModelMessages,
+            experimental_transform: smoothStream({ chunking: "word" }),
+            experimental_telemetry: {
+              isEnabled: isProductionEnvironment,
+              functionId: "planning-stream-text",
+            },
           });
 
-          dataStream.write({
-            type: "debugCode",
-            data: codeBlock,
+          let planningText = "";
+          for await (const delta of planningResult.textStream) {
+            planningText += delta;
+            // Stream partial code updates to the client for Developer Mode.
+            // Try to strip ```ts fences so the client can render clean code.
+            const partialCode = extractCodeBlock(planningText) ?? planningText;
+            dataStream.write({
+              type: "data-debugCode",
+              data: partialCode,
+            });
+          }
+
+          planningText = planningText.trim();
+          console.log("[chat-api] planning response (truncated)", {
+            chatId: id,
+            preview: planningText.slice(0, 400),
           });
+          const codeBlock = extractCodeBlock(planningText);
 
-          // Force a tiny delay to ensure the chunk is flushed before blocking execution
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          let mediatorText =
+            "No tool execution was required for this turn. Respond directly to the user.";
+          if (codeBlock) {
+            console.log("[chat-api] extracted code block, analyzing imports", {
+              chatId: id,
+            });
 
-          const modulesUsed = findImportedModules(codeBlock);
+            // Signal execution status
+            dataStream.write({
+              type: "data-toolStatus",
+              data: { status: "executing" },
+            });
 
-          if (modulesUsed.length === 0) {
-            console.warn(
-              "[chat-api] generated code did not import any approved skills; falling back to direct answer",
-              { chatId: id }
-            );
-          } else {
-            const allowedModules = new Set<AllowedModule>();
-            const paidModulesUsed = new Set<PaidToolContext>();
+            // Force a tiny delay to ensure the chunk is flushed before blocking execution
+            await new Promise((resolve) => setTimeout(resolve, 10));
 
-            for (const moduleName of modulesUsed) {
-              if (paidToolModuleMap.has(moduleName)) {
-                const contexts = paidToolModuleMap.get(moduleName);
-                if (contexts && contexts.length > 0) {
-                  allowedModules.add(moduleName);
-                  for (const context of contexts) {
-                    paidModulesUsed.add(context);
-                  }
-                } else {
-                  throw new ChatSDKError(
-                    "bad_request:chat",
-                    `Module ${moduleName} is not available for this request.`
-                  );
-                }
-              } else if (BUILTIN_MODULE_SET.has(moduleName)) {
-                allowedModules.add(moduleName);
-              } else {
-                throw new ChatSDKError(
-                  "forbidden:chat",
-                  `Module ${moduleName} is not authorized for this turn.`
-                );
-              }
-            }
+            const modulesUsed = findImportedModules(codeBlock);
 
-            if (allowedModules.size === 0) {
+            if (modulesUsed.length === 0) {
               console.warn(
-                "[chat-api] no authorized skills found after filtering; falling back to direct answer",
+                "[chat-api] generated code did not import any approved skills; falling back to direct answer",
                 { chatId: id }
               );
             } else {
-              const verifiedSkillContexts: PaidToolContext[] = [];
-              for (const context of paidModulesUsed) {
-                const verification = await verifyPayment(
-                  context.transactionHash as `0x${string}`,
-                  context.tool.id,
-                  context.tool.developerWallet
-                );
-                if (!verification.isValid) {
-                  console.warn("[chat-api] payment verification failed", {
-                    chatId: id,
-                    toolId: context.tool.id,
-                    tx: context.transactionHash,
-                    error: verification.error,
-                  });
+              const allowedModules = new Set<AllowedModule>();
+              const paidModulesUsed = new Set<PaidToolContext>();
+
+              for (const moduleName of modulesUsed) {
+                if (paidToolModuleMap.has(moduleName)) {
+                  const contexts = paidToolModuleMap.get(moduleName);
+                  if (contexts && contexts.length > 0) {
+                    allowedModules.add(moduleName);
+                    for (const context of contexts) {
+                      paidModulesUsed.add(context);
+                    }
+                  } else {
+                    throw new ChatSDKError(
+                      "bad_request:chat",
+                      `Module ${moduleName} is not available for this request.`
+                    );
+                  }
+                } else if (BUILTIN_MODULE_SET.has(moduleName)) {
+                  allowedModules.add(moduleName);
+                } else {
                   throw new ChatSDKError(
-                    "bad_request:chat",
-                    verification.error || "Payment verification failed."
+                    "forbidden:chat",
+                    `Module ${moduleName} is not authorized for this turn.`
                   );
                 }
-                if (context.kind === "skill") {
-                  verifiedSkillContexts.push(context);
+              }
+
+              if (allowedModules.size === 0) {
+                console.warn(
+                  "[chat-api] no authorized skills found after filtering; falling back to direct answer",
+                  { chatId: id }
+                );
+              } else {
+                const verifiedSkillContexts: PaidToolContext[] = [];
+                for (const context of paidModulesUsed) {
+                  const verification = await verifyPayment(
+                    context.transactionHash as `0x${string}`,
+                    context.tool.id,
+                    context.tool.developerWallet
+                  );
+                  if (!verification.isValid) {
+                    console.warn("[chat-api] payment verification failed", {
+                      chatId: id,
+                      toolId: context.tool.id,
+                      tx: context.transactionHash,
+                      error: verification.error,
+                    });
+                    throw new ChatSDKError(
+                      "bad_request:chat",
+                      verification.error || "Payment verification failed."
+                    );
+                  }
+                  if (context.kind === "skill") {
+                    verifiedSkillContexts.push(context);
+                  }
                 }
-              }
 
-              const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
+                const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
 
-              console.log("[chat-api] executing skill code", {
-                chatId: id,
-                allowedModules: Array.from(allowedModules),
-                httpTools: Array.from(allowedToolMap.keys()),
-              });
-
-              const execution = await executeSkillCode({
-                code: codeBlock,
-                allowedModules: Array.from(allowedModules),
-                runtime: {
-                  session,
-                  dataStream,
-                  requestId: id,
+                console.log("[chat-api] executing skill code", {
                   chatId: id,
-                  allowedTools: allowedToolMap.size
-                    ? allowedToolMap
-                    : undefined,
-                },
-              });
-
-              dataStream.write({
-                type: "debugResult",
-                data: formatExecutionData(execution.data),
-              });
-
-              for (const context of verifiedSkillContexts) {
-                await recordToolQuery({
-                  toolId: context.tool.id,
-                  userId: session.user.id,
-                  chatId: id,
-                  amountPaid: context.tool.pricePerQuery,
-                  transactionHash: context.transactionHash,
-                  queryOutput: execution.ok
-                    ? (execution.data as Record<string, unknown>)
-                    : undefined,
-                  status: execution.ok ? "completed" : "failed",
+                  allowedModules: Array.from(allowedModules),
+                  httpTools: Array.from(allowedToolMap.keys()),
                 });
-              }
 
-              if (!execution.ok) {
-                console.error("[chat-api] skill execution failed", {
-                  chatId: id,
-                  error: execution.error,
-                  logs: execution.logs,
+                const execution = await executeSkillCode({
                   code: codeBlock,
+                  allowedModules: Array.from(allowedModules),
+                  runtime: {
+                    session,
+                    dataStream,
+                    requestId: id,
+                    chatId: id,
+                    allowedTools: allowedToolMap.size
+                      ? allowedToolMap
+                      : undefined,
+                  },
                 });
+
+                if (execution.ok) {
+                  dataStream.write({
+                    type: "data-debugResult",
+                    data: formatExecutionData(execution.data),
+                  });
+                } else {
+                  dataStream.write({
+                    type: "data-debugResult",
+                    data: formatExecutionData({
+                      error: execution.error,
+                      logs: execution.logs,
+                    }),
+                  });
+                }
+
+                for (const context of verifiedSkillContexts) {
+                  await recordToolQuery({
+                    toolId: context.tool.id,
+                    userId: session.user.id,
+                    chatId: id,
+                    amountPaid: context.tool.pricePerQuery,
+                    transactionHash: context.transactionHash,
+                    queryOutput: execution.ok
+                      ? (execution.data as Record<string, unknown>)
+                      : undefined,
+                    status: execution.ok ? "completed" : "failed",
+                  });
+                }
+
+                if (!execution.ok) {
+                  console.error("[chat-api] skill execution failed", {
+                    chatId: id,
+                    error: execution.error,
+                    logs: execution.logs,
+                    code: codeBlock,
+                  });
+                }
+
+                mediatorText = execution.ok
+                  ? `Tool execution succeeded.\nModules used: ${Array.from(
+                      allowedModules
+                    ).join(", ")}\nResult JSON:\n${formatExecutionData(
+                      execution.data
+                    )}`
+                  : `Tool execution failed: ${execution.error}\nLogs:\n${execution.logs.join(
+                      "\n"
+                    )}`;
+                console.log("[chat-api] execution finished", {
+                  chatId: id,
+                  ok: execution.ok,
+                });
+
+                // Signal thinking status for final response
+                dataStream.write({
+                  type: "data-toolStatus",
+                  data: { status: "thinking" },
+                });
+                await new Promise((resolve) => setTimeout(resolve, 10));
               }
-
-              mediatorText = execution.ok
-                ? `Tool execution succeeded.\nModules used: ${Array.from(
-                    allowedModules
-                  ).join(", ")}\nResult JSON:\n${formatExecutionData(
-                    execution.data
-                  )}`
-                : `Tool execution failed: ${execution.error}\nLogs:\n${execution.logs.join(
-                    "\n"
-                  )}`;
-              console.log("[chat-api] execution finished", {
-                chatId: id,
-                ok: execution.ok,
-              });
-
-              // Signal thinking status for final response
-              dataStream.write({
-                type: "data-tool-status",
-                data: { status: "thinking" },
-              });
-              await new Promise((resolve) => setTimeout(resolve, 10));
             }
           }
-        }
 
-        const mediatorMessage: ChatMessage = {
-          id: generateUUID(),
-          role: "assistant",
-          parts: [
-            {
-              type: "text",
-              text: `[[EXECUTION SUMMARY]]\n${mediatorText}`,
+          const mediatorMessage: ChatMessage = {
+            id: generateUUID(),
+            role: "assistant",
+            parts: [
+              {
+                type: "text",
+                text: `[[EXECUTION SUMMARY]]\n${mediatorText}`,
+              },
+            ],
+          };
+
+          console.log("[chat-api] mediator message (truncated)", {
+            chatId: id,
+            preview:
+              mediatorMessage.parts[0]?.type === "text"
+                ? (mediatorMessage.parts[0].text as string).slice(0, 400)
+                : null,
+          });
+
+          const finalMessages = convertToModelMessages([
+            ...uiMessages,
+            mediatorMessage,
+          ]);
+
+          console.log("[chat-api] starting final response stream", {
+            chatId: id,
+            messageCount: finalMessages.length,
+          });
+
+          const answerSystemInstructions = `${regularPrompt}
+
+You are responding to the user *after* tools have already been executed.
+
+You will see an internal assistant message that starts with "[[EXECUTION SUMMARY]]" and contains a JSON summary of the tool results.
+
+- Use that summary (and the full conversation) to answer the user's question in clear, natural language.
+- Do NOT show TypeScript code or the raw JSON unless the user explicitly asks to see it.
+- Instead, explain the key findings, numbers, and rankings in a concise way.
+- If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.`;
+
+          const result = streamText({
+            model: myProvider.languageModel(selectedChatModel),
+            system: answerSystemInstructions,
+            messages: finalMessages,
+            stopWhen: stepCountIs(5),
+            experimental_transform: smoothStream({ chunking: "word" }),
+            experimental_telemetry: {
+              isEnabled: isProductionEnvironment,
+              functionId: "stream-text",
             },
-          ],
-        };
+            onFinish: async ({ usage }) => {
+              try {
+                const providers = await getTokenlensCatalog();
+                const modelId =
+                  myProvider.languageModel(selectedChatModel).modelId;
+                if (!modelId) {
+                  finalMergedUsage = usage;
+                  dataStream.write({
+                    type: "data-usage",
+                    data: finalMergedUsage,
+                  });
+                  return;
+                }
 
-        const finalMessages = convertToModelMessages([
-          ...uiMessages,
-          mediatorMessage,
-        ]);
+                if (!providers) {
+                  finalMergedUsage = usage;
+                  dataStream.write({
+                    type: "data-usage",
+                    data: finalMergedUsage,
+                  });
+                  return;
+                }
 
-        const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: systemInstructions,
-          messages: finalMessages,
-          stopWhen: stepCountIs(5),
-          experimental_transform: smoothStream({ chunking: "word" }),
-          experimental_telemetry: {
-            isEnabled: isProductionEnvironment,
-            functionId: "stream-text",
-          },
-          onFinish: async ({ usage }) => {
-            try {
-              const providers = await getTokenlensCatalog();
-              const modelId =
-                myProvider.languageModel(selectedChatModel).modelId;
-              if (!modelId) {
+                const summary = getUsage({ modelId, usage, providers });
+                finalMergedUsage = {
+                  ...usage,
+                  ...summary,
+                  modelId,
+                } as AppUsage;
+                dataStream.write({
+                  type: "data-usage",
+                  data: finalMergedUsage,
+                });
+              } catch (err) {
+                console.warn("TokenLens enrichment failed", err);
                 finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
                 });
-                return;
               }
+            },
+          });
 
-              if (!providers) {
-                finalMergedUsage = usage;
-                dataStream.write({
-                  type: "data-usage",
-                  data: finalMergedUsage,
-                });
-                return;
-              }
+          result.consumeStream();
 
-              const summary = getUsage({ modelId, usage, providers });
-              finalMergedUsage = { ...usage, ...summary, modelId } as AppUsage;
-              dataStream.write({ type: "data-usage", data: finalMergedUsage });
-            } catch (err) {
-              console.warn("TokenLens enrichment failed", err);
-              finalMergedUsage = usage;
-              dataStream.write({ type: "data-usage", data: finalMergedUsage });
-            }
-          },
-        });
-
-        result.consumeStream();
-
-        dataStream.merge(
-          result.toUIMessageStream({
-            sendReasoning: true,
-          })
-        );
+          dataStream.merge(
+            result.toUIMessageStream({
+              sendReasoning: true,
+            })
+          );
+        } catch (error) {
+          console.error("[chat-api] error in paid tools branch", {
+            chatId: id,
+            error,
+          });
+          throw error;
+        }
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {

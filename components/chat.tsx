@@ -103,13 +103,23 @@ export function Chat({
       },
     }),
     onData: (dataPart) => {
+      if (process.env.NODE_ENV === "development") {
+        // Client-side debug log for streaming parts
+        // This helps us verify that tool status, debugCode/debugResult,
+        // and assistant text deltas are actually reaching the browser.
+        // eslint-disable-next-line no-console
+        console.log("[chat-client] data part", {
+          type: (dataPart as any).type,
+          hasData: "data" in (dataPart as any),
+        });
+      }
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data);
       }
       // Handle custom protocol messages
       const part = dataPart as any;
-      if (part.type === "data-tool-status" && typeof part.data === "object") {
+      if (part.type === "data-toolStatus" && typeof part.data === "object") {
         const statusValue = part.data.status;
         if (statusValue === "executing") {
           setStage("executing");
@@ -122,6 +132,11 @@ export function Chat({
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
+      // Surface all client-side streaming errors so we can debug issues
+      // that aren't ChatSDKError instances (e.g. transport/parse errors).
+      // eslint-disable-next-line no-console
+      console.error("[chat-client] useChat error", error);
+
       if (error instanceof ChatSDKError) {
         // Check if it's a credit card error
         if (
@@ -134,6 +149,14 @@ export function Chat({
             description: error.message,
           });
         }
+      } else {
+        toast({
+          type: "error",
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred while streaming the response.",
+        });
       }
     },
   });
