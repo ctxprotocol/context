@@ -8,8 +8,9 @@ import Providers from "@/components/providers"; // Import the new Providers comp
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://chat.vercel.ai"),
-  title: "Next.js Chatbot Template",
-  description: "Next.js chatbot template using the AI SDK.",
+  title: "Context",
+  description:
+    "Context is a decentralized AI context marketplace that lets developers earn as data brokers.",
 };
 
 export const viewport = {

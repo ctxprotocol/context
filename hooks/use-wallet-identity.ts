@@ -45,15 +45,31 @@ export function useWalletIdentity() {
 
   useEffect(() => {
     const handlePreferenceChange = () => setPreferenceKey((prev) => prev + 1);
+
+    // Same-tab preference updates (e.g., when the user switches wallets
+    // from within this window).
     window.addEventListener(
       "privy-wallet-preference-changed",
       handlePreferenceChange
     );
-    return () =>
+
+    // Cross-tab preference updates: when another tab changes the preferred
+    // wallet in localStorage, the "storage" event fires in this tab.
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "privy_wallet_preference") {
+        handlePreferenceChange();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
       window.removeEventListener(
         "privy-wallet-preference-changed",
         handlePreferenceChange
       );
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const wallets: WalletUnion[] = useMemo(() => {

@@ -1,8 +1,14 @@
 /**
- * Wipe all users and their related data from the database.
+ * Wipe ALL user-related data from the database.
  *
- * This is safe for your current situation because you mentioned there are only
- * two test users and no other user data in this app.
+ * This script is intentionally aggressive:
+ * - It deletes every row from all user-related tables, regardless of whether
+ *   the corresponding parent rows (e.g. in "User" or "Chat") still exist.
+ * - This means it will also clean up any "orphaned" rows that might have been
+ *   left behind by previous partial deletes or manual DB edits.
+ *
+ * Only run this against databases where it's safe to completely reset all
+ * user data (e.g. local dev / preview environments).
  *
  * Run with:
  *   npx tsx scripts/wipe-all-users-and-data.ts
@@ -26,99 +32,65 @@ async function wipeAllUsersAndData() {
   const db = drizzle(client);
 
   try {
-    console.log("⏳ Wiping all users and related data...");
+    console.log("⏳ Wiping all user-related tables (including orphaned rows)...");
 
     // Order matters to satisfy foreign key constraints.
+    //
+    // We always delete from child tables first, then parents:
+    // Suggestions → Votes → Streams → Messages → ToolQuery/ToolReport
+    // → Documents → Chats → Tools → Users
 
-    // Suggestions → Documents → Streams → Votes → Messages → Chats
+    // Suggestions (depends on Document + User)
     await db.execute(sql`
-      DELETE FROM "Suggestion"
-      WHERE "documentId" IN (
-        SELECT "id" FROM "Document"
-      );
+      DELETE FROM "Suggestion";
+    `);
+
+    // Votes (depends on Chat + Messages)
+    await db.execute(sql`
+      DELETE FROM "Vote_v2";
     `);
 
     await db.execute(sql`
-      DELETE FROM "Document"
-      WHERE "userId" IN (
-        SELECT "id" FROM "User"
-      );
+      DELETE FROM "Vote";
+    `);
+
+    // Streams (depends on Chat)
+    await db.execute(sql`
+      DELETE FROM "Stream";
+    `);
+
+    // Messages (depend on Chat)
+    await db.execute(sql`
+      DELETE FROM "Message_v2";
     `);
 
     await db.execute(sql`
-      DELETE FROM "Stream"
-      WHERE "chatId" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
+      DELETE FROM "Message";
     `);
 
+    // Tool queries that reference chats/tools/users
     await db.execute(sql`
-      DELETE FROM "Vote_v2"
-      WHERE "chatId" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
+      DELETE FROM "ToolQuery";
     `);
 
+    // Tool reports created by any user
     await db.execute(sql`
-      DELETE FROM "Vote"
-      WHERE "chatId" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
+      DELETE FROM "ToolReport";
     `);
 
+    // Documents (depend on User)
     await db.execute(sql`
-      DELETE FROM "Message_v2"
-      WHERE "chatId" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
+      DELETE FROM "Document";
     `);
 
+    // Chats (depend on User)
     await db.execute(sql`
-      DELETE FROM "Message"
-      WHERE "chatId" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
+      DELETE FROM "Chat";
     `);
 
-    // Tool queries that reference those chats
+    // Any tools owned or verified by users
     await db.execute(sql`
-      DELETE FROM "ToolQuery"
-      WHERE "chat_id" IN (
-        SELECT "id" FROM "Chat"
-        WHERE "userId" IN (SELECT "id" FROM "User")
-      );
-    `);
-
-    await db.execute(sql`
-      DELETE FROM "Chat"
-      WHERE "userId" IN (
-        SELECT "id" FROM "User"
-      );
-    `);
-
-    // Tool queries and reports created by any user (remaining rows)
-    await db.execute(sql`
-      DELETE FROM "ToolQuery"
-      WHERE "user_id" IN (
-        SELECT "id" FROM "User"
-      );
-    `);
-
-    await db.execute(sql`
-      DELETE FROM "ToolReport"
-      WHERE "reporter_id" IN (
-        SELECT "id" FROM "User"
-      );
-    `);
-
-    // Any tools owned or verified by users (if any exist)
-    await db.execute(sql`
-      DELETE FROM "AITool"
+      DELETE FROM "AITool";
     `);
 
     // Finally delete the users themselves

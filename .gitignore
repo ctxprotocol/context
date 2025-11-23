@@ -46,3 +46,6 @@ yarn-error.log*
 # md files
 *.md
 !README.md
+
+# local-only DB maintenance scripts
+scripts/wipe-all-users-and-data.ts

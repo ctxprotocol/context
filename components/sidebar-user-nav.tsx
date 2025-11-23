@@ -1,9 +1,11 @@
 "use client";
 
+import type { ConnectedWallet } from "@privy-io/react-auth";
 import { useLinkAccount, useLogin, usePrivy } from "@privy-io/react-auth";
 import { useSetActiveWallet } from "@privy-io/wagmi";
 import { ChevronUp } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
@@ -13,10 +15,10 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
   DropdownMenuSub,
-  DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
@@ -51,8 +53,7 @@ export function SidebarUserNav() {
 
   // Display email if available, otherwise show formatted wallet address
   const displayName = isConnected
-    ? userEmail ||
-      (walletAddress ? formatWalletAddress(walletAddress) : "User")
+    ? userEmail || (walletAddress ? formatWalletAddress(walletAddress) : "User")
     : "Connect Wallet";
 
   const { login } = useLogin({
@@ -74,11 +75,13 @@ export function SidebarUserNav() {
   const { linkWallet } = useLinkAccount();
 
   const handleSwitchWallet = async (address: string) => {
-    const wallet = wallets.find((w) => w.address === address);
-    if (!wallet) return;
+    const wallet = wallets.find((w) => w?.address === address);
+    if (!wallet) {
+      return;
+    }
 
     try {
-      await setActiveWallet(wallet);
+      await setActiveWallet(wallet as ConnectedWallet);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("privy_wallet_preference", wallet.address);
         window.dispatchEvent(new Event("privy-wallet-preference-changed"));
@@ -138,7 +141,23 @@ export function SidebarUserNav() {
   const handleLinkExternalWallet = async () => {
     try {
       setIsLinkingWallet(true);
-      await linkWallet();
+      const linkedWallet = (await linkWallet()) as ConnectedWallet | undefined;
+
+      // Ensure the newly linked wallet becomes the active one everywhere:
+      // - Update Privy/Wagmi via setActiveWallet
+      // - Persist the preference in localStorage
+      // - Notify any listeners (like useWalletIdentity) via a custom event
+      if (linkedWallet) {
+        await setActiveWallet(linkedWallet);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(
+            "privy_wallet_preference",
+            linkedWallet.address
+          );
+          window.dispatchEvent(new Event("privy-wallet-preference-changed"));
+        }
+      }
+
       toast({
         type: "success",
         description: "External wallet connected. Future payments will use it.",
@@ -228,14 +247,9 @@ export function SidebarUserNav() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <a
-                href="/contribute"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full cursor-pointer"
-              >
+              <Link className="w-full cursor-pointer" href="/contribute">
                 Contribute a Tool
-              </a>
+              </Link>
             </DropdownMenuItem>
             {isConnected && walletAddress && (
               <>
@@ -245,9 +259,14 @@ export function SidebarUserNav() {
                 </DropdownMenuLabel>
                 {wallets.length > 1 && (
                   <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Switch Wallet</DropdownMenuSubTrigger>
+                    <DropdownMenuSubTrigger>
+                      Switch Wallet
+                    </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
                       {wallets.map((wallet) => {
+                        if (!wallet) {
+                          return null;
+                        }
                         const isCurrent = wallet.address === walletAddress;
                         return (
                           <DropdownMenuItem

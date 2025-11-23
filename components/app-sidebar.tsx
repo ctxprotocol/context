@@ -77,7 +77,7 @@ export function AppSidebar({
                 }}
               >
                 <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
-                  Chatbot
+                  Context
                 </span>
               </Link>
               <div className="flex flex-row gap-1">
