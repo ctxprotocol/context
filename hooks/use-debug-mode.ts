@@ -7,8 +7,10 @@ export function useDebugMode() {
 
   useEffect(() => {
     const stored = localStorage.getItem("isDebugMode");
-    if (stored) {
-      setIsDebugMode(JSON.stringify(stored) === "true");
+    // Persisted value is stored as the string "true" or "false".
+    // We only enable debug mode when the stored value is exactly "true".
+    if (stored === "true") {
+      setIsDebugMode(true);
     }
   }, []);
 

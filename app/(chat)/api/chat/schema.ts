@@ -29,6 +29,10 @@ export const postRequestBodySchema = z.object({
   selectedChatModel: z.enum(["chat-model", "chat-model-reasoning"]),
   selectedVisibilityType: z.enum(["public", "private"]),
   toolInvocations: z.array(toolInvocationSchema).max(5).optional(),
+  // Optional flag indicating whether the client wants developer-mode
+  // instrumentation (TypeScript plan + JSON result) included inline
+  // in the final assistant markdown response.
+  isDebugMode: z.boolean().optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

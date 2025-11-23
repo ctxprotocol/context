@@ -41,8 +41,6 @@ const PurePreviewMessage = ({
   isReadonly,
   requiresScrollPadding,
   isDebugMode,
-  debugCode,
-  debugResult,
 }: {
   chatId: string;
   message: ChatMessage;
@@ -53,8 +51,6 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
   requiresScrollPadding: boolean;
   isDebugMode: boolean;
-  debugCode?: string;
-  debugResult?: string;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -100,21 +96,6 @@ const PurePreviewMessage = ({
               message.role === "user" && mode !== "edit",
           })}
         >
-          {/* Developer Mode: show code & execution result inline
-              within the assistant message bubble. */}
-          {isDebugMode &&
-            message.role === "assistant" &&
-            (debugCode || debugResult) && (
-              <div className="mb-2 flex flex-col gap-2">
-                {debugCode && (
-                  <CodeBlock code={debugCode} language="typescript" />
-                )}
-                {debugResult && (
-                  <CodeBlock code={debugResult} language="json" />
-                )}
-              </div>
-            )}
-
           {attachmentsFromMessage.length > 0 && (
             <div
               className="flex flex-row justify-end gap-2"

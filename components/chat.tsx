@@ -62,6 +62,19 @@ export function Chat({
   const { setDataStream } = useDataStream();
   const { setStage } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
+  const debugModeRef = useRef(isDebugMode);
+
+  useEffect(() => {
+    debugModeRef.current = isDebugMode;
+  }, [isDebugMode]);
+
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
+    console.log("[chat-client] debug mode state", {
+      isDebugMode,
+      debugModeRef: debugModeRef.current,
+    });
+  }
 
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
@@ -97,6 +110,9 @@ export function Chat({
             message: request.messages.at(-1),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
+            // Use the ref so we always send the latest dev-mode value,
+            // even though the transport closure was created earlier.
+            isDebugMode: debugModeRef.current,
             ...request.body,
           },
         };

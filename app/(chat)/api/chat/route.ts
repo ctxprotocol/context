@@ -237,13 +237,23 @@ export async function POST(request: Request) {
       selectedChatModel,
       selectedVisibilityType,
       toolInvocations = [],
+      isDebugMode = false,
     }: {
       id: string;
       message: ChatMessage;
       selectedChatModel: ChatModel["id"];
       selectedVisibilityType: VisibilityType;
       toolInvocations?: { toolId: string; transactionHash: string }[];
+      isDebugMode?: boolean;
     } = requestBody;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[chat-api] request debug flags", {
+        chatId: id,
+        isDebugMode,
+        toolInvocationsCount: toolInvocations.length,
+      });
+    }
 
     const session = await auth();
 
@@ -539,13 +549,6 @@ export async function POST(request: Request) {
           let planningText = "";
           for await (const delta of planningResult.textStream) {
             planningText += delta;
-            // Stream partial code updates to the client for Developer Mode.
-            // Try to strip ```ts fences so the client can render clean code.
-            const partialCode = extractCodeBlock(planningText) ?? planningText;
-            dataStream.write({
-              type: "data-debugCode",
-              data: partialCode,
-            });
           }
 
           planningText = planningText.trim();
@@ -557,7 +560,20 @@ export async function POST(request: Request) {
 
           let mediatorText =
             "No tool execution was required for this turn. Respond directly to the user.";
+          // Keep track of the last execution payload so we can optionally
+          // surface it inline in the final markdown response for Developer
+          // Mode. This stays server-side and is only exposed to the model
+          // when isDebugMode is true.
+          let executionPayload: string | undefined;
+
           if (codeBlock) {
+            if (process.env.NODE_ENV === "development") {
+              console.log("[chat-api] planning extracted code block", {
+                chatId: id,
+                isDebugMode,
+                codePreview: codeBlock.slice(0, 160),
+              });
+            }
             console.log("[chat-api] extracted code block, analyzing imports", {
               chatId: id,
             });
@@ -659,17 +675,11 @@ export async function POST(request: Request) {
                 });
 
                 if (execution.ok) {
-                  dataStream.write({
-                    type: "data-debugResult",
-                    data: formatExecutionData(execution.data),
-                  });
+                  executionPayload = formatExecutionData(execution.data);
                 } else {
-                  dataStream.write({
-                    type: "data-debugResult",
-                    data: formatExecutionData({
-                      error: execution.error,
-                      logs: execution.logs,
-                    }),
+                  executionPayload = formatExecutionData({
+                    error: execution.error,
+                    logs: execution.logs,
                   });
                 }
 
@@ -749,6 +759,39 @@ export async function POST(request: Request) {
             messageCount: finalMessages.length,
           });
 
+          // When Developer Mode is enabled, we want a *single* assistant
+          // message that contains:
+          //   1) The TypeScript plan in a fenced ```ts block
+          //   2) The raw execution result (or error/logs) in a fenced ```json block
+          //   3) The natural-language answer
+          //
+          // To preserve the template's markdown rendering and styling, we
+          // instruct the model to emit these blocks inline in the final
+          // response instead of sending them as separate debug streams.
+          //
+          // When Developer Mode is disabled, we keep the original behavior
+          // and explicitly tell the model *not* to surface TS/JSON.
+          const devPrefix =
+            isDebugMode && codeBlock && executionPayload
+              ? `
+
+At the very top of your answer, before any prose, output **exactly** the following markdown snippet, without modifying it:
+
+\`\`\`ts
+${codeBlock}
+\`\`\`
+
+\`\`\`json
+${executionPayload}
+\`\`\`
+
+After that snippet and a blank line, write your natural language explanation as described below.
+`
+              : `
+
+Do NOT show TypeScript code or the raw JSON unless the user explicitly asks to see it.
+`;
+
           const answerSystemInstructions = `${regularPrompt}
 
 You are responding to the user *after* tools have already been executed.
@@ -756,9 +799,9 @@ You are responding to the user *after* tools have already been executed.
 You will see an internal assistant message that starts with "[[EXECUTION SUMMARY]]" and contains a JSON summary of the tool results.
 
 - Use that summary (and the full conversation) to answer the user's question in clear, natural language.
-- Do NOT show TypeScript code or the raw JSON unless the user explicitly asks to see it.
 - Instead, explain the key findings, numbers, and rankings in a concise way.
-- If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.`;
+- If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.
+${devPrefix}`;
 
           const result = streamText({
             model: myProvider.languageModel(selectedChatModel),

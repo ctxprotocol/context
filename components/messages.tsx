@@ -8,7 +8,6 @@ import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
-import { CodeBlock } from "./elements/code-block";
 import { Conversation, ConversationContent } from "./elements/conversation";
 import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
@@ -125,16 +124,6 @@ function PureMessages({
     });
   }
 
-  // Helper to find latest debug info
-  const lastDebugCode = dataStream
-    .slice()
-    .reverse()
-    .find((p) => p.type === "data-debugCode")?.data;
-  const lastDebugResult = dataStream
-    .slice()
-    .reverse()
-    .find((p) => p.type === "data-debugResult")?.data;
-
   return (
     <div
       className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex-1 touch-pan-y overflow-y-scroll"
@@ -171,18 +160,14 @@ function PureMessages({
               return null;
             }
 
-            const isLastAssistant =
-              message.role === "assistant" && index === messages.length - 1;
-
             return (
               <PreviewMessage
                 chatId={chatId}
-                debugCode={
-                  isLastAssistant ? (lastDebugCode as string) : undefined
-                }
-                debugResult={
-                  isLastAssistant ? (lastDebugResult as string) : undefined
-                }
+                // Developer Mode now relies on the inline markdown emitted by
+                // the final assistant response. We keep the flag so UI pieces
+                // that care about the mode (e.g. sidebar toggle) still work,
+                // but we no longer thread separate debugCode/debugResult
+                // streams into the message component.
                 isDebugMode={isDebugMode}
                 isLoading={
                   status === "streaming" && messages.length - 1 === index

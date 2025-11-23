@@ -42,6 +42,14 @@ export const CodeBlock = ({
       )}
       {...props}
     >
+      <div className="flex w-full items-center justify-between border-b bg-muted px-4 py-2">
+        <span className="text-xs font-medium text-muted-foreground lowercase">
+          {language}
+        </span>
+        <div className="flex items-center gap-2">
+          {!children ? <CodeBlockCopyButton /> : children}
+        </div>
+      </div>
       <div className="relative">
         <SyntaxHighlighter
           className="overflow-hidden dark:hidden"
@@ -95,11 +103,6 @@ export const CodeBlock = ({
         >
           {code}
         </SyntaxHighlighter>
-        {children && (
-          <div className="absolute top-2 right-2 flex items-center gap-2">
-            {children}
-          </div>
-        )}
       </div>
     </div>
   </CodeBlockContext.Provider>
