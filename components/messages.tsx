@@ -177,17 +177,19 @@ function PureMessages({
             return (
               <PreviewMessage
                 chatId={chatId}
+                debugCode={
+                  isLastAssistant ? (lastDebugCode as string) : undefined
+                }
+                debugResult={
+                  isLastAssistant ? (lastDebugResult as string) : undefined
+                }
+                isDebugMode={isDebugMode}
                 isLoading={
                   status === "streaming" && messages.length - 1 === index
                 }
                 isReadonly={isReadonly}
                 key={message.id}
                 message={message}
-                isDebugMode={isDebugMode}
-                debugCode={isLastAssistant ? (lastDebugCode as string) : undefined}
-                debugResult={
-                  isLastAssistant ? (lastDebugResult as string) : undefined
-                }
                 regenerate={regenerate}
                 requiresScrollPadding={
                   hasSentMessage && index === messages.length - 1

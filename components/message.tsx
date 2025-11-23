@@ -13,9 +13,9 @@ import { cn, sanitizeText } from "@/lib/utils";
 import { useDataStream } from "./data-stream-provider";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
+import { CodeBlock } from "./elements/code-block";
 import { MessageContent } from "./elements/message";
 import { Response } from "./elements/response";
-import { CodeBlock } from "./elements/code-block";
 import {
   Tool,
   ToolContent,

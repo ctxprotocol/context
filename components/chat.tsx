@@ -209,6 +209,7 @@ export function Chat({
           <Messages
             chatId={id}
             isArtifactVisible={isArtifactVisible}
+            isDebugMode={isDebugMode}
             isReadonly={isReadonly}
             messages={messages}
             regenerate={regenerate}
@@ -216,7 +217,6 @@ export function Chat({
             setMessages={setMessages}
             status={status}
             votes={votes}
-            isDebugMode={isDebugMode}
           />
 
           <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
@@ -245,9 +245,9 @@ export function Chat({
 
         <ContextSidebar
           className="md:sticky md:top-0 md:h-dvh"
+          isDebugMode={isDebugMode}
           isOpen={isContextSidebarOpen}
           onClose={() => setIsContextSidebarOpen(false)}
-          isDebugMode={isDebugMode}
           onToggleDebugMode={toggleDebugMode}
         />
       </div>
