@@ -23,8 +23,8 @@ export const contributeFormSchema = z
     developerWallet: z
       .string()
       .regex(/^0x[a-fA-F0-9]{40}$/, "Wallet must be a valid EVM address"),
-    defaultParams: z.string().max(20000).optional(),
-    outputSchema: z.string().max(20000).optional(),
+    defaultParams: z.string().max(20_000).optional(),
+    outputSchema: z.string().max(20_000).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.kind === "http") {
