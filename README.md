@@ -88,11 +88,31 @@ For complex logic that requires high performance or verified execution, you can 
 ### 🔒 HTTP Tool Safety Limits
 
 Each paid tool invocation runs inside a sandboxed code-execution environment.
-To protect contributors from abuse, HTTP-based skills are limited to a small
-number of upstream requests per turn (currently **100 HTTP calls per paid
-query**). Tool authors should design their APIs and examples so the agent can
-do useful work within that budget (e.g. 1 discovery call plus a handful of
-detail lookups), and the planner prompt will encourage efficient patterns.
+
+- **HTTP Tools (via `callHttpSkill`)**
+  - Enforced limit in `lib/ai/skills/http.ts`:
+    - `MAX_REQUESTS_PER_TURN = 100`
+    - Every `callHttpSkill({ toolId, input })` increments an internal `executionCount`.
+    - Once `executionCount >= 100`, the platform throws an error for that turn.
+  - This is the “**100 HTTP calls per paid query**” rule. Tool authors should design their
+    APIs and JSON examples so the Agent can do useful work within that budget
+    (e.g. 1 discovery call plus a handful of detail lookups).
+
+- **Native Tools (custom skills in `lib/ai/skills/community/*`)**
+  - Executed via `executeSkillCode` in `lib/ai/code-executor.ts`.
+  - There is **no per-call counter** on how many times your exported functions are invoked.
+  - The real limits are:
+    - The VM timeout in `executeSkillCode` (default `timeoutMs = 5000`).
+    - The underlying platform limits (Vercel function time, memory, etc.).
+  - A Native Tool can internally make as many HTTP calls or computations as its code allows
+    within those time/memory limits. As the skill author, you are responsible for keeping
+    your own internal usage sane.
+
+- **Economic Model (Both Types)**
+  - In both cases, the **user pays once per chat turn per Tool**.
+  - For HTTP Tools, the platform additionally enforces the 100‑call cap via `callHttpSkill`.
+  - For Native Tools, you still only get paid once per turn, even if your code runs many times
+    inside that single execution.
 
 ## 📄 License
 
