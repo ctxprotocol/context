@@ -8,10 +8,10 @@ type CallHttpToolParams = {
 };
 
 const HTTP_TIMEOUT_MS = 10_000; // Increased timeout
-// Per paid tool invocation, we allow up to 10 HTTP requests. This is enough
+// Per paid tool invocation, we allow up to 100 HTTP requests. This is enough
 // for discovery-style patterns (e.g. 1 "chains" call + a handful of
 // "gas_price" lookups) while still protecting contributors from abuse.
-const MAX_REQUESTS_PER_TURN = 10;
+const MAX_REQUESTS_PER_TURN = 100;
 
 export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
   const runtime = getSkillRuntime();

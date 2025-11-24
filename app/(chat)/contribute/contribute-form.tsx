@@ -56,13 +56,13 @@ Endpoints:
 - "oracles": Requires "chainId" OR ("system" + "network"). Use "chains" to find these.
 
 Call budget:
-- Each paid query may call this HTTP tool at most 10 times.
+- Each paid query may call this HTTP tool at most 100 times.
 - Typical pattern:
   1. Call "chains" once to get all supported chains.
   2. Filter the list in your code using the 'label' field (e.g. chain.label.includes("Optimism")).
-  3. Then make up to 9 additional calls to "gas_price" or "oracles".
+  3. Then make up to 99 additional calls to "gas_price" or "oracles".
 - Never loop over every chain. If the user asks for "top 3" or a summary across many chains,
-  choose a small subset (e.g. 3–10 major L2s) and work within the 10-call budget.
+  choose a small subset (e.g. 3–10 major L2s) and work within the 100-call budget.
 
 Example intent:
 - "Gas on Base" -> 1. Call "chains" -> find Base (label="Base") is chainId 8453 -> 2. Call "gas_price" with chainId=8453.`;
@@ -77,7 +77,7 @@ Exports:
 Usage:
 The agent will automatically import this module and call the appropriate function based on the user's request.
 Use 'getChains' to resolve network names to chain IDs first, and design workflows so that each paid query makes
-no more than 10 total HTTP calls (e.g. 1 discovery call + a small number of detailed lookups).`;
+no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of detailed lookups).`;
 
   return (
     <form action={formAction}>

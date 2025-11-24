@@ -83,7 +83,7 @@ For complex logic that requires high performance or verified execution, you can 
 
 Each paid tool invocation runs inside a sandboxed code-execution environment.
 To protect contributors from abuse, HTTP-based tools are limited to a small
-number of upstream requests per turn (currently **10 HTTP calls per paid
+number of upstream requests per turn (currently **100 HTTP calls per paid
 query**). Tool authors should design their APIs and examples so the agent can
 do useful work within that budget (e.g. 1 discovery call plus a handful of
 detail lookups), and the planner prompt will encourage efficient patterns.
