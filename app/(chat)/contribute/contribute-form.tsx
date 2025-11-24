@@ -51,7 +51,7 @@ export function ContributeForm() {
   const httpDescriptionPlaceholder = `Fetch real-time gas prices, supported chains, or oracle metadata.
 
 Endpoints:
-- "chains": Returns valid chainIds, systems, and networks. Call this first to resolve names (e.g. "Base") to IDs.
+- "chains": Returns valid chainIds, systems, networks, and labels. Call this first to resolve names (e.g. "Base") to IDs using the 'label' field.
 - "gas_price": Requires "chainId" (from "chains"). Optional: "confidence" (1-99).
 - "oracles": Requires "chainId" OR ("system" + "network"). Use "chains" to find these.
 
@@ -59,12 +59,13 @@ Call budget:
 - Each paid query may call this HTTP tool at most 10 times.
 - Typical pattern:
   1. Call "chains" once to get all supported chains.
-  2. Then make up to 9 additional calls to "gas_price" or "oracles".
+  2. Filter the list in your code using the 'label' field (e.g. chain.label.includes("Optimism")).
+  3. Then make up to 9 additional calls to "gas_price" or "oracles".
 - Never loop over every chain. If the user asks for "top 3" or a summary across many chains,
   choose a small subset (e.g. 3–10 major L2s) and work within the 10-call budget.
 
 Example intent:
-- "Gas on Base" -> 1. Call "chains" -> find Base is chainId 8453 -> 2. Call "gas_price" with chainId=8453.`;
+- "Gas on Base" -> 1. Call "chains" -> find Base (label="Base") is chainId 8453 -> 2. Call "gas_price" with chainId=8453.`;
 
   const skillDescriptionPlaceholder = `This module exports functions to interact with Blocknative data.
 
@@ -282,7 +283,8 @@ no more than 10 total HTTP calls (e.g. 1 discovery call + a small number of deta
       { "confidence": 99, "maxFeePerGasGwei": 0.1 }
     ],
     "chains": [
-      { "chainId": 1, "network": "mainnet" }
+      { "chainId": 1, "network": "mainnet", "label": "Ethereum Mainnet" },
+      { "chainId": 137, "network": "mainnet", "label": "Polygon" }
     ],
     "oracles": [
       { "name": "Chainlink", "system": "ethereum" }

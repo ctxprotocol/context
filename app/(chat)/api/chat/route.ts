@@ -72,6 +72,25 @@ const HTTP_TOOL_MODULE = "@/lib/ai/skills/http-tool" as const;
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
 
+type ExecutionStatus = "not_executed" | "success" | "failed";
+
+function hasNonEmptyData(data: unknown): boolean {
+  if (data === null || data === undefined) return false;
+  if (typeof data === "string") return data.trim().length > 0;
+  if (typeof data === "number" || typeof data === "boolean") return true;
+  if (Array.isArray(data)) {
+    return data.some(hasNonEmptyData);
+  }
+  if (typeof data === "object") {
+    const keys = Object.keys(data);
+    if (keys.length === 0) return false;
+    // Special case for error object: if the object has exactly one key `error`, treat it as "no data"
+    if (keys.length === 1 && keys[0] === "error") return false;
+    return Object.values(data as Record<string, unknown>).some(hasNonEmptyData);
+  }
+  return false;
+}
+
 type PaidToolContext = {
   tool: AITool;
   transactionHash: string;
@@ -565,6 +584,8 @@ export async function POST(request: Request) {
           // Mode. This stays server-side and is only exposed to the model
           // when isDebugMode is true.
           let executionPayload: string | undefined;
+          let executionStatus: ExecutionStatus = "not_executed";
+          let executionHasData = false;
 
           if (codeBlock) {
             if (process.env.NODE_ENV === "development") {
@@ -675,12 +696,32 @@ export async function POST(request: Request) {
                 });
 
                 if (execution.ok) {
+                  executionStatus = "success";
+                  executionHasData = hasNonEmptyData(execution.data);
                   executionPayload = formatExecutionData(execution.data);
                 } else {
+                  executionStatus = "failed";
+                  executionHasData = false;
                   executionPayload = formatExecutionData({
                     error: execution.error,
                     logs: execution.logs,
                   });
+                }
+
+                if (process.env.NODE_ENV === "development") {
+                  console.log("[chat-api] execution payload constructed", {
+                    chatId: id,
+                    payloadLength: executionPayload?.length,
+                    hasData: executionHasData,
+                    status: executionStatus,
+                    preview: executionPayload?.slice(0, 200),
+                  });
+                  if (execution.ok) {
+                    console.log(
+                      "[chat-api] full execution data:",
+                      JSON.stringify(execution.data, null, 2)
+                    );
+                  }
                 }
 
                 for (const context of verifiedSkillContexts) {
@@ -707,14 +748,17 @@ export async function POST(request: Request) {
                 }
 
                 mediatorText = execution.ok
-                  ? `Tool execution succeeded.\nModules used: ${Array.from(
-                      allowedModules
-                    ).join(", ")}\nResult JSON:\n${formatExecutionData(
-                      execution.data
-                    )}`
-                  : `Tool execution failed: ${execution.error}\nLogs:\n${execution.logs.join(
-                      "\n"
-                    )}`;
+                  ? `Tool execution succeeded.
+HAS_DATA: ${executionHasData}
+STATUS: ${executionStatus}
+Modules used: ${Array.from(allowedModules).join(", ")}
+Result JSON:
+${formatExecutionData(execution.data)}`
+                  : `Tool execution failed: ${execution.error}
+HAS_DATA: false
+STATUS: failed
+Logs:
+${execution.logs.join("\n")}`;
                 console.log("[chat-api] execution finished", {
                   chatId: id,
                   ok: execution.ok,
@@ -775,17 +819,19 @@ export async function POST(request: Request) {
             isDebugMode && codeBlock && executionPayload
               ? `
 
-At the very top of your answer, before any prose, output **exactly** the following markdown snippet, without modifying it:
+At the very top of your answer, before any prose, you **MUST** output the following two markdown blocks exactly as shown. Do not merge them or change their content.
 
+Block 1 (TypeScript Plan):
 \`\`\`ts
 ${codeBlock}
 \`\`\`
 
+Block 2 (Execution Result):
 \`\`\`json
 ${executionPayload}
 \`\`\`
 
-After that snippet and a blank line, write your natural language explanation as described below.
+After these two blocks and a blank line, write your natural language explanation as described below.
 `
               : `
 
@@ -801,6 +847,11 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
 - Use that summary (and the full conversation) to answer the user's question in clear, natural language.
 - Instead, explain the key findings, numbers, and rankings in a concise way.
 - If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.
+
+Anti-Hallucination Rules:
+- Any chains, chain IDs, gas prices, or other numeric values you mention **MUST** appear explicitly in the JSON in the execution summary.
+- If the EXECUTION SUMMARY includes \`HAS_DATA: false\` or a \`STATUS\` other than \`"success"\`, you **MUST** clearly say that no reliable data is available and you **MUST NOT** guess or invent values (numbers, prices, chain names, rankings, etc.).
+- If there is no usable data, explain that limitation (e.g. the tool returned no results or an error) instead of answering as if you had real numbers.
 ${devPrefix}`;
 
           const result = streamText({
