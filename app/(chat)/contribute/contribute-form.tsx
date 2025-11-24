@@ -136,7 +136,7 @@ no more than 10 total HTTP calls (e.g. 1 discovery call + a small number of deta
               )}
               defaultValue={state.payload?.description || ""}
               id="description"
-              maxLength={1000}
+              maxLength={5000}
               name="description"
               placeholder={
                 kind === "http"
@@ -252,6 +252,7 @@ no more than 10 total HTTP calls (e.g. 1 discovery call + a small number of deta
                 className="font-mono text-xs"
                 defaultValue={state.payload?.defaultParams || ""}
                 id="defaultParams"
+                maxLength={20_000}
                 name="defaultParams"
                 placeholder={`{
   "endpoint": "gas_price",
@@ -276,6 +277,7 @@ no more than 10 total HTTP calls (e.g. 1 discovery call + a small number of deta
                 className="font-mono text-xs"
                 defaultValue={state.payload?.outputSchema || ""}
                 id="outputSchema"
+                maxLength={20_000}
                 name="outputSchema"
                 placeholder={`{
   "data": {

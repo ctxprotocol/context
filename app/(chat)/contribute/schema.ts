@@ -10,7 +10,7 @@ export type ContributeFormState = {
 export const contributeFormSchema = z
   .object({
     name: z.string().min(1).max(255),
-    description: z.string().min(1).max(1000),
+    description: z.string().min(1).max(5000),
     category: z.string().min(1, "Category is required"),
     kind: z.enum(["http", "skill"]).default("http"),
     endpoint: z.string().min(1).optional(), // URL for http, module path for skill
@@ -23,8 +23,8 @@ export const contributeFormSchema = z
     developerWallet: z
       .string()
       .regex(/^0x[a-fA-F0-9]{40}$/, "Wallet must be a valid EVM address"),
-    defaultParams: z.string().optional(),
-    outputSchema: z.string().optional(),
+    defaultParams: z.string().max(20000).optional(),
+    outputSchema: z.string().max(20000).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.kind === "http") {
