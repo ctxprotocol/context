@@ -52,10 +52,7 @@ async function seedBlocknativeHttpTool() {
       .where(eq(aiTool.name, "Blocknative Gas (HTTP)"));
 
     if (existingTools.length > 0) {
-      console.log(
-        "Blocknative HTTP tool already exists:",
-        existingTools[0].id
-      );
+      console.log("Blocknative HTTP tool already exists:", existingTools[0].id);
       return;
     }
 
@@ -79,7 +76,7 @@ async function seedBlocknativeHttpTool() {
             confidence: 90,
           },
           usage:
-            'callHttpTool({ toolId: "TOOL_ID", input: { endpoint: "gas_price", chainId: 8453, confidence: 90 } })',
+            'callHttpSkill({ toolId: "TOOL_ID", input: { endpoint: "gas_price", chainId: 8453, confidence: 90 } })',
         },
         apiEndpoint: `${baseUrl}/api/tools/execute`,
         category: "Network",
@@ -99,6 +96,3 @@ seedBlocknativeHttpTool().then(() => {
   console.log("Done.");
   process.exit(0);
 });
-
-
-

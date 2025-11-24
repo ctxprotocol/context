@@ -32,6 +32,11 @@ Developers register **Tools** (the paid product) which are powered by either:
 - **HTTP Tools:** Remote API endpoints hosted by you. You provide JSON examples so the Agent knows the wire format.
 - **Native Tools:** Verified TypeScript modules running on our platform. The Agent reads your code signatures directly.
 
+> **Concept Check:**
+> *   **Tool:** The Product the user buys (e.g., "Blocknative Gas Pro" for $0.01).
+> *   **Skill:** The Action the agent performs (e.g., `callHttpSkill` or `uniswap.getQuote`).
+> *   **Developers** contribute a "Tool" (the product wrapper). That Tool is powered by either "HTTP Skills" (generic fetcher) or "Native Skills" (custom code).
+
 ### 2. The Agent (Demand)
 When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
 1. **Plans** a solution using composability.

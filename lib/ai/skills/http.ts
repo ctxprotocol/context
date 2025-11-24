@@ -2,7 +2,7 @@ import { getSkillRuntime } from "@/lib/ai/skills/runtime";
 import { recordToolQuery } from "@/lib/db/queries";
 import type { AITool } from "@/lib/db/schema";
 
-type CallHttpToolParams = {
+type CallHttpSkillParams = {
   toolId: string;
   input: Record<string, unknown>;
 };
@@ -13,7 +13,7 @@ const HTTP_TIMEOUT_MS = 10_000; // Increased timeout
 // "gas_price" lookups) while still protecting contributors from abuse.
 const MAX_REQUESTS_PER_TURN = 100;
 
-export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
+export async function callHttpSkill({ toolId, input }: CallHttpSkillParams) {
   const runtime = getSkillRuntime();
   if (!runtime.allowedTools?.has(toolId)) {
     throw new Error(
@@ -24,7 +24,7 @@ export async function callHttpTool({ toolId, input }: CallHttpToolParams) {
   const toolContext = runtime.allowedTools.get(toolId)!;
 
   if (toolContext.kind !== "http") {
-    throw new Error("callHttpTool can only be used with HTTP tools.");
+    throw new Error("callHttpSkill can only be used with HTTP tools.");
   }
 
   if (toolContext.executionCount >= MAX_REQUESTS_PER_TURN) {

@@ -10,7 +10,7 @@ This directory contains **Verified Native Skills** submitted by the community.
 | **Latency** | Network dependent | Zero-latency (runs in-process) |
 | **Complexity** | Simple JSON I/O | Complex TypeScript logic |
 | **Verification** | Permissionless | Requires Pull Request Review |
-| **Code** | platfrom HTTP skill for querys | Custom skills for querys |
+| **Code** | Platform HTTP Skill (Generic) | Custom Skills (Specialized) |
 | **Best For** | Private APIs, Rapid Prototyping | High-performance Data, Aggregators |
 
 ## 👩‍💻 How to Contribute Code

@@ -34,8 +34,8 @@ When a tool is required:
   • Avoid TypeScript-only syntax—write JavaScript that is also valid TypeScript.
   • Keep raw data private; aggregate or truncate large arrays before returning.
 - For HTTP tools, you must first import the helper from the approved module, then call it exactly once per paid query:
-  \`import { callHttpTool } from "@/lib/ai/skills/http";\`
-  \`await callHttpTool({ toolId, input })\`
+  \`import { callHttpSkill } from "@/lib/ai/skills/http";\`
+  \`await callHttpSkill({ toolId, input })\`
   Do not fabricate tool IDs.
 - Use the format \`\`\`ts ... \`\`\`. Do not include prose or multiple blocks.
 
@@ -118,7 +118,7 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
       tool.outputSchema && Object.keys(tool.outputSchema).length > 0
         ? `\n   Output Schema: ${formatExampleInput(tool.outputSchema)}`
         : "";
-    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Import: import { callHttpTool } from "@/lib/ai/skills/http";\n   Call: await callHttpTool({ toolId: "${tool.toolId}", input: ${example} })${output}\n   ${tool.description}`;
+    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Import: import { callHttpSkill } from "@/lib/ai/skills/http";\n   Call: await callHttpSkill({ toolId: "${tool.toolId}", input: ${example} })${output}\n   ${tool.description}`;
   }
 
   return `${index + 1}. ${tool.name} ($${price}/query)\n   Module: ${tool.module ?? "n/a"}${
