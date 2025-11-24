@@ -2,14 +2,15 @@
 
 This directory contains **Verified Native Skills** submitted by the community.
 
-## ⚡️ Native Skills vs. HTTP Tools
+## ⚡️ Native Tools vs. HTTP Tools
 
-| Feature | HTTP Tools | Native Skills |
+| Feature | HTTP Tools | Native Tools |
 | :--- | :--- | :--- |
 | **Hosting** | You host it (your server) | We host it (Context Protocol) |
 | **Latency** | Network dependent | Zero-latency (runs in-process) |
 | **Complexity** | Simple JSON I/O | Complex TypeScript logic |
 | **Verification** | Permissionless | Requires Pull Request Review |
+| **Code** | platfrom HTTP skill for querys | Custom skills for querys |
 | **Best For** | Private APIs, Rapid Prototyping | High-performance Data, Aggregators |
 
 ## 👩‍💻 How to Contribute Code
@@ -35,7 +36,7 @@ Just submitting code doesn't get you paid. You must also create a **Marketplace 
 
 1. **Submit the PR** with your code (as described above).
 2. **Register the Tool:** Go to the `/contribute` page in the Context App.
-3. **Select "Native Skill":** Choose this option instead of "HTTP Tool".
+3. **Select "Native Tool":** Choose this option instead of "HTTP Tool".
 4. **Link Your Code:** Enter the module path (e.g., `@/lib/ai/skills/community/your-skill-name`).
 5. **Set Your Price:** Choose your fee per query (e.g., $0.01 USDC).
 
@@ -57,7 +58,7 @@ Since your code is the documentation, your description should focus on **intent*
 
 ### 2. Example Input/Output (Not Needed!)
 *   **HTTP Tools:** Must provide precise JSON examples so the Agent knows the wire format.
-*   **Native Skills:** These fields are **Hidden**.
+*   **Native Tools:** These fields are **Hidden**.
     *   **Why?** Because Native Skills are code! The Agent automatically reads your TypeScript module signature (inputs, outputs, types) from the runtime environment. Your code *is* the documentation.
 
 ### 🧩 The Power of Composability

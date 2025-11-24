@@ -1,7 +1,7 @@
 import vm from "node:vm";
 import * as communitySkills from "@/lib/ai/skills/community";
 import * as documentSkills from "@/lib/ai/skills/document";
-import * as httpToolSkills from "@/lib/ai/skills/http-tool";
+import * as httpToolSkills from "@/lib/ai/skills/http";
 import { type SkillRuntime, setSkillRuntime } from "@/lib/ai/skills/runtime";
 import * as suggestionSkills from "@/lib/ai/skills/suggestions";
 import * as weatherSkills from "@/lib/ai/skills/weather";
@@ -14,7 +14,7 @@ const BUILTIN_MODULES_MAP = {
   "@/lib/ai/skills/document": documentSkills,
   "@/lib/ai/skills/suggestions": suggestionSkills,
   "@/lib/ai/skills/weather": weatherSkills,
-  "@/lib/ai/skills/http-tool": httpToolSkills,
+  "@/lib/ai/skills/http": httpToolSkills,
 } as const;
 
 // 2. Community modules (from the index barrel file)

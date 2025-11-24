@@ -67,7 +67,7 @@ const BUILTIN_MODULES: AllowedModule[] = [
 
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
 const REGISTERED_MODULE_SET = new Set<string>(REGISTERED_SKILL_MODULES);
-const HTTP_TOOL_MODULE = "@/lib/ai/skills/http-tool" as const;
+const HTTP_TOOL_MODULE = "@/lib/ai/skills/http" as const;
 
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;

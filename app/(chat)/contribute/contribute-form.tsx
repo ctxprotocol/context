@@ -120,7 +120,7 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
               <div className="flex items-center space-x-2">
                 <RadioGroupItem id="kind-skill" value="skill" />
                 <Label htmlFor="kind-skill">
-                  Native Skill (Internal Module)
+                  Native Tool (Internal Module)
                 </Label>
               </div>
             </RadioGroup>
@@ -211,6 +211,13 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
                 step="0.0001"
                 type="number"
               />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                <strong>Note:</strong> Users pay this fee{" "}
+                <strong>once per chat turn</strong>. For that single fee, the
+                Agent may call your tool multiple times (up to 100 requests for
+                HTTP tools) to solve the task. Set your price to cover this
+                potential volume.
+              </p>
               <FieldError message={priceError} />
             </div>
           </div>

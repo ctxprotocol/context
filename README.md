@@ -30,7 +30,7 @@ Context is built on a **Code Execution** paradigm. Instead of rigid "tool callin
 ### 1. The Marketplace (Supply)
 Developers register **Tools** (the paid product) which are powered by either:
 - **HTTP Tools:** Remote API endpoints hosted by you. You provide JSON examples so the Agent knows the wire format.
-- **Native Skills:** Verified TypeScript modules running on our platform. The Agent reads your code signatures directly.
+- **Native Tools:** Verified TypeScript modules running on our platform. The Agent reads your code signatures directly.
 
 ### 2. The Agent (Demand)
 When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs Aave?"), the Agent:
@@ -71,6 +71,7 @@ Want to earn revenue from your API?
 1. **Build an HTTP Endpoint:** It just needs to accept JSON and return JSON. You can use our [Context SDK](https://github.com/ctxprotocol/sdk) for a type-safe experience.
 2. **Register in the App:** Go to `/contribute` in the running app.
 3. **Set a Price:** Choose your fee per query (e.g., $0.01 USDC).
+   *   **Note:** This fee is paid **once per chat turn**. The Agent can call your API up to 100 times within that single paid turn to fetch necessary data.
 4. **Earn:** Your tool is now instantly available on the **decentralized marketplace**, accessible by the Context chat app and eventually the public API.
 
 #### 🛠 Advanced: Native Skills Registry
@@ -82,7 +83,7 @@ For complex logic that requires high performance or verified execution, you can 
 ### 🔒 HTTP Tool Safety Limits
 
 Each paid tool invocation runs inside a sandboxed code-execution environment.
-To protect contributors from abuse, HTTP-based tools are limited to a small
+To protect contributors from abuse, HTTP-based skills are limited to a small
 number of upstream requests per turn (currently **100 HTTP calls per paid
 query**). Tool authors should design their APIs and examples so the agent can
 do useful work within that budget (e.g. 1 discovery call plus a handful of
