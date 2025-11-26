@@ -22,10 +22,7 @@ type CallMcpToolParams = {
   args: Record<string, unknown>;
 };
 
-type McpToolResult = {
-  content: unknown;
-  isError?: boolean;
-};
+type McpToolResult = unknown;
 
 const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
@@ -34,29 +31,91 @@ const MAX_CALLS_PER_TURN = 100;
 const clientCache = new Map<string, Client>();
 
 /**
- * Get or create an MCP client for the given endpoint
+ * Unwrap MCP content format to return clean data
+ * MCP returns: { content: [{ type: "text", text: "..." }, ...] }
+ * We want to return the actual parsed data directly
  */
-async function getMcpClient(endpoint: string): Promise<Client> {
-  const cached = clientCache.get(endpoint);
-  if (cached) {
-    return cached;
+function unwrapMcpContent(content: unknown): unknown {
+  if (!Array.isArray(content) || content.length === 0) {
+    return content;
   }
 
-  const transport = new SSEClientTransport(new URL(endpoint));
-  const client = new Client(
-    {
-      name: "context-protocol",
-      version: "1.0.0",
-    },
-    {
-      capabilities: {},
+  // If there's only one content block and it's text, parse and return it
+  if (content.length === 1) {
+    const block = content[0];
+    if (block && typeof block === 'object' && 'type' in block) {
+      if (block.type === 'text' && 'text' in block && typeof block.text === 'string') {
+        // Try to parse as JSON, otherwise return as string
+        try {
+          return JSON.parse(block.text);
+        } catch {
+          return block.text;
+        }
+      }
+      // For other types (image, etc.), return as-is
+      return block;
     }
+  }
+
+  // Multiple content blocks - try to combine text blocks
+  const textBlocks = content.filter(
+    (block): block is { type: 'text'; text: string } =>
+      block && typeof block === 'object' && 'type' in block && block.type === 'text' && 'text' in block
   );
 
-  await client.connect(transport);
-  clientCache.set(endpoint, client);
+  if (textBlocks.length === content.length) {
+    // All blocks are text - combine them
+    const combined = textBlocks.map(b => b.text).join('\n');
+    try {
+      return JSON.parse(combined);
+    } catch {
+      return combined;
+    }
+  }
 
-  return client;
+  // Mixed content - return as array
+  return content.map(block => {
+    if (block && typeof block === 'object' && 'type' in block && block.type === 'text' && 'text' in block) {
+      try {
+        return JSON.parse(block.text as string);
+      } catch {
+        return block.text;
+      }
+    }
+    return block;
+  });
+}
+
+/**
+ * Get or create an MCP client for the given endpoint
+ * Note: We don't cache clients because SSE connections can become stale.
+ * Each call creates a fresh connection for reliability.
+ */
+async function getMcpClient(endpoint: string): Promise<Client> {
+  // Don't use cache for now - SSE connections can become stale
+  // and cause silent failures. Create fresh connection each time.
+  console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
+
+  try {
+    const transport = new SSEClientTransport(new URL(endpoint));
+    const client = new Client(
+      {
+        name: "context-protocol",
+        version: "1.0.0",
+      },
+      {
+        capabilities: {},
+      }
+    );
+
+    await client.connect(transport);
+    console.log("[mcp-skill] Successfully connected to:", endpoint);
+
+    return client;
+  } catch (error) {
+    console.error("[mcp-skill] Failed to connect to MCP server:", endpoint, error);
+    throw error;
+  }
 }
 
 /**
@@ -138,6 +197,8 @@ export async function callMcpTool({
   const endpoint = extractMcpEndpoint(tool);
   const chatId = runtime.chatId ?? runtime.requestId;
 
+  console.log("[mcp-skill] Calling tool:", { toolId, toolName, args, endpoint });
+
   try {
     // Get or create MCP client
     const client = await getMcpClient(endpoint);
@@ -147,12 +208,20 @@ export async function callMcpTool({
     const timeout = setTimeout(() => controller.abort(), MCP_TIMEOUT_MS);
 
     try {
+      console.log("[mcp-skill] Invoking client.callTool:", toolName);
       const result = await client.callTool({
         name: toolName,
         arguments: args,
       });
 
       clearTimeout(timeout);
+      console.log("[mcp-skill] Raw MCP result:", JSON.stringify(result).slice(0, 500));
+
+      // Unwrap MCP content format to return clean data to the agent
+      // MCP returns: { content: [{ type: "text", text: "..." }], isError: false }
+      // We want to return the actual parsed data directly
+      const unwrappedContent = unwrapMcpContent(result.content);
+      console.log("[mcp-skill] Unwrapped content:", JSON.stringify(unwrappedContent).slice(0, 500));
 
       // Record the query for analytics
       await recordToolQuery({
@@ -164,18 +233,23 @@ export async function callMcpTool({
           ? "free-tool"
           : runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown",
         queryInput: { toolName, args },
-        queryOutput: result.content as Record<string, unknown>,
+        queryOutput: unwrappedContent as Record<string, unknown>,
         status: result.isError ? "failed" : "completed",
       });
 
-      return {
-        content: result.content,
-        isError: result.isError,
-      };
+      // Return unwrapped content directly so agent code can access it naturally
+      // e.g., result.data.chains instead of result.content[0].text
+      if (result.isError) {
+        throw new Error(typeof unwrappedContent === 'string' ? unwrappedContent : JSON.stringify(unwrappedContent));
+      }
+
+      return unwrappedContent;
     } finally {
       clearTimeout(timeout);
     }
   } catch (error) {
+    console.error("[mcp-skill] Tool call failed:", { toolId, toolName, error });
+
     // Record failed query
     await recordToolQuery({
       toolId,

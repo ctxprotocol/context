@@ -41,10 +41,12 @@ For MCP-based tools (the standard), use the MCP skill module:
 \`\`\`ts
 import { callMcpTool } from "@/lib/ai/skills/mcp";
 const result = await callMcpTool({ toolId: "...", toolName: "...", args: { ... } });
+// result is the UNWRAPPED data - access properties directly like result.data, result.chains, etc.
 \`\`\`
 - \`toolId\`: The database ID of the MCP server (provided in tool list)
 - \`toolName\`: The specific tool name on that server (listed in mcpTools)
 - \`args\`: The arguments matching the tool's inputSchema
+- The result is automatically unwrapped from MCP format - you get the actual data object directly
 
 ## Tool Discovery (Auto Mode)
 When Auto Mode is enabled, you can search the marketplace for relevant tools:
@@ -67,6 +69,7 @@ Rules:
 - Always check for empty or missing data from tools. If arrays are empty or undefined, return a JSON result that clearly indicates that no reliable data is available instead of fabricating values.
 - Do not embed fallback or default numeric values just to be helpful. If the API returns no usable data, propagate that fact in the returned object.
 - Free tools (price = $0.00) can be used immediately. Paid tools require user authorization.
+- **CRITICAL: Do NOT wrap tool calls in try/catch blocks that swallow errors.** Let errors propagate naturally so the system can diagnose issues. If you must handle errors, re-throw them with context.
 `;
 
 export const regularPrompt =
