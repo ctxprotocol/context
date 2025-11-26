@@ -38,7 +38,10 @@ import { ERC20_ABI } from "@/lib/abi/erc20";
 import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
 import type { AITool } from "@/lib/db/schema";
-import { useWriteContextRouterExecutePaidQuery } from "@/lib/generated";
+import {
+  useWriteContextRouterExecutePaidQuery,
+  useWriteContextRouterExecuteBatchPaidQuery,
+} from "@/lib/generated";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
@@ -71,6 +74,15 @@ import type { VisibilityType } from "./visibility-selector";
 type ToolInvocationPayload = {
   toolId: string;
   transactionHash: `0x${string}`;
+  fallbackText?: string;
+};
+
+// Batch payment payload for multiple tools
+type BatchToolInvocationPayload = {
+  toolInvocations: Array<{
+    toolId: string;
+    transactionHash: `0x${string}`;
+  }>;
   fallbackText?: string;
 };
 
@@ -165,7 +177,7 @@ function PureMultimodalInput({
   });
   const { writeContractAsync: writeErc20Async } = useWriteContract();
 
-  // Router execute
+  // Router execute (single tool)
   const {
     writeContract: writeExecute,
     data: executeHash,
@@ -176,12 +188,25 @@ function PureMultimodalInput({
   const { isLoading: isExecConfirming, isSuccess: isExecSuccess } =
     useWaitForTransactionReceipt({ hash: executeHash });
 
+  // Router execute (batch - multiple tools)
+  const {
+    writeContract: writeBatchExecute,
+    data: batchExecuteHash,
+    isPending: isBatchExecutePending,
+    error: batchExecuteError,
+    reset: resetBatchExecute,
+  } = useWriteContextRouterExecuteBatchPaidQuery();
+  const { isLoading: isBatchExecConfirming, isSuccess: isBatchExecSuccess } =
+    useWaitForTransactionReceipt({ hash: batchExecuteHash });
+
   const [showPayDialog, setShowPayDialog] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isSwitchingNetwork, setIsSwitchingNetwork] = useState(false);
   const [lastExecutedTx, setLastExecutedTx] = useState<
     `0x${string}` | undefined
   >(undefined);
+  // Track which tools are being paid for (for batch payments)
+  const [executingTools, setExecutingTools] = useState<AITool[]>([]);
   const [showAddFundsDialog, setShowAddFundsDialog] = useState(false);
   const [isFundingWallet, setIsFundingWallet] = useState(false);
   const [fundingRequest, setFundingRequest] = useState<{
@@ -189,17 +214,25 @@ function PureMultimodalInput({
     toolName: string;
   } | null>(null);
 
-  // Track executeHash to trigger post-payment flow
+  // Track executeHash to trigger post-payment flow (single or batch)
   useEffect(() => {
     if (executeHash && isPaying) {
       setLastExecutedTx(executeHash);
     }
   }, [executeHash, isPaying]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle transaction errors (user cancellation, etc.)
+  // Track batchExecuteHash for batch payments
   useEffect(() => {
-    if (executeError && isPaying) {
-      const errorMessage = executeError.message || "Transaction failed";
+    if (batchExecuteHash && isPaying) {
+      setLastExecutedTx(batchExecuteHash);
+    }
+  }, [batchExecuteHash, isPaying]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handle transaction errors (user cancellation, etc.) - single or batch
+  useEffect(() => {
+    const error = executeError || batchExecuteError;
+    if (error && isPaying) {
+      const errorMessage = error.message || "Transaction failed";
 
       // Remove any temp payment messages
       setMessages((prev) =>
@@ -220,11 +253,14 @@ function PureMultimodalInput({
       // Reset state
       setIsPaying(false);
       setShowPayDialog(false);
-      resetExecute(); // Clear the error from Wagmi
-      resetPaymentStatus(); // Reset payment status
-      setLastExecutedTx(undefined); // Ensure we don't reuse a failed tx
+      resetExecute();
+      resetBatchExecute();
+      resetPaymentStatus();
+      setLastExecutedTx(undefined);
+      setExecutingTool(null);
+      setExecutingTools([]);
     }
-  }, [executeError, isPaying, resetExecute, setMessages, resetPaymentStatus]);
+  }, [executeError, batchExecuteError, isPaying, resetExecute, resetBatchExecute, setMessages, resetPaymentStatus]);
 
   // Clear executed tx on successful submit or error to prevent reuse
   useEffect(() => {
@@ -233,6 +269,7 @@ function PureMultimodalInput({
     if (status === "submitted" || status === "streaming") {
       setLastExecutedTx(undefined);
       setExecutingTool(null);
+      setExecutingTools([]);
     }
   }, [status]);
 
@@ -289,7 +326,7 @@ function PureMultimodalInput({
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
 
   const submitForm = useCallback(
-    (toolInvocation?: ToolInvocationPayload) => {
+    (toolInvocation?: ToolInvocationPayload | BatchToolInvocationPayload) => {
       const trimmedInput = input.trim();
       const hasText = trimmedInput.length > 0;
 
@@ -326,13 +363,25 @@ function PureMultimodalInput({
         ],
       };
 
-      const sendOptions = toolInvocation
-        ? {
+      // Handle both single and batch tool invocations
+      let sendOptions: { body: { toolInvocations: { toolId: string; transactionHash: `0x${string}` }[] } } | undefined;
+      if (toolInvocation) {
+        if ("toolInvocations" in toolInvocation) {
+          // Batch invocation
+          sendOptions = {
+            body: {
+              toolInvocations: toolInvocation.toolInvocations,
+            },
+          };
+        } else {
+          // Single invocation
+          sendOptions = {
             body: {
               toolInvocations: [toolInvocation],
             },
-          }
-        : undefined;
+          };
+        }
+      }
 
       sendMessage(messagePayload, sendOptions);
 
@@ -486,29 +535,49 @@ function PureMultimodalInput({
 
   // After execute success: verify + execute tool server-side and then send the augmented message
   useEffect(() => {
-    if (!isExecSuccess || !lastExecutedTx || !executingTool) {
+    const isSuccess = isExecSuccess || isBatchExecSuccess;
+    if (!isSuccess || !lastExecutedTx) {
       return;
     }
 
-    setStage("planning", executingTool.name);
-    submitForm({
-      toolId: executingTool.id,
-      transactionHash: lastExecutedTx,
-      fallbackText: `Using ${executingTool.name}`,
-    });
+    // Handle batch execution (multiple tools)
+    if (executingTools.length > 1) {
+      const toolNames = executingTools.map((t) => t.name).join(", ");
+      setStage("planning", toolNames);
+      submitForm({
+        toolInvocations: executingTools.map((tool) => ({
+          toolId: tool.id,
+          transactionHash: lastExecutedTx,
+        })),
+        fallbackText: `Using ${toolNames}`,
+      });
+    } else if (executingTool) {
+      // Handle single tool execution
+      setStage("planning", executingTool.name);
+      submitForm({
+        toolId: executingTool.id,
+        transactionHash: lastExecutedTx,
+        fallbackText: `Using ${executingTool.name}`,
+      });
+    }
 
     setIsPaying(false);
     setShowPayDialog(false);
     setLastExecutedTx(undefined);
     setExecutingTool(null);
+    setExecutingTools([]);
     resetExecute();
+    resetBatchExecute();
   }, [
     executingTool,
+    executingTools,
     isExecSuccess,
+    isBatchExecSuccess,
     lastExecutedTx,
     setStage,
     submitForm,
     resetExecute,
+    resetBatchExecute,
   ]);
 
   const handleSwitchNetwork = useCallback(async () => {
@@ -579,7 +648,10 @@ function PureMultimodalInput({
   }, [status, resetPaymentStatus]);
 
   const confirmPayment = useCallback(async () => {
-    if (!primaryTool || !walletAddress || !routerAddress || !usdcAddress) {
+    // Determine which tools to pay for
+    const toolsToPay = selectedTool ? [selectedTool] : activeTools;
+    
+    if (toolsToPay.length === 0 || !walletAddress || !routerAddress || !usdcAddress) {
       toast.error("Missing wallet or contract configuration.");
       return;
     }
@@ -591,34 +663,39 @@ function PureMultimodalInput({
     }
 
     try {
-      // Snapshot the tool we're executing so stages stay consistent
-      // even if the user toggles tools mid-flight.
-      setExecutingTool(primaryTool);
       setIsPaying(true);
 
-      const amount = parseUnits(primaryTool.pricePerQuery ?? "0.00", 6);
+      // Calculate total amount needed
+      let totalAmount = 0n;
+      for (const tool of toolsToPay) {
+        totalAmount += parseUnits(tool.pricePerQuery ?? "0.00", 6);
+      }
 
-      // Calculate spending cap: tool price × 1000 queries
-      const pricePerQuery = Number.parseFloat(
-        primaryTool.pricePerQuery ?? "0.01"
-      );
-      const maxAllowance = parseUnits((pricePerQuery * 1000).toString(), 6);
+      // Calculate max allowance for all tools combined
+      let maxAllowance = 0n;
+      for (const tool of toolsToPay) {
+        const pricePerQuery = Number.parseFloat(tool.pricePerQuery ?? "0.01");
+        maxAllowance += parseUnits((pricePerQuery * 1000).toString(), 6);
+      }
 
       // Check USDC balance first
       const { data: balanceData } = await refetchBalance();
       const balance = (balanceData as bigint | undefined) ?? 0n;
 
-      if (balance < amount) {
+      const totalAmountStr = (Number(totalAmount) / 1_000_000).toFixed(2);
+      const toolNames = toolsToPay.map((t) => t.name).join(", ");
+
+      if (balance < totalAmount) {
         if (isEmbeddedWallet) {
           setFundingRequest({
-            amount: primaryTool.pricePerQuery ?? "1",
-            toolName: primaryTool.name,
+            amount: totalAmountStr,
+            toolName: toolNames,
           });
-          toast.error("You need to add USDC before running this tool.");
+          toast.error("You need to add USDC before running these tools.");
           setShowAddFundsDialog(true);
         } else {
           toast.error(
-            `Insufficient USDC balance. You need ${primaryTool.pricePerQuery} USDC on Base mainnet.`
+            `Insufficient USDC balance. You need ${totalAmountStr} USDC on Base mainnet.`
           );
         }
         setIsPaying(false);
@@ -627,10 +704,7 @@ function PureMultimodalInput({
         return;
       }
 
-      // At this point we know the embedded wallet has enough USDC to pay.
-      // Now it's important that we *don't* accidentally route the transaction
-      // through a different browser wallet. If a mismatch is detected here,
-      // abort before we approve/execute on-chain.
+      // Check for wallet mismatch
       if (isEmbeddedWallet && hasWalletMismatch) {
         toast.error(
           "You're logged in with an embedded wallet, but a different browser wallet is connected. To use this account, disconnect external wallets or log in directly with that wallet."
@@ -641,34 +715,45 @@ function PureMultimodalInput({
         return;
       }
 
-      // Check and handle allowance (approve for 1000 queries to reduce popups)
+      // Check and handle allowance
       const allowanceRes = await refetchAllowance();
       const allowance = (allowanceRes.data as bigint | undefined) ?? 0n;
-      if (allowance < amount) {
-        // Stage 1: Setting payment cap
-        setStage("setting-cap", primaryTool.name);
+      if (allowance < totalAmount) {
+        setStage("setting-cap", toolNames);
         await writeErc20Async({
           address: usdcAddress,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [routerAddress, maxAllowance], // Approve for 1000 queries
+          args: [routerAddress, maxAllowance],
         });
-
-        // Wait a moment for approval to be mined
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
-      // Stage 2: Confirming payment
-      setStage("confirming-payment", primaryTool.name);
+      setStage("confirming-payment", toolNames);
 
-      // Execute payment (toolId set to 0n for MVP; actual numeric IDs can come later)
-      writeExecute({
-        args: [0n, primaryTool.developerWallet as `0x${string}`, amount],
-      });
-      // executeHash will be set by Wagmi and tracked by useEffect above
-      // Errors from writeExecute are handled by the executeError useEffect
+      // Single tool: use single execute
+      if (toolsToPay.length === 1) {
+        const tool = toolsToPay[0];
+        setExecutingTool(tool);
+        writeExecute({
+          args: [0n, tool.developerWallet as `0x${string}`, totalAmount],
+        });
+      } else {
+        // Multiple tools: use batch execute
+        setExecutingTools(toolsToPay);
+        const toolIds = toolsToPay.map(() => 0n); // Using 0n for MVP
+        const developerWallets = toolsToPay.map(
+          (t) => t.developerWallet as `0x${string}`
+        );
+        const amounts = toolsToPay.map((t) =>
+          parseUnits(t.pricePerQuery ?? "0.00", 6)
+        );
+
+        writeBatchExecute({
+          args: [toolIds, developerWallets, amounts],
+        });
+      }
     } catch (error) {
-      // Check if user rejected the transaction
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
@@ -677,19 +762,19 @@ function PureMultimodalInput({
         errorMessage.includes("user rejected") ||
         errorMessage.includes("User denied")
       ) {
-        // Expected user action – don't spam error overlay
         toast.error("Transaction cancelled");
       } else if (
         errorMessage.includes("insufficient funds") ||
         errorMessage.includes("Insufficient")
       ) {
-        if (primaryTool && isEmbeddedWallet) {
+        const toolNames = toolsToPay.map((t) => t.name).join(", ");
+        if (isEmbeddedWallet) {
           setFundingRequest({
-            amount: primaryTool.pricePerQuery ?? "1",
-            toolName: primaryTool.name,
+            amount: (Number(totalAmount) / 1_000_000).toFixed(2),
+            toolName: toolNames,
           });
           setShowAddFundsDialog(true);
-          toast.error("You need to add USDC before running this tool.");
+          toast.error("You need to add USDC before running these tools.");
         } else {
           toast.error("Insufficient USDC balance");
         }
@@ -699,10 +784,11 @@ function PureMultimodalInput({
 
       setIsPaying(false);
       setShowPayDialog(false);
-      resetPaymentStatus(); // Reset payment status on error
+      resetPaymentStatus();
     }
   }, [
-    primaryTool,
+    selectedTool,
+    activeTools,
     walletAddress,
     chainId,
     routerAddress,
@@ -713,6 +799,7 @@ function PureMultimodalInput({
     refetchAllowance,
     writeErc20Async,
     writeExecute,
+    writeBatchExecute,
     setStage,
     resetPaymentStatus,
   ]);
@@ -873,17 +960,30 @@ function PureMultimodalInput({
           )}
         </PromptInputToolbar>
       </PromptInput>
-      {primaryTool ? (
+      {(selectedTool || activeTools.length > 0) ? (
         <PaymentDialog
           chainId={chainId}
-          isBusy={isPaying || isExecutePending || isExecConfirming}
+          isBusy={isPaying || isExecutePending || isExecConfirming || isBatchExecutePending || isBatchExecConfirming}
           isSwitchingNetwork={isSwitchingNetwork}
           onConfirm={confirmPayment}
           onOpenChange={setShowPayDialog}
           onSwitchNetwork={handleSwitchNetwork}
           open={showPayDialog}
-          price={primaryTool.pricePerQuery ?? "0.00"}
-          toolName={primaryTool.name}
+          price={
+            selectedTool
+              ? (selectedTool.pricePerQuery ?? "0.00")
+              : activeTools.reduce(
+                  (sum, t) => sum + Number(t.pricePerQuery ?? 0),
+                  0
+                ).toFixed(2)
+          }
+          toolName={
+            selectedTool
+              ? selectedTool.name
+              : activeTools.length === 1
+                ? activeTools[0].name
+                : `${activeTools.length} tools`
+          }
         />
       ) : null}
       <AddFundsDialog

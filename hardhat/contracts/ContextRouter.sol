@@ -78,6 +78,45 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice User pays for multiple tools in a single transaction
+     * @dev User must approve this contract to spend the total USDC amount first
+     * @param toolIds Array of tool IDs being used
+     * @param developerWallets Array of wallet addresses for each tool's creator
+     * @param amounts Array of amounts to pay for each tool in USDC
+     */
+    function executeBatchPaidQuery(
+        uint256[] calldata toolIds,
+        address[] calldata developerWallets,
+        uint256[] calldata amounts
+    ) external nonReentrant {
+        require(toolIds.length == developerWallets.length, "Array length mismatch");
+        require(toolIds.length == amounts.length, "Array length mismatch");
+        require(toolIds.length > 0, "Empty arrays");
+
+        // Calculate total amount needed
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            require(amounts[i] > 0, "Amount must be greater than 0");
+            require(developerWallets[i] != address(0), "Invalid developer address");
+            totalAmount += amounts[i];
+        }
+
+        // Transfer total USDC from user to this contract (ONE transaction)
+        usdc.safeTransferFrom(msg.sender, address(this), totalAmount);
+
+        // Split payments to each developer
+        for (uint256 i = 0; i < toolIds.length; i++) {
+            uint256 platformFee = (amounts[i] * PLATFORM_FEE_PERCENT) / 100;
+            uint256 developerEarning = amounts[i] - platformFee;
+
+            developerBalances[developerWallets[i]] += developerEarning;
+            platformBalance += platformFee;
+
+            emit QueryPaid(toolIds[i], msg.sender, developerWallets[i], amounts[i], platformFee);
+        }
+    }
+
+    /**
      * @notice Developer claims their accumulated earnings
      * @dev Can only claim your own balance
      */

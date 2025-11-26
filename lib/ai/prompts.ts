@@ -1,5 +1,6 @@
 import type { Geo } from "@vercel/functions";
 import type { ArtifactKind } from "@/components/artifact";
+
 export type EnabledToolSummary = {
   toolId: string;
   name: string;
@@ -7,9 +8,9 @@ export type EnabledToolSummary = {
   price?: string | null;
   module?: string;
   usage?: string;
-  kind: "skill" | "http";
-  exampleInput?: Record<string, unknown>;
-  outputSchema?: Record<string, unknown>;
+  kind: "skill" | "mcp";
+  // MCP-specific: list of tools available on this server
+  mcpTools?: { name: string; description?: string; inputSchema?: unknown }[];
 };
 
 const codingAgentPrompt = `
@@ -23,7 +24,7 @@ Key Philosophy:
 When no tools are needed:
 - Reply in natural language with a short, direct answer.
 - Reference previous conversation state when helpful.
-- If you do not have access to active tools, **DO NOT write code that imports \`callHttpSkill\`**. You cannot execute these functions offline. You MAY still write generic code (e.g. Python, React snippets) if the user explicitly asks for it.
+- If you do not have access to active tools, **DO NOT write code that imports tool skills**. You cannot execute these functions offline. You MAY still write generic code (e.g. Python, React snippets) if the user explicitly asks for it.
 
 When a tool is required:
 - Respond with one TypeScript code block and nothing else.
@@ -34,11 +35,27 @@ When a tool is required:
   • Return a compact JSON-serializable object that summarizes the actionable result.
   • Avoid TypeScript-only syntax—write JavaScript that is also valid TypeScript.
   • Keep raw data private; aggregate or truncate large arrays before returning.
-- For HTTP tools, you must first import the helper from the approved module, then call it exactly once per paid query:
-  \`import { callHttpSkill } from "@/lib/ai/skills/http";\`
-  \`await callHttpSkill({ toolId, input })\`
-  Do not fabricate tool IDs.
-- Use the format \`\`\`ts ... \`\`\`. Do not include prose or multiple blocks.
+
+## MCP Tools
+For MCP-based tools (the standard), use the MCP skill module:
+\`\`\`ts
+import { callMcpTool } from "@/lib/ai/skills/mcp";
+const result = await callMcpTool({ toolId: "...", toolName: "...", args: { ... } });
+\`\`\`
+- \`toolId\`: The database ID of the MCP server (provided in tool list)
+- \`toolName\`: The specific tool name on that server (listed in mcpTools)
+- \`args\`: The arguments matching the tool's inputSchema
+
+## Tool Discovery (Auto Mode)
+When Auto Mode is enabled, you can search the marketplace for relevant tools:
+\`\`\`ts
+import { searchMarketplace } from "@/lib/ai/skills/marketplace";
+const tools = await searchMarketplace("weather forecast");
+// Returns: [{ id, name, description, price, kind }]
+\`\`\`
+- This is FREE and always available
+- Use it to find tools that match the user's request
+- For paid tools found via search, inform the user they need to enable them in the sidebar
 
 Rules:
 - Never import or execute modules outside the approved list.
@@ -49,6 +66,7 @@ Rules:
 - Prefer deriving data from tool responses (discovery) rather than hardcoding values, as tool outputs may change over time or vary by context.
 - Always check for empty or missing data from tools. If arrays are empty or undefined, return a JSON result that clearly indicates that no reliable data is available instead of fabricating values.
 - Do not embed fallback or default numeric values just to be helpful. If the API returns no usable data, propagate that fact in the returned object.
+- Free tools (price = $0.00) can be used immediately. Paid tools require user authorization.
 `;
 
 export const regularPrompt =
@@ -110,30 +128,32 @@ export const systemPrompt = ({
 
 function formatEnabledTool(tool: EnabledToolSummary, index: number) {
   const price = Number(tool.price || 0).toFixed(2);
-  if (tool.kind === "http") {
-    const example =
-      tool.exampleInput && Object.keys(tool.exampleInput).length > 0
-        ? formatExampleInput(tool.exampleInput)
-        : "{ /* supply input */ }";
-    const output =
-      tool.outputSchema && Object.keys(tool.outputSchema).length > 0
-        ? `\n   Output Schema: ${formatExampleInput(tool.outputSchema)}`
-        : "";
-    return `${index + 1}. ${tool.name} (HTTP • $${price}/query)\n   Tool ID: ${tool.toolId}\n   Import: import { callHttpSkill } from "@/lib/ai/skills/http";\n   Call: await callHttpSkill({ toolId: "${tool.toolId}", input: ${example} })${output}\n   ${tool.description}`;
+  const isFree = Number(tool.price || 0) === 0;
+  const priceLabel = isFree ? "FREE" : `$${price}/query`;
+
+  // MCP Tools (The Standard)
+  if (tool.kind === "mcp") {
+    const mcpToolsList = tool.mcpTools?.length
+      ? tool.mcpTools
+          .map((t) => `      - ${t.name}: ${t.description || "No description"}`)
+          .join("\n")
+      : "      (No tools discovered)";
+
+    return `${index + 1}. ${tool.name} (MCP Server • ${priceLabel})
+   Tool ID: ${tool.toolId}
+   Import: import { callMcpTool } from "@/lib/ai/skills/mcp";
+   Available Tools:
+${mcpToolsList}
+   Example:
+     await callMcpTool({ toolId: "${tool.toolId}", toolName: "<tool_name>", args: { ... } })
+   ${tool.description}`;
   }
 
-  return `${index + 1}. ${tool.name} ($${price}/query)\n   Module: ${tool.module ?? "n/a"}${
-    tool.usage ? `\n   Usage: ${tool.usage}` : ""
-  }\n   ${tool.description}\n   (Native Skill: The agent will infer the function signature from the module path and description.)`;
-}
-
-function formatExampleInput(input: Record<string, unknown>) {
-  const asJson = JSON.stringify(input, null, 2);
-  // Collapse small objects to single line, but keep larger ones readable
-  if (asJson.length < 50) {
-    return asJson.replace(/\n/g, " ");
-  }
-  return asJson;
+  // Native Skills
+  return `${index + 1}. ${tool.name} (Native Skill • ${priceLabel})
+   Module: ${tool.module ?? "n/a"}${tool.usage ? `\n   Usage: ${tool.usage}` : ""}
+   ${tool.description}
+   (Import the module directly and call the exported functions.)`;
 }
 
 export const codePrompt = `

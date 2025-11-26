@@ -67,7 +67,7 @@ const BUILTIN_MODULES: AllowedModule[] = [
 
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
 const REGISTERED_MODULE_SET = new Set<string>(REGISTERED_SKILL_MODULES);
-const HTTP_TOOL_MODULE = "@/lib/ai/skills/http" as const;
+const MCP_TOOL_MODULE = "@/lib/ai/skills/mcp" as const;
 
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
@@ -95,7 +95,7 @@ type PaidToolContext = {
   tool: AITool;
   transactionHash: string;
   module: AllowedModule;
-  kind: "skill" | "http";
+  kind: "skill" | "mcp";
 };
 
 function extractCodeBlock(text: string) {
@@ -154,11 +154,12 @@ function getSkillModuleFromTool(tool: AITool): AllowedModule | null {
 function buildAllowedToolRuntimeMap(paidTools: PaidToolContext[]) {
   const map = new Map<string, AllowedToolContext>();
   for (const context of paidTools) {
-    if (context.kind === "http") {
+    // MCP tools need to be tracked for billing
+    if (context.kind === "mcp") {
       map.set(context.tool.id, {
         tool: context.tool,
         transactionHash: context.transactionHash,
-        kind: "http",
+        kind: "mcp",
         executionCount: 0,
       });
     }
@@ -166,14 +167,14 @@ function buildAllowedToolRuntimeMap(paidTools: PaidToolContext[]) {
   return map;
 }
 
-function getDefaultHttpInput(tool: AITool) {
+function getMcpTools(tool: AITool) {
   const schema = tool.toolSchema;
   if (!schema || typeof schema !== "object") {
     return;
   }
-  const defaults = (schema as Record<string, unknown>).defaultParams;
-  if (defaults && typeof defaults === "object" && !Array.isArray(defaults)) {
-    return defaults as Record<string, unknown>;
+  const tools = (schema as Record<string, unknown>).tools;
+  if (Array.isArray(tools)) {
+    return tools as { name: string; description?: string; inputSchema?: unknown }[];
   }
   return;
 }
@@ -187,21 +188,6 @@ function getToolUsage(tool: AITool) {
   return typeof usage === "string" ? usage : undefined;
 }
 
-function getOutputSchema(tool: AITool) {
-  const schema = tool.toolSchema;
-  if (!schema || typeof schema !== "object") {
-    return;
-  }
-  const outputSchema = (schema as Record<string, unknown>).outputSchema;
-  if (
-    outputSchema &&
-    typeof outputSchema === "object" &&
-    !Array.isArray(outputSchema)
-  ) {
-    return outputSchema as Record<string, unknown>;
-  }
-  return;
-}
 
 const getTokenlensCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
@@ -298,19 +284,21 @@ export async function POST(request: Request) {
           throw new ChatSDKError("not_found:chat", "Requested tool not found");
         }
 
-        const isHttp = tool.toolSchema
-          ? (tool.toolSchema as Record<string, unknown>).kind === "http"
-          : false;
+        const toolKind = tool.toolSchema
+          ? (tool.toolSchema as Record<string, unknown>).kind
+          : undefined;
 
-        if (isHttp) {
+        // MCP tools use the MCP module
+        if (toolKind === "mcp") {
           return {
             tool,
             transactionHash: invocation.transactionHash,
-            module: HTTP_TOOL_MODULE,
-            kind: "http" as const,
+            module: MCP_TOOL_MODULE,
+            kind: "mcp" as const,
           };
         }
 
+        // Native skills use their module path
         const module = getSkillModuleFromTool(tool);
         if (!module) {
           throw new ChatSDKError(
@@ -342,11 +330,8 @@ export async function POST(request: Request) {
         price: entry.tool.pricePerQuery,
         module: entry.kind === "skill" ? entry.module : undefined,
         kind: entry.kind,
-        exampleInput:
-          entry.kind === "http" ? getDefaultHttpInput(entry.tool) : undefined,
         usage: getToolUsage(entry.tool),
-        outputSchema:
-          entry.kind === "http" ? getOutputSchema(entry.tool) : undefined,
+        mcpTools: entry.kind === "mcp" ? getMcpTools(entry.tool) : undefined,
       });
     }
 

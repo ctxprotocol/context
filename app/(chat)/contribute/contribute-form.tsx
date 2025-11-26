@@ -24,15 +24,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { cn } from "@/lib/utils";
-import { submitHttpTool } from "./actions";
+import { submitTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
 export function ContributeForm() {
   const [state, formAction, isPending] = useActionState(
-    submitHttpTool,
+    submitTool,
     contributeFormInitialState
   );
-  const [kind, setKind] = useState("http");
+  const [kind, setKind] = useState("mcp");
   const { activeWallet } = useWalletIdentity();
   const walletAddress = activeWallet?.address;
   const isConnected = !!walletAddress;
@@ -42,51 +42,43 @@ export function ContributeForm() {
   const categoryError = state.fieldErrors?.category;
   const priceError = state.fieldErrors?.price;
   const endpointError = state.fieldErrors?.endpoint;
-  const defaultParamsError = state.fieldErrors?.defaultParams;
-  const outputSchemaError = state.fieldErrors?.outputSchema;
   const developerWalletError = state.fieldErrors?.developerWallet;
 
   const connectedWallet = walletAddress || "";
 
-  const httpDescriptionPlaceholder = `Fetch real-time gas prices, supported chains, or oracle metadata.
+  // MCP tools auto-discover schemas via listTools(), so the description
+  // focuses on WHAT the server does and WHY users should use it.
+  const mcpDescriptionPlaceholder = `What does your MCP server do? (Tool schemas are auto-discovered)
 
-Endpoints:
-- "chains": Returns valid chainIds, systems, networks, and labels. Call this first to resolve names (e.g. "Base") to IDs using the 'label' field.
-- "gas_price": Requires "chainId" (from "chains"). Optional: "confidence" (1-99).
-- "oracles": Requires "chainId" OR ("system" + "network"). Use "chains" to find these.
+Example:
+Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism. Accurate estimates for fast, standard, and slow transactions. Updated every block.
 
-Call budget:
-- Each paid query may call this HTTP tool at most 100 times.
-- Typical pattern:
-  1. Call "chains" once to get all supported chains.
-  2. Filter the list in your code using the 'label' field (e.g. chain.label.includes("Optimism")).
-  3. Then make up to 99 additional calls to "gas_price" or "oracles".
-- Never loop over every chain. If the user asks for "top 3" or a summary across many chains,
-  choose a small subset (e.g. 3–10 major L2s) and work within the 100-call budget.
+Agent tips (optional):
+- Call list_chains first to discover available networks
+- Gas prices returned in Gwei`;
 
-Example intent:
-- "Gas on Base" -> 1. Call "chains" -> find Base (label="Base") is chainId 8453 -> 2. Call "gas_price" with chainId=8453.`;
+  const skillDescriptionPlaceholder = `Describe the exported functions and how to use them.
 
-  const skillDescriptionPlaceholder = `This module exports functions to interact with Blocknative data.
+Example:
+This module exports functions to interact with Uniswap.
 
 Exports:
-- getGasPrice({ chainId, confidence }): Returns gas estimates.
-- getChains(): Returns list of supported networks.
-- getOracles({ chainId, system, network }): Returns oracle data.
+- getQuote({ tokenIn, tokenOut, amount }): Returns swap quote
+- getPoolInfo({ poolAddress }): Returns pool statistics
+- listPools({ token }): Returns pools containing a token
 
 Usage:
-The agent will automatically import this module and call the appropriate function based on the user's request.
-Use 'getChains' to resolve network names to chain IDs first, and design workflows so that each paid query makes
-no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of detailed lookups).`;
+The agent will import this module and call the appropriate function.
+Design workflows to minimize external API calls.`;
 
   return (
     <form action={formAction}>
       <Card className="border shadow-sm">
         <CardHeader>
-          <CardTitle>Tool details</CardTitle>
+          <CardTitle>Register a Tool</CardTitle>
           <CardDescription>
-            Everything will be reviewed automatically. Be descriptive so users
-            understand the value of your data.
+            Connect your MCP server or submit a native skill to earn revenue
+            from AI queries.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -108,22 +100,54 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
           <div className="space-y-2">
             <Label>Type</Label>
             <RadioGroup
-              className="flex flex-row gap-4"
-              defaultValue={state.payload?.kind || "http"}
+              className="flex flex-col gap-3 sm:flex-row sm:gap-6"
+              defaultValue={state.payload?.kind || "mcp"}
               name="kind"
               onValueChange={setKind}
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem id="kind-http" value="http" />
-                <Label htmlFor="kind-http">HTTP Tool (External API)</Label>
+                <RadioGroupItem id="kind-mcp" value="mcp" />
+                <Label className="cursor-pointer" htmlFor="kind-mcp">
+                  MCP Server
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem id="kind-skill" value="skill" />
-                <Label htmlFor="kind-skill">
-                  Native Tool (Internal Module)
+                <Label className="cursor-pointer" htmlFor="kind-skill">
+                  Native Skill
                 </Label>
               </div>
             </RadioGroup>
+            <p className="text-muted-foreground text-xs">
+              {kind === "mcp" ? (
+                <>
+                  <strong>MCP Server (Recommended):</strong> Build a standard{" "}
+                  <a
+                    className="underline"
+                    href="https://modelcontextprotocol.io"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Model Context Protocol
+                  </a>{" "}
+                  server and paste your SSE endpoint. Tools are auto-discovered.
+                </>
+              ) : (
+                <>
+                  <strong>Native Skill:</strong> High-performance TypeScript
+                  module hosted on Context. Requires a{" "}
+                  <a
+                    className="underline"
+                    href="https://github.com/ctxprotocol/context/tree/main/lib/ai/skills/community"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    Pull Request
+                  </a>
+                  .
+                </>
+              )}
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -139,16 +163,26 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
               maxLength={5000}
               name="description"
               placeholder={
-                kind === "http"
-                  ? httpDescriptionPlaceholder
+                kind === "mcp"
+                  ? mcpDescriptionPlaceholder
                   : skillDescriptionPlaceholder
               }
-              rows={kind === "http" ? 20 : 15}
+              rows={kind === "mcp" ? 9 : 13}
             />
             <p className="text-muted-foreground text-xs">
-              This is the <strong>Instruction Manual</strong> for both the AI
-              Agent and the User. Be extremely specific about <em>when</em> to
-              use this tool and <em>how</em> to use its parameters.
+              {kind === "mcp" ? (
+                <>
+                  Explain what your server does and why users should use it.
+                  Tool schemas are <strong>auto-discovered</strong> from your
+                  MCP server no need to document parameters here.
+                </>
+              ) : (
+                <>
+                  Shown to users in the marketplace and used by the AI to
+                  understand your tool. Explain what it does, why it&apos;s
+                  valuable, and how to use the exported functions.
+                </>
+              )}
             </p>
             <FieldError message={descriptionError} />
           </div>
@@ -204,7 +238,7 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
                   priceError &&
                     "border-destructive focus-visible:ring-destructive"
                 )}
-                defaultValue={state.payload?.price || "0.01"}
+                defaultValue={state.payload?.price || "0.00"}
                 id="price"
                 min="0"
                 name="price"
@@ -212,11 +246,8 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
                 type="number"
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
-                <strong>Note:</strong> Users pay this fee{" "}
-                <strong>once per chat turn</strong>. For that single fee, the
-                Agent may call your tool multiple times (up to 100 requests for
-                HTTP tools) to solve the task. Set your price to cover this
-                potential volume.
+                Set to <strong>$0.00</strong> for free tools, or charge per
+                query. Users pay <strong>once per chat turn</strong>.
               </p>
               <FieldError message={priceError} />
             </div>
@@ -224,7 +255,7 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
 
           <div className="space-y-2">
             <Label htmlFor="endpoint">
-              {kind === "http" ? "HTTP Endpoint" : "Module Path"}
+              {kind === "mcp" ? "MCP Endpoint (SSE)" : "Module Path"}
             </Label>
             <Input
               aria-invalid={endpointError ? true : undefined}
@@ -236,86 +267,30 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
               id="endpoint"
               name="endpoint"
               placeholder={
-                kind === "http"
-                  ? "https://your-domain.com/context/blocknative"
+                kind === "mcp"
+                  ? "https://your-mcp-server.com/sse"
                   : "@/lib/ai/skills/community/my-skill"
               }
-              type={kind === "http" ? "url" : "text"}
+              type={kind === "mcp" ? "url" : "text"}
             />
-            {kind === "skill" && (
-              <p className="text-muted-foreground text-xs">
-                Must match the path in your Pull Request (e.g.
-                @/lib/ai/skills/community/...). We will automatically read the
-                source code to understand how to use it.
-              </p>
-            )}
+            <p className="text-muted-foreground text-xs">
+              {kind === "mcp" ? (
+                <>
+                  Your MCP server&apos;s SSE endpoint. We&apos;ll connect and
+                  auto-discover your tools via <code>listTools()</code>.
+                </>
+              ) : (
+                <>
+                  Must match the path in your Pull Request (e.g.{" "}
+                  <code>@/lib/ai/skills/community/...</code>).
+                </>
+              )}
+            </p>
             <FieldError message={endpointError} />
           </div>
 
-          {kind === "http" && (
-            <div className="space-y-2">
-              <Label htmlFor="defaultParams">Example input (JSON)</Label>
-              <Textarea
-                className="font-mono text-xs"
-                defaultValue={state.payload?.defaultParams || ""}
-                id="defaultParams"
-                maxLength={20_000}
-                name="defaultParams"
-                placeholder={`{
-  "endpoint": "gas_price",
-  "chainId": 8453,
-  "confidence": 99
-}`}
-                rows={5}
-              />
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                Provide a valid JSON object representing a typical request.
-                Include common parameters like <code>chainId</code> or{" "}
-                <code>network</code> to guide the AI.
-              </p>
-              <FieldError message={defaultParamsError} />
-            </div>
-          )}
-
-          {kind === "http" && (
-            <div className="space-y-2">
-              <Label htmlFor="outputSchema">Example Output (JSON)</Label>
-              <Textarea
-                className="font-mono text-xs"
-                defaultValue={state.payload?.outputSchema || ""}
-                id="outputSchema"
-                maxLength={20_000}
-                name="outputSchema"
-                placeholder={`{
-  "data": {
-    "estimates": [
-      { "confidence": 99, "maxFeePerGasGwei": 0.1 }
-    ],
-    "chains": [
-      { "chainId": 1, "network": "mainnet", "label": "Ethereum Mainnet" },
-      { "chainId": 137, "network": "mainnet", "label": "Polygon" }
-    ],
-    "oracles": [
-      { "name": "Chainlink", "system": "ethereum" }
-    ]
-  }
-}`}
-                rows={8}
-              />
-              <p className="text-muted-foreground text-xs leading-relaxed">
-                <strong>CRITICAL:</strong> Provide a precise, real-world example
-                of your API's JSON response. The AI Agent uses this schema to
-                write code that parses your data. If this example is inaccurate,
-                the agent will guess the structure and likely fail to retrieve
-                data, causing your tool to be rated poorly. Include examples for
-                all supported endpoints if possible.
-              </p>
-              <FieldError message={outputSchemaError} />
-            </div>
-          )}
-
           <div className="space-y-2">
-            <Label htmlFor="developerWallet">Developer wallet</Label>
+            <Label htmlFor="developerWallet">Developer Wallet</Label>
             <Input
               aria-invalid={developerWalletError ? true : undefined}
               className={cn(
@@ -338,12 +313,16 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
               type="hidden"
               value={connectedWallet}
             />
+            <p className="text-muted-foreground text-xs">
+              Earnings are sent to this wallet on Base.
+            </p>
             <FieldError message={developerWalletError} />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="text-muted-foreground text-sm">
-            On-chain payments are routed automatically via ContextRouter.
+            Payments routed via ContextRouter on Base (90% to you, 10% platform
+            fee).
           </div>
           <Button
             className="w-full md:w-auto"
@@ -353,10 +332,10 @@ no more than 100 total HTTP calls (e.g. 1 discovery call + a small number of det
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
+                Verifying...
               </>
             ) : (
-              "Submit tool"
+              "Submit Tool"
             )}
           </Button>
         </CardFooter>

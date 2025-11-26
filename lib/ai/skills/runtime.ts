@@ -6,7 +6,7 @@ import type { ChatMessage } from "@/lib/types";
 export type AllowedToolContext = {
   tool: AITool;
   transactionHash: string;
-  kind: "skill" | "http";
+  kind: "skill" | "mcp";
   executionCount: number;
 };
 

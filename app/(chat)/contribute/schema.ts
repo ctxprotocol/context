@@ -9,29 +9,28 @@ export type ContributeFormState = {
 
 export const contributeFormSchema = z
   .object({
-    name: z.string().min(1).max(255),
-    description: z.string().min(1).max(5000),
+    name: z.string().min(1, "Name is required").max(255),
+    description: z.string().min(1, "Description is required").max(5000),
     category: z.string().min(1, "Category is required"),
-    kind: z.enum(["http", "skill"]).default("http"),
-    endpoint: z.string().min(1).optional(), // URL for http, module path for skill
+    kind: z.enum(["mcp", "skill"]).default("mcp"),
+    endpoint: z.string().min(1).optional(), // URL for mcp, module path for skill
     price: z
       .string()
       .regex(/^\d+\.?\d*$/, "Enter a valid number")
-      .refine((value) => Number(value) > 0, {
-        message: "Price must be greater than 0",
+      .refine((value) => Number(value) >= 0, {
+        message: "Price must be 0 or greater",
       }),
     developerWallet: z
       .string()
       .regex(/^0x[a-fA-F0-9]{40}$/, "Wallet must be a valid EVM address"),
-    defaultParams: z.string().max(20_000).optional(),
-    outputSchema: z.string().max(20_000).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.kind === "http") {
+    if (data.kind === "mcp") {
+      // MCP Server validation
       if (!data.endpoint) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Endpoint URL is required for HTTP tools",
+          message: "MCP endpoint URL is required",
           path: ["endpoint"],
         });
       } else if (!z.string().url().safeParse(data.endpoint).success) {
@@ -41,19 +40,22 @@ export const contributeFormSchema = z
           path: ["endpoint"],
         });
       }
-    } else if (!data.endpoint) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Module path is required for Native Skills",
-        path: ["endpoint"],
-      });
-    } else if (!data.endpoint.startsWith("@/")) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Module path must start with @/ (e.g. @/lib/ai/skills/community/...)",
-        path: ["endpoint"],
-      });
+    } else if (data.kind === "skill") {
+      // Native skill validation
+      if (!data.endpoint) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Module path is required for Native Skills",
+          path: ["endpoint"],
+        });
+      } else if (!data.endpoint.startsWith("@/")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Module path must start with @/ (e.g. @/lib/ai/skills/community/...)",
+          path: ["endpoint"],
+        });
+      }
     }
   });
 

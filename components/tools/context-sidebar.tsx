@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type CSSProperties, useMemo, useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 // No router needed here; navigation handled elsewhere if needed
 import {
   Sidebar,
@@ -41,6 +42,8 @@ export function ContextSidebar({
   const { tools, loading, activeToolIds, activeTools, totalCost, toggleTool } =
     useSessionTools();
   const [searchQuery, setSearchQuery] = useState("");
+  // Auto Mode: When enabled, the agent can dynamically discover and use tools
+  const [isAutoMode, setIsAutoMode] = useLocalStorage("context-auto-mode", false);
   const categories = useMemo(
     () => Array.from(new Set(tools.map((tool) => tool.category || "Other"))),
     [tools]
@@ -199,6 +202,40 @@ export function ContextSidebar({
           </SidebarContent>
           <SidebarFooter className="border-t">
             <div className="flex flex-col gap-1 px-2 py-2 text-sidebar-foreground/70 text-xs">
+              {/* Auto Mode Toggle */}
+              <div className="flex items-center justify-between py-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help">Auto Mode</span>
+                  </TooltipTrigger>
+                  <TooltipContent align="start" className="max-w-[200px]">
+                    Let the AI discover and select tools automatically based on your query
+                  </TooltipContent>
+                </Tooltip>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isAutoMode}
+                  onClick={() => setIsAutoMode(!isAutoMode)}
+                  className={cn(
+                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50",
+                    isAutoMode ? "bg-emerald-500" : "bg-input"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                      isAutoMode ? "translate-x-4" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+              {isAutoMode && (
+                <div className="text-sidebar-foreground/50 text-[10px] leading-tight">
+                  AI will search marketplace for relevant tools (free tools only in auto mode)
+                </div>
+              )}
+              {/* Developer Mode Toggle */}
               <div className="flex items-center justify-between py-1">
                 <span>Developer Mode</span>
                 <button

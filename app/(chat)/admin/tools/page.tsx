@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { getActiveAITools } from "@/lib/db/queries";
@@ -56,11 +55,18 @@ export default async function AdminToolsPage() {
             </TableHeader>
             <TableBody>
               {tools.map((tool) => {
-                const schema = tool.toolSchema as Record<string, any>;
-                const isHttp = schema.kind === "http";
-                const endpoint = isHttp 
+                const schema = tool.toolSchema as Record<string, unknown>;
+                const kind = schema?.kind as string | undefined;
+                const isMcp = kind === "mcp";
+                const isSkill = kind === "skill";
+                const endpoint = isMcp 
                   ? (schema.endpoint as string) 
-                  : (schema.skill?.module as string);
+                  : isSkill
+                    ? ((schema.skill as Record<string, unknown>)?.module as string)
+                    : "Unknown";
+
+                const typeLabel = isMcp ? "MCP" : isSkill ? "Native" : "Unknown";
+                const typeColor = isMcp ? "bg-blue-600" : isSkill ? "bg-purple-600" : "bg-gray-600";
 
                 return (
                     <TableRow key={tool.id} className="hover:bg-muted/50 border-b border-border/50 last:border-none">
@@ -73,8 +79,8 @@ export default async function AdminToolsPage() {
                       </TableCell>
                       <TableCell className="font-medium text-sm text-foreground">{tool.name}</TableCell>
                     <TableCell>
-                        <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-wider">
-                        {isHttp ? "HTTP" : "Native"}
+                        <Badge variant="outline" className={`font-mono text-[10px] uppercase tracking-wider ${typeColor} text-white border-transparent`}>
+                        {typeLabel}
                       </Badge>
                     </TableCell>
                       <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground font-mono">
@@ -95,4 +101,3 @@ export default async function AdminToolsPage() {
     </div>
   );
 }
-

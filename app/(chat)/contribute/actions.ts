@@ -1,12 +1,14 @@
 "use server";
 
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
 import { contributeFormSchema, type ContributeFormState } from "./schema";
 
-export async function submitHttpTool(
+export async function submitTool(
   _prevState: ContributeFormState,
   formData: FormData
 ): Promise<ContributeFormState> {
@@ -19,17 +21,14 @@ export async function submitHttpTool(
     name: formData.get("name"),
     description: formData.get("description"),
     category: formData.get("category") || undefined,
-    kind: formData.get("kind") || "http",
+    kind: formData.get("kind") || "mcp",
     endpoint: formData.get("endpoint"),
     price: formData.get("price"),
     developerWallet: formData.get("developerWallet"),
-    defaultParams: formData.get("defaultParams") || undefined,
-    outputSchema: formData.get("outputSchema") || undefined,
   };
 
-  // We cast raw to any to satisfy the payload type which expects the validated types,
-  // but for repopulating the form string values are actually better.
-  const payload = raw as unknown as any;
+  // Cast raw to any for payload repopulation (string values work better for form)
+  const payload = raw as unknown as ContributeFormState["payload"];
 
   const parsed = contributeFormSchema.safeParse(raw);
 
@@ -66,13 +65,13 @@ export async function submitHttpTool(
         return false;
       }
 
-      const kind = (schema as { kind?: unknown }).kind;
+      const schemaKind = (schema as { kind?: unknown }).kind;
 
-      if (parsed.data.kind === "http" && kind === "http") {
+      if (parsed.data.kind === "mcp" && schemaKind === "mcp") {
         return (schema as { endpoint?: unknown }).endpoint === normalizedEndpoint;
       }
 
-      if (parsed.data.kind === "skill" && kind === "skill") {
+      if (parsed.data.kind === "skill" && schemaKind === "skill") {
         const skill = (schema as { skill?: { module?: unknown } }).skill;
         return skill && skill.module === normalizedEndpoint;
       }
@@ -92,93 +91,79 @@ export async function submitHttpTool(
     }
   }
 
-  let defaultParams: Record<string, unknown> | undefined;
-  if (parsed.data.defaultParams) {
-    try {
-      defaultParams = JSON.parse(parsed.data.defaultParams);
-      if (!defaultParams || typeof defaultParams !== "object") {
-        throw new Error("defaultParams must be a JSON object");
-      }
-    } catch (error) {
+  // Build tool schema based on kind
+  let toolSchema: Record<string, unknown>;
+  let mcpTools: { name: string; description?: string; inputSchema?: unknown }[] = [];
+
+  if (parsed.data.kind === "mcp") {
+    // Verify MCP server by connecting and listing tools
+    if (!parsed.data.endpoint) {
       return {
         status: "error",
-        message: "defaultParams must be valid JSON",
-        fieldErrors: { defaultParams: "Enter a valid JSON object" },
+        message: "MCP endpoint is required.",
+        fieldErrors: { endpoint: "MCP endpoint is required" },
         payload,
       };
     }
-  }
 
-  let outputSchema: Record<string, unknown> | undefined;
-  if (parsed.data.outputSchema) {
     try {
-      outputSchema = JSON.parse(parsed.data.outputSchema);
-      if (!outputSchema || typeof outputSchema !== "object") {
-        throw new Error("outputSchema must be a JSON object");
-      }
-    } catch (error) {
-      return {
-        status: "error",
-        message: "outputSchema must be valid JSON",
-        fieldErrors: { outputSchema: "Enter a valid JSON object" },
-        payload,
-      };
-    }
-  }
+      const transport = new SSEClientTransport(new URL(parsed.data.endpoint));
+      const client = new Client(
+        { name: "context-verification", version: "1.0.0" },
+        { capabilities: {} }
+      );
 
-  const toolSchema =
-    parsed.data.kind === "http"
-      ? {
-          kind: "http",
-          endpoint: parsed.data.endpoint,
-          defaultParams,
-          outputSchema,
-        }
-      : {
-          kind: "skill",
-          skill: {
-            module: parsed.data.endpoint,
-          },
-          defaultParams,
-          // Native skills have output schema in code
-        };
+      await client.connect(transport);
+      const result = await client.listTools();
+      await client.close();
 
-  if (parsed.data.kind === "http" && parsed.data.endpoint) {
-    try {
-      const res = await fetch(parsed.data.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          input: defaultParams || {},
-          context: {
-            chatId: "00000000-0000-0000-0000-000000000000",
-            requestId: "verify-endpoint",
-            userId: session.user.id,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "Unknown error");
+      if (!result.tools || result.tools.length === 0) {
         return {
           status: "error",
-          message: `Endpoint verification failed (${res.status}): ${text.slice(
-            0,
-            100
-          )}`,
-          fieldErrors: { endpoint: "Endpoint returned an error" },
+          message: "MCP server has no tools. Please expose at least one tool.",
+          fieldErrors: { endpoint: "No tools found on this MCP server" },
           payload,
         };
       }
+
+      // Cache the discovered tools
+      mcpTools = result.tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+      }));
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
       return {
         status: "error",
-        message:
-          "Could not reach endpoint. Please ensure it is publicly accessible.",
-        fieldErrors: { endpoint: "Connection failed" },
+        message: `Could not connect to MCP server: ${message}`,
+        fieldErrors: { endpoint: "MCP connection failed" },
         payload,
       };
     }
+
+    toolSchema = {
+      kind: "mcp",
+      endpoint: parsed.data.endpoint,
+      tools: mcpTools,
+    };
+  } else {
+    // Native skill
+    if (!parsed.data.endpoint) {
+      return {
+        status: "error",
+        message: "Module path is required.",
+        fieldErrors: { endpoint: "Module path is required" },
+        payload,
+      };
+    }
+
+    toolSchema = {
+      kind: "skill",
+      skill: {
+        module: parsed.data.endpoint,
+      },
+    };
   }
 
   await createAITool({
@@ -196,7 +181,6 @@ export async function submitHttpTool(
 
   return {
     status: "success",
-    message: "Tool submitted! It will appear in the sidebar shortly.",
-    // No payload returned on success, form clears naturally
+    message: `Tool submitted! ${parsed.data.kind === "mcp" ? `Discovered ${mcpTools.length} tool(s) from your MCP server.` : "It will be reviewed shortly."}`,
   };
 }
