@@ -248,7 +248,7 @@ export function SidebarUserNav() {
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link className="w-full cursor-pointer" href="/contribute">
-                Contribute a Tool
+                Contribute a tool
               </Link>
             </DropdownMenuItem>
             {isConnected && walletAddress && (

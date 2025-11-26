@@ -3,14 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -74,14 +67,7 @@ Design workflows to minimize external API calls.`;
   return (
     <form action={formAction}>
       <Card className="border shadow-sm">
-        <CardHeader>
-          <CardTitle>Register a Tool</CardTitle>
-          <CardDescription>
-            Connect your MCP server or submit a native skill to earn revenue
-            from AI queries.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
