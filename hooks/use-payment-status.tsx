@@ -20,7 +20,11 @@ export type PaymentStage =
 type PaymentStatusContextType = {
   stage: PaymentStage;
   toolName: string | null;
+  streamingCode: string | null;
+  debugResult: string | null;
   setStage: (stage: PaymentStage, toolName?: string) => void;
+  setStreamingCode: (code: string | null) => void;
+  setDebugResult: (result: string | null) => void;
   reset: () => void;
 };
 
@@ -31,6 +35,8 @@ const PaymentStatusContext = createContext<
 export function PaymentStatusProvider({ children }: { children: ReactNode }) {
   const [stage, setStageState] = useState<PaymentStage>("idle");
   const [toolName, setToolName] = useState<string | null>(null);
+  const [streamingCode, setStreamingCodeState] = useState<string | null>(null);
+  const [debugResult, setDebugResultState] = useState<string | null>(null);
 
   const setStage = useCallback((newStage: PaymentStage, name?: string) => {
     setStageState(newStage);
@@ -39,13 +45,34 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setStreamingCode = useCallback((code: string | null) => {
+    setStreamingCodeState(code);
+  }, []);
+
+  const setDebugResult = useCallback((result: string | null) => {
+    setDebugResultState(result);
+  }, []);
+
   const reset = useCallback(() => {
     setStageState("idle");
     setToolName(null);
+    setStreamingCodeState(null);
+    setDebugResultState(null);
   }, []);
 
   return (
-    <PaymentStatusContext.Provider value={{ stage, toolName, setStage, reset }}>
+    <PaymentStatusContext.Provider
+      value={{
+        stage,
+        toolName,
+        streamingCode,
+        debugResult,
+        setStage,
+        setStreamingCode,
+        setDebugResult,
+        reset,
+      }}
+    >
       {children}
     </PaymentStatusContext.Provider>
   );

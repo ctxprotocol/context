@@ -88,13 +88,13 @@ function PureMessages({
         );
 
       if (hasTextContent) {
-        // Once we start receiving text delta, we are done executing/planning and back to "Thinking"
-        // (or just showing the stream, which implies thinking/typing).
-        // Clear the payment status stage to hide the bubble.
-        setStage("idle");
+        // Once we start receiving text delta, we are done executing/planning.
+        // Reset the full payment status (including streaming code and debug result)
+        // to hide the thinking accordion.
+        reset();
       }
     }
-  }, [setStage, stage, status, messages]);
+  }, [reset, setStage, stage, status, messages]);
 
   // When the AI response has finished and we were in the "thinking" stage,
   // reset the payment status so the status bubble disappears.
@@ -190,7 +190,9 @@ function PureMessages({
           })}
 
           <AnimatePresence mode="wait">
-            {shouldShowThinking && <ThinkingMessage key="thinking" />}
+            {shouldShowThinking && (
+              <ThinkingMessage isDebugMode={isDebugMode} key="thinking" />
+            )}
           </AnimatePresence>
 
           <div

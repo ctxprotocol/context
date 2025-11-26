@@ -1,23 +1,20 @@
 "use client";
 
-import type { ConnectedWallet } from "@privy-io/react-auth";
-import { useLinkAccount, useLogin, usePrivy } from "@privy-io/react-auth";
-import { useSetActiveWallet } from "@privy-io/wagmi";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
+import { useLogin, usePrivy } from "@privy-io/react-auth";
 import { ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { useReadContract } from "wagmi";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -26,6 +23,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
+import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
 import { CheckIcon, CopyIcon, LoaderIcon } from "./icons";
 import { toast } from "./toast";
@@ -40,16 +38,38 @@ export function SidebarUserNav() {
     logout,
     exportWallet,
   } = usePrivy();
-  const { setActiveWallet } = useSetActiveWallet();
 
   const isConnected = authenticated;
   const userEmail = privyUser?.email?.address;
   const [copied, setCopied] = useState(false);
-  const [isLinkingWallet, setIsLinkingWallet] = useState(false);
-  const { isEmbeddedWallet, embeddedWallet, activeWallet, wallets } =
-    useWalletIdentity();
+  const { activeWallet } = useWalletIdentity();
+  const { client: smartWalletClient } = useSmartWallets();
 
   const walletAddress = activeWallet?.address;
+  const smartWalletAddress = smartWalletClient?.account?.address;
+
+  // Use smart wallet address for balance if available, otherwise use active wallet
+  const balanceCheckAddress = (smartWalletAddress || walletAddress) as
+    | `0x${string}`
+    | undefined;
+  const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
+
+  // Read USDC balance
+  const { data: usdcBalance } = useReadContract({
+    address: usdcAddress,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: balanceCheckAddress ? [balanceCheckAddress] : undefined,
+    query: {
+      enabled: Boolean(balanceCheckAddress && usdcAddress),
+      refetchInterval: 30000, // Refresh every 30 seconds
+    },
+  });
+
+  // Format USDC balance (6 decimals)
+  const formattedBalance = usdcBalance
+    ? (Number(usdcBalance) / 1_000_000).toFixed(2)
+    : "0.00";
 
   // Display email if available, otherwise show formatted wallet address
   const displayName = isConnected
@@ -71,30 +91,6 @@ export function SidebarUserNav() {
       toast({ type: "error", description: "Failed to log in with Privy." });
     },
   });
-
-  const { linkWallet } = useLinkAccount();
-
-  const handleSwitchWallet = async (address: string) => {
-    const wallet = wallets.find((w) => w?.address === address);
-    if (!wallet) {
-      return;
-    }
-
-    try {
-      await setActiveWallet(wallet as ConnectedWallet);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("privy_wallet_preference", wallet.address);
-        window.dispatchEvent(new Event("privy-wallet-preference-changed"));
-      }
-      toast({ type: "success", description: "Switched active wallet" });
-    } catch (error) {
-      console.error("Switch wallet error:", error);
-      toast({
-        type: "error",
-        description: "Failed to switch wallet.",
-      });
-    }
-  };
 
   const handleSignOut = async () => {
     if (ready && authenticated) {
@@ -135,62 +131,6 @@ export function SidebarUserNav() {
         type: "error",
         description: "Failed to export wallet. Please try again.",
       });
-    }
-  };
-
-  const handleLinkExternalWallet = async () => {
-    try {
-      setIsLinkingWallet(true);
-      const linkedWallet = (await linkWallet()) as ConnectedWallet | undefined;
-
-      // Ensure the newly linked wallet becomes the active one everywhere:
-      // - Update Privy/Wagmi via setActiveWallet
-      // - Persist the preference in localStorage
-      // - Notify any listeners (like useWalletIdentity) via a custom event
-      if (linkedWallet) {
-        await setActiveWallet(linkedWallet);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(
-            "privy_wallet_preference",
-            linkedWallet.address
-          );
-          window.dispatchEvent(new Event("privy-wallet-preference-changed"));
-        }
-      }
-
-      toast({
-        type: "success",
-        description: "External wallet connected. Future payments will use it.",
-      });
-    } catch (error) {
-      const message =
-        typeof error === "string"
-          ? error
-          : error instanceof Error
-            ? error.message
-            : "";
-
-      if (message === "exited_auth_flow") {
-        return;
-      }
-
-      // This happens if the MetaMask address is already the primary
-      // account for a *different* Privy user.
-      if (message.includes("User already exists for this address")) {
-        toast({
-          type: "error",
-          description:
-            "This wallet is already linked to another account. Sign out and log in with that wallet instead, or choose a different wallet.",
-        });
-      } else {
-        console.error("Link wallet error:", error);
-        toast({
-          type: "error",
-          description: "Failed to connect wallet. Please try again.",
-        });
-      }
-    } finally {
-      setIsLinkingWallet(false);
     }
   };
 
@@ -254,35 +194,12 @@ export function SidebarUserNav() {
             {isConnected && walletAddress && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">
-                  Current wallet: {isEmbeddedWallet ? "Embedded" : "External"}
+                <DropdownMenuLabel className="flex items-center justify-between font-normal text-muted-foreground text-xs">
+                  <span>Your wallet</span>
+                  <span className="font-medium text-foreground">
+                    ${formattedBalance} USDC
+                  </span>
                 </DropdownMenuLabel>
-                {wallets.length > 1 && (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      Switch Wallet
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent>
-                      {wallets.map((wallet) => {
-                        if (!wallet) {
-                          return null;
-                        }
-                        const isCurrent = wallet.address === walletAddress;
-                        return (
-                          <DropdownMenuItem
-                            key={wallet.address}
-                            onSelect={() => handleSwitchWallet(wallet.address)}
-                          >
-                            <span className="flex w-full items-center justify-between gap-2">
-                              <span>{formatWalletAddress(wallet.address)}</span>
-                              {isCurrent && <CheckIcon size={14} />}
-                            </span>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                )}
                 <DropdownMenuItem
                   className="cursor-pointer"
                   data-testid="user-nav-item-copy"
@@ -309,35 +226,9 @@ export function SidebarUserNav() {
                 >
                   Export wallet
                 </DropdownMenuItem>
-                {isEmbeddedWallet && (
-                  <DropdownMenuItem
-                    className="cursor-pointer"
-                    data-testid="user-nav-item-link-wallet"
-                    disabled={isLinkingWallet}
-                    onSelect={() => {
-                      handleLinkExternalWallet();
-                    }}
-                  >
-                    {isLinkingWallet
-                      ? "Connecting wallet…"
-                      : "Use your own wallet"}
-                  </DropdownMenuItem>
-                )}
               </>
             )}
-            {!isEmbeddedWallet && embeddedWallet ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">
-                  Embedded wallet {formatWalletAddress(embeddedWallet.address)}{" "}
-                  still holds any existing funds or earnings. Export it while
-                  active to move assets.
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-              </>
-            ) : (
-              <DropdownMenuSeparator />
-            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild data-testid="user-nav-item-auth">
               <button
                 className="w-full cursor-pointer"

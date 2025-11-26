@@ -28,6 +28,7 @@ import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import { ThinkingAccordion } from "./thinking-accordion";
 import { parseToolContext, ToolContext } from "./tool-context";
 import { Weather } from "./weather";
 
@@ -324,16 +325,7 @@ export const PreviewMessage = memo(
     if (!equal(prevProps.vote, nextProps.vote)) {
       return false;
     }
-
     if (prevProps.isDebugMode !== nextProps.isDebugMode) {
-      return false;
-    }
-
-    if (prevProps.debugCode !== nextProps.debugCode) {
-      return false;
-    }
-
-    if (prevProps.debugResult !== nextProps.debugResult) {
       return false;
     }
 
@@ -341,10 +333,20 @@ export const PreviewMessage = memo(
   }
 );
 
-export const ThinkingMessage = () => {
+type ThinkingMessageProps = {
+  isDebugMode?: boolean;
+};
+
+export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) => {
   const role = "assistant";
-  const { stage, toolName } = usePaymentStatus();
+  const { stage, toolName, streamingCode, debugResult } = usePaymentStatus();
   const statusMessage = getPaymentStatusMessage(stage, toolName);
+
+  // Show the accordion when we have streaming code or are in planning/executing stages
+  const showAccordion =
+    streamingCode !== null ||
+    stage === "planning" ||
+    stage === "executing";
 
   return (
     <motion.div
@@ -362,9 +364,19 @@ export const ThinkingMessage = () => {
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          <div className="payment-status-gradient animate-status-gradient bg-size-200 p-0 text-gradient text-sm">
-            {statusMessage}
-          </div>
+          {showAccordion ? (
+            <ThinkingAccordion
+              debugResult={debugResult}
+              isDebugMode={isDebugMode}
+              stage={stage}
+              streamingCode={streamingCode}
+              toolName={toolName}
+            />
+          ) : (
+            <div className="payment-status-gradient animate-status-gradient bg-size-200 p-0 text-gradient text-sm">
+              {statusMessage}
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

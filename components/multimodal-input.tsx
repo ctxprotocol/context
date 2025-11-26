@@ -30,6 +30,7 @@ import {
 } from "wagmi";
 import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
+import { useAutoPay } from "@/hooks/use-auto-pay";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useToolSelection } from "@/hooks/use-tool-selection";
@@ -132,6 +133,7 @@ function PureMultimodalInput({
   const { stage, setStage, reset: resetPaymentStatus } = usePaymentStatus();
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
   const { fundWallet } = useFundWallet();
+  const { isAutoPay, canAfford, recordSpend } = useAutoPay();
 
   // Wallet and contract addresses
   // Rename address to wagmiAddress to avoid confusion
@@ -325,6 +327,9 @@ function PureMultimodalInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
 
+  // Track if we should auto-execute payment (when Auto Pay is enabled)
+  const [pendingAutoPayment, setPendingAutoPayment] = useState(false);
+  
   const submitForm = useCallback(
     (toolInvocation?: ToolInvocationPayload | BatchToolInvocationPayload) => {
       const trimmedInput = input.trim();
@@ -335,6 +340,26 @@ function PureMultimodalInput({
         !isReadonly &&
         (selectedTool || activeTools.length > 0)
       ) {
+        // Calculate total cost
+        const toolsToPay = selectedTool ? [selectedTool] : activeTools;
+        const totalCost = toolsToPay.reduce(
+          (sum, t) => sum + Number(t.pricePerQuery ?? 0),
+          0
+        );
+        
+        // If Auto Pay is enabled and within budget, trigger auto-payment
+        if (isAutoPay) {
+          if (canAfford(totalCost)) {
+            // Set flag to trigger auto-payment via useEffect
+            setPendingAutoPayment(true);
+            return;
+          } else {
+            // Budget exceeded - show toast and fall back to dialog
+            toast.error(`Budget exceeded. Need $${totalCost.toFixed(2)} but only have remaining budget.`);
+          }
+        }
+        
+        // Show payment dialog (normal flow or Auto Pay budget exceeded)
         setShowPayDialog(true);
         return;
       }
@@ -406,7 +431,9 @@ function PureMultimodalInput({
       chatId,
       isReadonly,
       selectedTool,
-      activeTools.length,
+      activeTools,
+      isAutoPay,
+      canAfford,
     ]
   );
 
@@ -540,6 +567,18 @@ function PureMultimodalInput({
       return;
     }
 
+    // Calculate total cost for recording spend (Auto Pay budget tracking)
+    const toolsUsed = executingTools.length > 1 ? executingTools : (executingTool ? [executingTool] : []);
+    const totalCost = toolsUsed.reduce(
+      (sum, t) => sum + Number(t.pricePerQuery ?? 0),
+      0
+    );
+    
+    // Record spend against Auto Pay budget if enabled
+    if (isAutoPay && totalCost > 0) {
+      recordSpend(totalCost);
+    }
+
     // Handle batch execution (multiple tools)
     if (executingTools.length > 1) {
       const toolNames = executingTools.map((t) => t.name).join(", ");
@@ -578,6 +617,8 @@ function PureMultimodalInput({
     submitForm,
     resetExecute,
     resetBatchExecute,
+    isAutoPay,
+    recordSpend,
   ]);
 
   const handleSwitchNetwork = useCallback(async () => {
@@ -803,6 +844,14 @@ function PureMultimodalInput({
     setStage,
     resetPaymentStatus,
   ]);
+
+  // Auto-execute payment when Auto Pay is enabled and triggered
+  useEffect(() => {
+    if (pendingAutoPayment && !isPaying) {
+      setPendingAutoPayment(false);
+      confirmPayment();
+    }
+  }, [pendingAutoPayment, isPaying, confirmPayment]);
 
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>

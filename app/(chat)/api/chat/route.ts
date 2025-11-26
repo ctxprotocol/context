@@ -554,6 +554,15 @@ export async function POST(request: Request) {
             enabledTools: enabledToolSummaries,
           });
 
+          // Signal planning status so UI shows "Planning..."
+          dataStream.write({
+            type: "data-toolStatus",
+            data: { status: "planning" },
+          });
+
+          // Force a tiny delay to ensure the chunk is flushed
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
           // STREAMING PLANNER:
           // Use streamText so dev mode can see the code "as it's being written".
           const planningResult = streamText({
@@ -568,8 +577,14 @@ export async function POST(request: Request) {
           });
 
           let planningText = "";
+          // Stream each chunk of planning code to the client for real-time display
           for await (const delta of planningResult.textStream) {
             planningText += delta;
+            // Stream the cumulative planning text so the UI can display it as it's written
+            dataStream.write({
+              type: "data-debugCode",
+              data: planningText,
+            });
           }
 
           planningText = planningText.trim();
@@ -709,6 +724,12 @@ export async function POST(request: Request) {
                     logs: execution.logs,
                   });
                 }
+
+                // Stream execution result to client for Developer Mode display
+                dataStream.write({
+                  type: "data-debugResult",
+                  data: executionPayload,
+                });
 
                 if (process.env.NODE_ENV === "development") {
                   console.log("[chat-api] execution payload constructed", {

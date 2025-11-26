@@ -4,21 +4,25 @@ import { base, mainnet } from "viem/chains";
 
 export const privyConfig: PrivyClientConfig = {
   // Embedded wallet configuration
+  // IMPORTANT: All users get embedded wallets for Auto Pay to work
+  // External wallets (MetaMask) cannot auto-sign transactions by design
+  // Only embedded wallets enable seamless Auto Pay + gas sponsorship
   embeddedWallets: {
     ethereum: {
-      createOnLogin: "users-without-wallets",
+      createOnLogin: "all-users", // Every user gets an embedded wallet
     },
   },
   // Supported chains - must match wagmi config
   // We transact only on Base, but Privy may use mainnet for
   // wallet auth/SiWE. Keep wagmi on Base-only.
   supportedChains: [base, mainnet],
-  // Login methods
-  loginMethods: ["email", "wallet", "google", "github"],
+  // Login methods - NO external wallets (they can't auto-sign)
+  // Users authenticate with email/social, get embedded wallet automatically
+  loginMethods: ["email", "google", "github"],
   // Appearance
   appearance: {
     showWalletLoginFirst: false,
-    walletList: [], // Keeps external wallets like MetaMask disabled for now
+    // No external wallets - embedded only for Auto Pay support
   },
 };
 

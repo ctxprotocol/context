@@ -11,6 +11,7 @@ import {
 } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
+import { AutoPayProvider } from "@/hooks/use-auto-pay";
 import { PaymentStatusProvider } from "@/hooks/use-payment-status";
 import { isEmbeddedWallet, usePrivyWalletSync } from "@/hooks/use-privy-wallet-sync";
 import { useSessionSync } from "@/hooks/use-session-sync";
@@ -108,16 +109,28 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
       config={privyConfig}
     >
-      <SmartWalletsProvider>
+      <SmartWalletsProvider
+        config={{
+          // Enable gas sponsorship - Context pays for gas, users only need USDC for tools
+          // The paymaster URL must be configured in the Privy Dashboard
+          paymasterContext: {
+            mode: "SPONSORED",
+            calculateGasLimits: true,
+            expiryDuration: 300, // 5 minutes
+          },
+        }}
+      >
         <QueryClientProvider client={queryClient}>
           <WagmiProvider
             config={wagmiConfig}
             setActiveWalletForWagmi={selectWalletForWagmi}
           >
             <SessionProvider>
-              <PaymentStatusProvider>
-                <SessionSyncManager>{children}</SessionSyncManager>
-              </PaymentStatusProvider>
+              <AutoPayProvider>
+                <PaymentStatusProvider>
+                  <SessionSyncManager>{children}</SessionSyncManager>
+                </PaymentStatusProvider>
+              </AutoPayProvider>
             </SessionProvider>
           </WagmiProvider>
         </QueryClientProvider>
