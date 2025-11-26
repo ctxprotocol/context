@@ -2,7 +2,7 @@
 
 This directory contains **Verified Native Tool Skills** submitted by the community.
 
-Native Tools are essentially **"Serverless MCP"**—we host the skill code, but the interface follows the same patterns as the Model Context Protocol. They run in-process with zero network latency.
+Native Tools are essentially **"Serverless MCP"** we host the skill code, but the interface follows the same patterns as the Model Context Protocol. They run in-process with zero network latency.
 
 ## 📖 Terminology
 

@@ -17,7 +17,7 @@
 
 ## 🌟 Vision
 
-We believe the future of AI is not a single "Super App," but a collaborative network of specialized agents and data sources. MCP is the open standard that makes this possible—and Context is where you get paid.
+We believe the future of AI is not a single "Super App," but a collaborative network of specialized agents and data sources. MCP is the open standard that makes this possible and Context is where you get paid.
 
 - **For Developers:** Don't build a custom API integration. Build a standard **MCP Server**. Expose your unique data (crypto, stocks, weather, sports, anything) and get paid in USDC every time an AI agent uses it.
 - **For Users:** Access a "God Mode" agent that has real-time access to the entire on-chain and off-chain world, without switching tabs. Enable "Auto Mode" to let the AI discover tools for you.
@@ -31,7 +31,7 @@ Context is built on a **Code Execution** paradigm. Instead of rigid "tool callin
 
 Developers register **Tools** (the paid product) which are powered by:
 
-- **MCP Tools (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL—we auto-discover your skills via `listTools()`. This is the primary integration path.
+- **MCP Tools (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL and we auto-discover your skills via `listTools()`. This is the primary integration path.
 - **Native Tools:** Verified TypeScript modules running on our platform ("Serverless MCP"). For high-performance use cases where you need zero-latency execution. Requires a Pull Request.
 
 > **Terminology:**
