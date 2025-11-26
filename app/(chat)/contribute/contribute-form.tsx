@@ -226,6 +226,7 @@ Design workflows to minimize external API calls.`;
                 )}
                 defaultValue={state.payload?.price || "0.00"}
                 id="price"
+                max="100"
                 min="0"
                 name="price"
                 step="0.0001"
@@ -233,7 +234,8 @@ Design workflows to minimize external API calls.`;
               />
               <p className="text-muted-foreground text-xs leading-relaxed">
                 Set to <strong>$0.00</strong> for free tools, or charge per
-                query. Users pay <strong>once per chat turn</strong>.
+                query (up to 4 decimals, e.g. $0.001). Users pay{" "}
+                <strong>once per chat turn</strong>.
               </p>
               <FieldError message={priceError} />
             </div>

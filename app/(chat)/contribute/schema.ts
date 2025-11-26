@@ -16,9 +16,12 @@ export const contributeFormSchema = z
     endpoint: z.string().min(1).optional(), // URL for mcp, module path for skill
     price: z
       .string()
-      .regex(/^\d+\.?\d*$/, "Enter a valid number")
+      .regex(/^\d+\.?\d{0,4}$/, "Max 4 decimal places allowed")
       .refine((value) => Number(value) >= 0, {
         message: "Price must be 0 or greater",
+      })
+      .refine((value) => Number(value) <= 100, {
+        message: "Price cannot exceed $100 per query",
       }),
     developerWallet: z
       .string()

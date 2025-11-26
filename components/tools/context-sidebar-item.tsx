@@ -6,7 +6,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import type { AITool } from "@/lib/db/schema";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 
 const PureContextSidebarItem = ({
@@ -18,9 +18,7 @@ const PureContextSidebarItem = ({
   isActive: boolean;
   onToggle: (toolId: string) => void;
 }) => {
-  const formattedPrice = tool.pricePerQuery
-    ? Number(tool.pricePerQuery).toFixed(2)
-    : "0.00";
+  const formattedPrice = formatPrice(tool.pricePerQuery ?? 0);
 
   const isNative = (tool.toolSchema as any)?.kind === "skill";
 

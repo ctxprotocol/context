@@ -119,3 +119,24 @@ export function formatWalletAddress(address: string): string {
   if (!address) return '';
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
+
+/**
+ * Format a price with smart decimal places.
+ * - Shows 2 decimals for whole cents ($1.00, $0.10)
+ * - Shows up to 4 decimals for micropayments ($0.001, $0.0001)
+ * - Trims trailing zeros after the minimum 2 decimals
+ */
+export function formatPrice(price: number | string): string {
+  const num = typeof price === 'string' ? Number.parseFloat(price) : price;
+  if (Number.isNaN(num)) return '0.00';
+  
+  // Format with 4 decimal places, then trim unnecessary trailing zeros
+  // but always keep at least 2 decimal places
+  const formatted = num.toFixed(4);
+  
+  // Remove trailing zeros, but keep minimum 2 decimal places
+  const trimmed = formatted.replace(/(\.\d{2})(\d*?)0+$/, '$1$2');
+  
+  // Clean up if we have trailing zeros after the 2nd decimal
+  return trimmed.replace(/(\.\d{2})0+$/, '$1');
+}

@@ -17,7 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useSessionTools } from "@/hooks/use-session-tools";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { CrossIcon, LoaderIcon } from "../icons";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
@@ -269,7 +269,7 @@ export function ContextSidebar({
                 </div>
               ) : (
                 <div className="text-sidebar-foreground/50">
-                  ${totalCost.toFixed(2)}/query
+                  ${formatPrice(totalCost)}/query
                 </div>
               )}
             </div>
