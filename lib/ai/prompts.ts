@@ -50,6 +50,20 @@ const result = await callMcpSkill({ toolId: "...", toolName: "...", args: { ... 
 - The result matches the tool's \`outputSchema\` - **always check outputSchema to know the exact property names**
 - Example: if outputSchema is \`{ chains: [...], fetchedAt: "..." }\`, access \`result.chains\` and \`result.fetchedAt\`
 - You can call this skill up to 100 times per tool payment within a single chat turn
+- **Performance tip**: Use \`Promise.all()\` for parallel execution when fetching multiple independent items:
+\`\`\`ts
+// Good: Parallel execution (fast)
+const [result1, result2, result3] = await Promise.all([
+  callMcpSkill({ toolId, toolName: "get_data", args: { id: 1 } }),
+  callMcpSkill({ toolId, toolName: "get_data", args: { id: 2 } }),
+  callMcpSkill({ toolId, toolName: "get_data", args: { id: 3 } }),
+]);
+
+// Avoid: Sequential execution (slow)
+const result1 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 1 } });
+const result2 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 2 } });
+const result3 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 3 } });
+\`\`\`
 
 ## Tool Discovery (Auto Mode)
 When Auto Mode is enabled, you can search the marketplace for relevant tools:

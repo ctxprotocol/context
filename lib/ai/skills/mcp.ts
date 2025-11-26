@@ -33,8 +33,15 @@ type McpSkillResult = unknown;
 const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
 
-// Cache MCP clients per endpoint to avoid reconnecting on every call
-const clientCache = new Map<string, Client>();
+// Connection cache TTL - connections are reused within this window
+const CONNECTION_CACHE_TTL_MS = 30_000; // 30 seconds
+
+// Cache MCP clients per endpoint with TTL to avoid reconnecting on every call
+type CachedClient = {
+  client: Client;
+  createdAt: number;
+};
+const clientCache = new Map<string, CachedClient>();
 
 /**
  * MCP Tool Result type (from MCP spec 2025-06-18)
@@ -124,12 +131,30 @@ function unwrapMcpContent(content: unknown): unknown {
 
 /**
  * Get or create an MCP client for the given endpoint
- * Note: We don't cache clients because SSE connections can become stale.
- * Each call creates a fresh connection for reliability.
+ * Uses TTL-based caching (30 seconds) to reuse connections within a code execution
+ * while still ensuring connections don't become stale across requests.
  */
 async function getMcpClient(endpoint: string): Promise<Client> {
-  // Don't use cache for now - SSE connections can become stale
-  // and cause silent failures. Create fresh connection each time.
+  const now = Date.now();
+  const cached = clientCache.get(endpoint);
+
+  // Check if we have a valid cached connection
+  if (cached && (now - cached.createdAt) < CONNECTION_CACHE_TTL_MS) {
+    console.log("[mcp-skill] Reusing cached MCP connection to:", endpoint);
+    return cached.client;
+  }
+
+  // Clean up stale connection if exists
+  if (cached) {
+    console.log("[mcp-skill] Cached connection expired, creating fresh one");
+    try {
+      await cached.client.close();
+    } catch {
+      // Ignore close errors
+    }
+    clientCache.delete(endpoint);
+  }
+
   console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
 
   try {
@@ -146,6 +171,9 @@ async function getMcpClient(endpoint: string): Promise<Client> {
 
     await client.connect(transport);
     console.log("[mcp-skill] Successfully connected to:", endpoint);
+
+    // Cache the connection with timestamp
+    clientCache.set(endpoint, { client, createdAt: now });
 
     return client;
   } catch (error) {
