@@ -31,13 +31,17 @@ Context is built on a **Code Execution** paradigm. Instead of rigid "tool callin
 
 Developers register **Tools** (the paid product) which are powered by:
 
-- **MCP Servers (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL—we auto-discover your tools via `listTools()`. This is the primary integration path.
+- **MCP Tools (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL—we auto-discover your skills via `listTools()`. This is the primary integration path.
 - **Native Tools:** Verified TypeScript modules running on our platform ("Serverless MCP"). For high-performance use cases where you need zero-latency execution. Requires a Pull Request.
 
+> **Terminology:**
+> - **Tool** = The paid marketplace listing (what users see in the sidebar)
+> - **Skill** = The execution function (can be called multiple times per tool payment)
+>
 > **How It Works:**
 > 1. You build an MCP server exposing your data/APIs
-> 2. You register it on Context with a price (e.g., $0.01/query)
-> 3. When users query the AI, it discovers and calls your tools
+> 2. You register it as an "MCP Tool" on Context with a price (e.g., $0.01/query)
+> 3. When users query the AI, it discovers and calls your skills via `callMcpSkill()`
 > 4. You get paid instantly in USDC on Base
 
 ### 2. The Agent (Demand)
@@ -46,7 +50,7 @@ When a user asks a complex question (e.g., "Is it profitable to arb Uniswap vs A
 
 1. **Discovers** relevant tools from the marketplace (or uses pre-selected ones)
 2. **Plans** a solution using composability
-3. **Writes Code** to invoke the necessary paid Tools via `callMcpTool()`
+3. **Writes Code** to invoke the necessary paid Tools via `callMcpSkill()`
 4. **Executes** the code securely in our sandbox
 5. **Pays** developers their fees instantly via `ContextRouter`
 6. **Synthesizes** the answer
@@ -76,25 +80,25 @@ cp .env.example .env.local
 pnpm dev
 ```
 
-### Contribute a Tool (MCP Server)
+### Contribute a Tool (MCP Tool)
 
-Want to earn revenue from your data? Build an MCP server and register it.
+Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
 1. **Build an MCP Server:** Follow the [Model Context Protocol spec](https://modelcontextprotocol.io). Use the official [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) or [Python SDK](https://github.com/modelcontextprotocol/python-sdk).
 
 2. **Deploy with SSE Transport:** Your server needs to be publicly accessible via Server-Sent Events (SSE). Example endpoint: `https://your-server.com/sse`
 
 3. **Register in the App:** Go to `/contribute` in the running app:
-   - Select **"MCP Server"** (the default)
+   - Select **"MCP Tool"** (the default)
    - Paste your SSE endpoint URL
-   - We'll auto-discover your tools via `listTools()`
+   - We'll auto-discover your skills via `listTools()`
 
 4. **Set a Price:** Choose your fee per query:
    - `$0.00` for free tools (great for adoption)
    - `$0.01+` for paid tools
-   - **Note:** This fee is paid **once per chat turn**. The Agent can call your tools multiple times within that single paid turn.
+   - **Note:** This fee is paid **once per chat turn**. The Agent can call your skills up to 100 times within that single paid turn via `callMcpSkill()`.
 
-5. **Earn:** Your tool is now instantly available on the **decentralized marketplace**!
+5. **Earn:** Your MCP Tool is now instantly available on the **decentralized marketplace**!
 
 #### Example MCP Server (TypeScript)
 
@@ -117,6 +121,16 @@ server.setRequestHandler("tools/list", async () => ({
         city: { type: "string", description: "City name" }
       },
       required: ["city"]
+    },
+    // Define output structure for reliable AI parsing (MCP 2025-06-18)
+    outputSchema: {
+      type: "object",
+      properties: {
+        temperature: { type: "number" },
+        conditions: { type: "string" },
+        humidity: { type: "number" }
+      },
+      required: ["temperature", "conditions"]
     }
   }]
 }));
@@ -125,7 +139,12 @@ server.setRequestHandler("tools/call", async (request) => {
   if (request.params.name === "get_weather") {
     const { city } = request.params.arguments;
     // Your API logic here
-    return { content: [{ type: "text", text: `Weather in ${city}: 72°F` }] };
+    const data = { temperature: 72, conditions: "Sunny", humidity: 45 };
+    return {
+      content: [{ type: "text", text: JSON.stringify(data) }],
+      // Return flat data in structuredContent for reliable AI parsing
+      structuredContent: data
+    };
   }
 });
 
@@ -133,6 +152,10 @@ server.setRequestHandler("tools/call", async (request) => {
 const transport = new SSEServerTransport("/sse", response);
 await server.connect(transport);
 ```
+
+> **Best Practice:** Always include `outputSchema` in your tool definitions and return data in `structuredContent`. This ensures AI agents can reliably access your data (e.g., `result.temperature` instead of guessing nested paths).
+
+See the full [Blocknative example](./examples/blocknative-contributor) for a production-ready implementation.
 
 ### 🛠 Advanced: Native Skills Registry
 
@@ -144,13 +167,13 @@ For complex logic that requires maximum performance or verified execution, you c
 
 Each tool invocation runs inside a sandboxed code-execution environment.
 
-- **MCP Tools (via `callMcpTool`)**
+- **MCP Tools (via `callMcpSkill`)**
   - Enforced limit: `MAX_CALLS_PER_TURN = 100`
-  - Every `callMcpTool({ toolId, toolName, args })` increments an internal counter
+  - Every `callMcpSkill({ toolId, toolName, args })` increments an internal counter
   - Once `executionCount >= 100`, the platform throws an error for that turn
-  - MCP connections are cached per endpoint for efficiency
+  - Fresh MCP connections are created per request for reliability
 
-- **Native Tools (custom skills in `lib/ai/skills/community/*`)**
+- **Native Tools (custom skill functions in `lib/ai/skills/community/*`)**
   - Executed via `executeSkillCode` in `lib/ai/code-executor.ts`
   - No per-call counter, but limited by VM timeout (default 5000ms)
   - Underlying platform limits (Vercel function time, memory, etc.)

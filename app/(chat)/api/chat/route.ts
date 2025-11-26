@@ -32,6 +32,7 @@ import {
   systemPrompt,
 } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
+import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
 import type { AllowedToolContext } from "@/lib/ai/skills/runtime";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
@@ -174,7 +175,7 @@ function getMcpTools(tool: AITool) {
   }
   const tools = (schema as Record<string, unknown>).tools;
   if (Array.isArray(tools)) {
-    return tools as { name: string; description?: string; inputSchema?: unknown }[];
+    return tools as { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[];
   }
   return;
 }
@@ -279,7 +280,7 @@ export async function POST(request: Request) {
 
     const paidTools = await Promise.all(
       toolInvocations.map(async (invocation) => {
-        const tool = await getAIToolById({ id: invocation.toolId });
+        let tool = await getAIToolById({ id: invocation.toolId });
         if (!tool) {
           throw new ChatSDKError("not_found:chat", "Requested tool not found");
         }
@@ -290,6 +291,22 @@ export async function POST(request: Request) {
 
         // MCP tools use the MCP module
         if (toolKind === "mcp") {
+          // Self-healing: Refresh MCP tool schema if stale (TTL-based, 1 hour)
+          // This ensures we always have the latest outputSchema from the MCP server
+          try {
+            const wasRefreshed = await refreshMcpToolSchema(tool);
+            if (wasRefreshed) {
+              // Re-fetch the tool to get the updated schema
+              const refreshedTool = await getAIToolById({ id: invocation.toolId });
+              if (refreshedTool) {
+                tool = refreshedTool;
+              }
+            }
+          } catch (err) {
+            // Don't fail the request if schema refresh fails
+            console.warn(`[chat-api] Schema refresh failed for ${tool.name}:`, err);
+          }
+
           return {
             tool,
             transactionHash: invocation.transactionHash,

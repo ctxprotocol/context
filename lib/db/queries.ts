@@ -793,6 +793,30 @@ export async function updateAIToolStatus({
 }
 
 /**
+ * Update the tool schema (used for refreshing MCP tool definitions)
+ */
+export async function updateAIToolSchema({
+  id,
+  toolSchema,
+}: {
+  id: string;
+  toolSchema: Record<string, unknown>;
+}) {
+  try {
+    return await db
+      .update(aiTool)
+      .set({ toolSchema, updatedAt: new Date() })
+      .where(eq(aiTool.id, id));
+  } catch (error) {
+    console.error("Failed to update tool schema:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update tool schema"
+    );
+  }
+}
+
+/**
  * Record a paid query execution
  * Updates tool statistics (query count, revenue) and records the transaction
  */

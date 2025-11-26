@@ -1,28 +1,34 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { getSkillRuntime } from "@/lib/ai/skills/runtime";
-import { getAIToolById, recordToolQuery } from "@/lib/db/queries";
+import { getAIToolById, recordToolQuery, updateAIToolSchema } from "@/lib/db/queries";
 import type { AITool } from "@/lib/db/schema";
 
 /**
- * MCP Client Skill
+ * MCP Skill Module
  *
- * This module provides the ability to call tools on remote MCP servers.
- * It replaces the old HTTP tool pattern with the standard MCP protocol.
- *
- * Key differences from callHttpSkill:
- * - Uses MCP's JSON-RPC protocol over SSE transport
- * - Tool discovery is built-in (listTools)
- * - Supports free tools (price = 0) without payment flow
+ * This module provides the skill functions to interact with MCP Tools.
+ * 
+ * Terminology:
+ * - **MCP Tool**: A paid marketplace listing (appears in sidebar, has a price)
+ * - **MCP Skill**: This execution layer that calls the MCP server (can be called up to 100x per tool payment)
+ * 
+ * The relationship:
+ * - User pays for an "MCP Tool" once per chat turn
+ * - Agent can call `callMcpSkill()` up to 100 times within that paid turn
+ * - Each call invokes a specific tool on the remote MCP server
  */
 
-type CallMcpToolParams = {
+type CallMcpSkillParams = {
+  /** The database ID of the MCP Tool (from marketplace listing) */
   toolId: string;
+  /** The specific tool name on the MCP server (from listTools discovery) */
   toolName: string;
+  /** Arguments to pass to the MCP tool */
   args: Record<string, unknown>;
 };
 
-type McpToolResult = unknown;
+type McpSkillResult = unknown;
 
 const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
@@ -31,7 +37,37 @@ const MAX_CALLS_PER_TURN = 100;
 const clientCache = new Map<string, Client>();
 
 /**
- * Unwrap MCP content format to return clean data
+ * MCP Tool Result type (from MCP spec 2025-06-18)
+ */
+type McpCallToolResult = {
+  content: unknown[];
+  isError?: boolean;
+  structuredContent?: Record<string, unknown>;
+};
+
+/**
+ * Unwrap MCP result to return clean, predictable data
+ * 
+ * MCP spec (2025-06-18) defines two ways to return data:
+ * 1. `structuredContent` - Preferred, typed JSON object matching outputSchema
+ * 2. `content` - Array of content blocks (text, image, etc.)
+ * 
+ * We prioritize `structuredContent` when available for consistent data access.
+ */
+function unwrapMcpResult(result: McpCallToolResult): unknown {
+  // Prefer structuredContent if available (MCP 2025-06-18 standard)
+  // This gives us clean, predictable data structure
+  if (result.structuredContent && Object.keys(result.structuredContent).length > 0) {
+    console.log("[mcp-skill] Using structuredContent (MCP standard)");
+    return result.structuredContent;
+  }
+
+  // Fall back to parsing content array
+  return unwrapMcpContent(result.content);
+}
+
+/**
+ * Unwrap MCP content array format to return clean data
  * MCP returns: { content: [{ type: "text", text: "..." }, ...] }
  * We want to return the actual parsed data directly
  */
@@ -144,17 +180,20 @@ function isFreeTool(tool: AITool): boolean {
 }
 
 /**
- * Call a tool on an MCP server
+ * Call a skill on an MCP Tool's server
  *
- * @param toolId - The database ID of the tool (used to look up endpoint and billing)
+ * This is the execution function for MCP Tools. Users pay once per "Tool" per turn,
+ * but the agent can call this skill function up to 100 times within that turn.
+ *
+ * @param toolId - The database ID of the MCP Tool (marketplace listing)
  * @param toolName - The name of the specific tool to call on the MCP server
  * @param args - Arguments to pass to the tool
  */
-export async function callMcpTool({
+export async function callMcpSkill({
   toolId,
   toolName,
   args,
-}: CallMcpToolParams): Promise<McpToolResult> {
+}: CallMcpSkillParams): Promise<McpSkillResult> {
   const runtime = getSkillRuntime();
 
   // Look up the tool from the database
@@ -217,10 +256,10 @@ export async function callMcpTool({
       clearTimeout(timeout);
       console.log("[mcp-skill] Raw MCP result:", JSON.stringify(result).slice(0, 500));
 
-      // Unwrap MCP content format to return clean data to the agent
-      // MCP returns: { content: [{ type: "text", text: "..." }], isError: false }
-      // We want to return the actual parsed data directly
-      const unwrappedContent = unwrapMcpContent(result.content);
+      // Unwrap MCP result to return clean data to the agent
+      // MCP 2025-06-18 spec supports `structuredContent` for typed responses
+      // We prefer that over parsing the content array
+      const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
       console.log("[mcp-skill] Unwrapped content:", JSON.stringify(unwrappedContent).slice(0, 500));
 
       // Record the query for analytics
@@ -276,7 +315,7 @@ export async function callMcpTool({
  */
 export async function listMcpTools(
   endpoint: string
-): Promise<{ name: string; description?: string; inputSchema?: unknown }[]> {
+): Promise<{ name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[]> {
   const client = await getMcpClient(endpoint);
   const result = await client.listTools();
 
@@ -284,6 +323,7 @@ export async function listMcpTools(
     name: tool.name,
     description: tool.description,
     inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
   }));
 }
 
@@ -300,5 +340,126 @@ export async function disconnectAllMcpClients(): Promise<void> {
     }
   }
   clientCache.clear();
+}
+
+// ============================================================================
+// SELF-HEALING SCHEMA REFRESH SYSTEM
+// ============================================================================
+
+/** Cache for schema refresh timestamps (toolId -> lastRefreshedAt) */
+const schemaRefreshCache = new Map<string, number>();
+
+/** TTL for schema refresh: 1 hour in milliseconds */
+const SCHEMA_REFRESH_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Check if a tool's schema needs refreshing based on TTL
+ */
+function needsSchemaRefresh(toolId: string): boolean {
+  const lastRefresh = schemaRefreshCache.get(toolId);
+  if (!lastRefresh) return true;
+  return Date.now() - lastRefresh > SCHEMA_REFRESH_TTL_MS;
+}
+
+/**
+ * Refresh the schema for a single MCP tool from its server
+ * This is the self-healing mechanism that keeps schemas up-to-date
+ * 
+ * @param tool - The AITool to refresh
+ * @returns true if schema was updated, false if unchanged or failed
+ */
+export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
+  const schema = tool.toolSchema as Record<string, unknown> | null;
+  if (!schema || schema.kind !== "mcp") {
+    return false;
+  }
+
+  const endpoint = schema.endpoint as string;
+  if (!endpoint) {
+    console.warn(`[mcp-refresh] Tool ${tool.id} has no endpoint`);
+    return false;
+  }
+
+  try {
+    console.log(`[mcp-refresh] Refreshing schema for ${tool.name} from ${endpoint}`);
+    
+    const freshTools = await listMcpTools(endpoint);
+    
+    if (!freshTools || freshTools.length === 0) {
+      console.warn(`[mcp-refresh] No tools found at ${endpoint}`);
+      return false;
+    }
+
+    // Check if schema has changed by comparing tool names and schemas
+    const existingTools = schema.tools as unknown[] | undefined;
+    const existingJson = JSON.stringify(existingTools || []);
+    const freshJson = JSON.stringify(freshTools);
+
+    if (existingJson === freshJson) {
+      console.log(`[mcp-refresh] Schema unchanged for ${tool.name}`);
+      schemaRefreshCache.set(tool.id, Date.now());
+      return false;
+    }
+
+    // Schema has changed - update the database
+    console.log(`[mcp-refresh] Schema changed for ${tool.name}, updating database`);
+    
+    const updatedSchema = {
+      ...schema,
+      tools: freshTools,
+    };
+
+    await updateAIToolSchema({
+      id: tool.id,
+      toolSchema: updatedSchema,
+    });
+
+    schemaRefreshCache.set(tool.id, Date.now());
+    console.log(`[mcp-refresh] Successfully updated schema for ${tool.name}`);
+    return true;
+  } catch (error) {
+    console.error(`[mcp-refresh] Failed to refresh schema for ${tool.name}:`, error);
+    // Don't throw - schema refresh failures shouldn't break the chat
+    return false;
+  }
+}
+
+/**
+ * Refresh schemas for multiple MCP tools if they need it (based on TTL)
+ * Called at the start of chat sessions to ensure fresh schemas
+ * 
+ * @param tools - Array of AITools to potentially refresh
+ * @returns Number of tools that were refreshed
+ */
+export async function refreshMcpToolSchemasIfNeeded(tools: AITool[]): Promise<number> {
+  const mcpTools = tools.filter((t) => {
+    const schema = t.toolSchema as Record<string, unknown> | null;
+    return schema?.kind === "mcp";
+  });
+
+  if (mcpTools.length === 0) {
+    return 0;
+  }
+
+  const toolsNeedingRefresh = mcpTools.filter((t) => needsSchemaRefresh(t.id));
+  
+  if (toolsNeedingRefresh.length === 0) {
+    console.log(`[mcp-refresh] All ${mcpTools.length} MCP tools have fresh schemas`);
+    return 0;
+  }
+
+  console.log(`[mcp-refresh] Refreshing ${toolsNeedingRefresh.length}/${mcpTools.length} MCP tool schemas`);
+
+  // Refresh in parallel with a concurrency limit
+  const results = await Promise.allSettled(
+    toolsNeedingRefresh.map((tool) => refreshMcpToolSchema(tool))
+  );
+
+  const refreshedCount = results.filter(
+    (r) => r.status === "fulfilled" && r.value === true
+  ).length;
+
+  console.log(`[mcp-refresh] Refreshed ${refreshedCount} tool schemas`);
+  return refreshedCount;
 }
 

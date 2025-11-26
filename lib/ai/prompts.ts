@@ -10,7 +10,7 @@ export type EnabledToolSummary = {
   usage?: string;
   kind: "skill" | "mcp";
   // MCP-specific: list of tools available on this server
-  mcpTools?: { name: string; description?: string; inputSchema?: unknown }[];
+  mcpTools?: { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[];
 };
 
 const codingAgentPrompt = `
@@ -37,16 +37,19 @@ When a tool is required:
   • Keep raw data private; aggregate or truncate large arrays before returning.
 
 ## MCP Tools
-For MCP-based tools (the standard), use the MCP skill module:
+For MCP Tools (the standard), use the MCP skill module:
 \`\`\`ts
-import { callMcpTool } from "@/lib/ai/skills/mcp";
-const result = await callMcpTool({ toolId: "...", toolName: "...", args: { ... } });
-// result is the UNWRAPPED data - access properties directly like result.data, result.chains, etc.
+import { callMcpSkill } from "@/lib/ai/skills/mcp";
+const result = await callMcpSkill({ toolId: "...", toolName: "...", args: { ... } });
+// result matches the outputSchema - check the tool's outputSchema to know the exact structure
+// Example: if outputSchema has { chains: array }, access result.chains
 \`\`\`
-- \`toolId\`: The database ID of the MCP server (provided in tool list)
+- \`toolId\`: The database ID of the MCP Tool (provided in tool list)
 - \`toolName\`: The specific tool name on that server (listed in mcpTools)
 - \`args\`: The arguments matching the tool's inputSchema
-- The result is automatically unwrapped from MCP format - you get the actual data object directly
+- The result matches the tool's \`outputSchema\` - **always check outputSchema to know the exact property names**
+- Example: if outputSchema is \`{ chains: [...], fetchedAt: "..." }\`, access \`result.chains\` and \`result.fetchedAt\`
+- You can call this skill up to 100 times per tool payment within a single chat turn
 
 ## Tool Discovery (Auto Mode)
 When Auto Mode is enabled, you can search the marketplace for relevant tools:
@@ -129,6 +132,18 @@ export const systemPrompt = ({
   return basePrompt;
 };
 
+function formatMcpToolDetails(t: { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }) {
+  const inputProps = (t.inputSchema as { properties?: Record<string, unknown> })?.properties;
+  const outputProps = (t.outputSchema as { properties?: Record<string, unknown> })?.properties;
+  
+  const inputKeys = inputProps ? Object.keys(inputProps).join(", ") : "none";
+  const outputKeys = outputProps ? Object.keys(outputProps).join(", ") : "unknown";
+  
+  return `      - ${t.name}: ${t.description || "No description"}
+        Input: { ${inputKeys} }
+        Output: { ${outputKeys} }`;
+}
+
 function formatEnabledTool(tool: EnabledToolSummary, index: number) {
   const price = Number(tool.price || 0).toFixed(2);
   const isFree = Number(tool.price || 0) === 0;
@@ -138,17 +153,18 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
   if (tool.kind === "mcp") {
     const mcpToolsList = tool.mcpTools?.length
       ? tool.mcpTools
-          .map((t) => `      - ${t.name}: ${t.description || "No description"}`)
+          .map((t) => formatMcpToolDetails(t))
           .join("\n")
       : "      (No tools discovered)";
 
-    return `${index + 1}. ${tool.name} (MCP Server • ${priceLabel})
+    return `${index + 1}. ${tool.name} (MCP Tool • ${priceLabel})
    Tool ID: ${tool.toolId}
-   Import: import { callMcpTool } from "@/lib/ai/skills/mcp";
-   Available Tools:
+   Import: import { callMcpSkill } from "@/lib/ai/skills/mcp";
+   Available MCP Tools:
 ${mcpToolsList}
    Example:
-     await callMcpTool({ toolId: "${tool.toolId}", toolName: "<tool_name>", args: { ... } })
+     const result = await callMcpSkill({ toolId: "${tool.toolId}", toolName: "<tool_name>", args: { ... } });
+     // Access result properties based on Output schema above (e.g., result.chains, result.estimates)
    ${tool.description}`;
   }
 

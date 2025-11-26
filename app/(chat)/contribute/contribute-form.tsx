@@ -39,16 +39,16 @@ export function ContributeForm() {
 
   const connectedWallet = walletAddress || "";
 
-  // MCP tools auto-discover schemas via listTools(), so the description
-  // focuses on WHAT the server does and WHY users should use it.
-  const mcpDescriptionPlaceholder = `What does your MCP server do? (Tool schemas are auto-discovered)
+  // MCP Tools auto-discover skills via listTools(), so the description
+  // focuses on WHAT the tool does and WHY users should use it.
+  const mcpDescriptionPlaceholder = `What does your MCP Tool do? (Skills are auto-discovered)
 
 Example:
-Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism. Accurate estimates for fast, standard, and slow transactions. Updated every block.
+Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism. Returns flat JSON with chainId, estimates array, and fetchedAt timestamp.
 
 Agent tips (optional):
-- Call list_chains first to discover available networks
-- Gas prices returned in Gwei`;
+- Call list_chains first to get all supported chainIds
+- Gas prices returned in Gwei with confidence levels`;
 
   const skillDescriptionPlaceholder = `Describe the exported functions and how to use them.
 
@@ -94,20 +94,20 @@ Design workflows to minimize external API calls.`;
               <div className="flex items-center space-x-2">
                 <RadioGroupItem id="kind-mcp" value="mcp" />
                 <Label className="cursor-pointer" htmlFor="kind-mcp">
-                  MCP Server
+                  MCP Tool
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem id="kind-skill" value="skill" />
                 <Label className="cursor-pointer" htmlFor="kind-skill">
-                  Native Skill
+                  Native Tool
                 </Label>
               </div>
             </RadioGroup>
             <p className="text-muted-foreground text-xs">
               {kind === "mcp" ? (
                 <>
-                  <strong>MCP Server (Recommended):</strong> Build a standard{" "}
+                  <strong>MCP Tool (Recommended):</strong> Build a standard{" "}
                   <a
                     className="underline"
                     href="https://modelcontextprotocol.io"
@@ -116,11 +116,12 @@ Design workflows to minimize external API calls.`;
                   >
                     Model Context Protocol
                   </a>{" "}
-                  server and paste your SSE endpoint. Tools are auto-discovered.
+                  server and paste your SSE endpoint. Skills are auto-discovered
+                  and can be called up to 100x per paid turn.
                 </>
               ) : (
                 <>
-                  <strong>Native Skill:</strong> High-performance TypeScript
+                  <strong>Native Tool:</strong> High-performance TypeScript
                   module hosted on Context. Requires a{" "}
                   <a
                     className="underline"
@@ -158,15 +159,17 @@ Design workflows to minimize external API calls.`;
             <p className="text-muted-foreground text-xs">
               {kind === "mcp" ? (
                 <>
-                  Explain what your server does and why users should use it.
-                  Tool schemas are <strong>auto-discovered</strong> from your
-                  MCP server no need to document parameters here.
+                  Explain what your MCP Tool does and why users should use it.
+                  Skills are <strong>auto-discovered</strong> from your MCP
+                  server. Use <code>outputSchema</code> and{" "}
+                  <code>structuredContent</code> for reliable AI parsing.
                 </>
               ) : (
                 <>
                   Shown to users in the marketplace and used by the AI to
-                  understand your tool. Explain what it does, why it&apos;s
-                  valuable, and how to use the exported functions.
+                  understand your Native Tool. Explain what it does, why
+                  it&apos;s valuable, and how to use the exported skill
+                  functions.
                 </>
               )}
             </p>
@@ -265,7 +268,16 @@ Design workflows to minimize external API calls.`;
               {kind === "mcp" ? (
                 <>
                   Your MCP server&apos;s SSE endpoint. We&apos;ll connect and
-                  auto-discover your tools via <code>listTools()</code>.
+                  auto-discover your skills via <code>listTools()</code>. See{" "}
+                  <a
+                    className="underline"
+                    href="https://github.com/ctxprotocol/context/tree/main/examples/blocknative-contributor"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    example server
+                  </a>
+                  .
                 </>
               ) : (
                 <>

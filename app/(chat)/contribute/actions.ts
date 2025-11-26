@@ -126,11 +126,12 @@ export async function submitTool(
         };
       }
 
-      // Cache the discovered tools
+      // Cache the discovered tools (including outputSchema for AI to understand response structure)
       mcpTools = result.tools.map((t) => ({
         name: t.name,
         description: t.description,
         inputSchema: t.inputSchema,
+        outputSchema: t.outputSchema,
       }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
@@ -179,8 +180,11 @@ export async function submitTool(
 
   revalidatePath("/chat");
 
+  const skillCount = mcpTools.length;
+  const skillWord = skillCount === 1 ? "skill" : "skills";
+  
   return {
     status: "success",
-    message: `Tool submitted! ${parsed.data.kind === "mcp" ? `Discovered ${mcpTools.length} tool(s) from your MCP server.` : "It will be reviewed shortly."}`,
+    message: `Tool submitted! ${parsed.data.kind === "mcp" ? `Discovered ${skillCount} ${skillWord} from your MCP server.` : "It will be reviewed shortly."}`,
   };
 }
