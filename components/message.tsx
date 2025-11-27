@@ -344,6 +344,7 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
     executionLogs,
     streamingReasoning,
     isReasoningComplete,
+    transactionInfo,
   } = usePaymentStatus();
 
   // For normal chat (no tools), stage stays "idle" - show simple gradient text
@@ -382,6 +383,7 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
               streamingCode={streamingCode}
               streamingReasoning={streamingReasoning}
               toolName={toolName}
+              transactionInfo={transactionInfo}
             />
           ) : (
             // Normal chat: simple animated gradient text

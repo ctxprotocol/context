@@ -6,6 +6,7 @@ import {
   type ExecutionLogEntry,
   getPaymentStatusMessage,
   type PaymentStage,
+  type TransactionInfo,
 } from "@/hooks/use-payment-status";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,8 @@ type ThinkingAccordionProps = {
   // Reasoning/thinking support
   streamingReasoning: string | null;
   isReasoningComplete: boolean;
+  // Transaction tracking for blockchain payments
+  transactionInfo: TransactionInfo;
   isDebugMode: boolean;
 };
 
@@ -192,6 +195,78 @@ function FadedResultPreview({ result }: { result: string }) {
   );
 }
 
+// Transaction status preview - shows blockchain tx progress
+// Displays: pending → submitted (with hash) → confirmed
+function TransactionStatusPreview({
+  transactionInfo,
+}: {
+  transactionInfo: TransactionInfo;
+}) {
+  const { hash, status, error } = transactionInfo;
+
+  // Format hash for display (show first and last 4 chars)
+  const formatHash = (h: string) => `${h.slice(0, 6)}...${h.slice(-4)}`;
+
+  // Base explorer URL (using BaseScan for Base network)
+  const explorerUrl = hash ? `https://basescan.org/tx/${hash}` : null;
+
+  return (
+    <div className="mt-2 space-y-1.5 rounded-md p-2 text-xs">
+      {/* Pending state - waiting for user/wallet */}
+      {status === "pending" && !hash && (
+        <div className="flex items-center gap-2 text-muted-foreground/50">
+          <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+          <span className="font-mono">awaiting signature...</span>
+        </div>
+      )}
+
+      {/* Submitted state - tx sent, show hash */}
+      {status === "submitted" && hash && (
+        <div className="flex items-center gap-2 text-muted-foreground/70">
+          <div className="size-1.5 animate-pulse rounded-full bg-blue-500/70" />
+          <span className="font-mono">tx submitted:</span>
+          <a
+            className="font-mono text-blue-500 hover:underline"
+            href={explorerUrl ?? "#"}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {formatHash(hash)}
+          </a>
+        </div>
+      )}
+
+      {/* Confirmed state */}
+      {status === "confirmed" && hash && (
+        <div className="flex items-center gap-2 text-green-600/80">
+          <span className="text-sm">✓</span>
+          <span className="font-mono">confirmed:</span>
+          <a
+            className="font-mono hover:underline"
+            href={explorerUrl ?? "#"}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {formatHash(hash)}
+          </a>
+        </div>
+      )}
+
+      {/* Failed state */}
+      {status === "failed" && (
+        <div className="flex items-center gap-2 text-destructive">
+          <span className="text-sm">✗</span>
+          <span className="font-mono">
+            {error?.includes("rejected") || error?.includes("denied")
+              ? "cancelled by user"
+              : "transaction failed"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Execution logs preview - shows real-time tool queries and results as they arrive
 // Mirrors the planning stage behavior: "executing..." disappears when content appears
 function ExecutionLogsPreview({
@@ -262,6 +337,7 @@ function PureThinkingAccordion({
   executionLogs,
   streamingReasoning,
   isReasoningComplete,
+  transactionInfo,
   isDebugMode,
 }: ThinkingAccordionProps) {
   // Auto-expand during active stages, or if debug mode is on
@@ -368,12 +444,7 @@ function PureThinkingAccordion({
             )}
 
             {stage === "confirming-payment" && (
-              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                <div className="size-1.5 animate-pulse rounded-full bg-green-500/70" />
-                <span className="font-mono">
-                  processing blockchain transaction...
-                </span>
-              </div>
+              <TransactionStatusPreview transactionInfo={transactionInfo} />
             )}
 
             {/* Planning stage with reasoning support:
@@ -392,18 +463,10 @@ function PureThinkingAccordion({
                   />
                 )}
 
-                {/* Show "thinking..." if planning started but no reasoning/code yet */}
-                {!hasReasoning && !extractedCode && (
+                {/* Show "generating code..." when waiting for code (before code starts streaming) */}
+                {!extractedCode && !hasReasoning && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-                    <span className="font-mono">thinking...</span>
-                  </div>
-                )}
-
-                {/* Show "generating code..." after reasoning completes but before code appears */}
-                {isReasoningComplete && !extractedCode && (
-                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                    <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
                     <span className="font-mono">generating code...</span>
                   </div>
                 )}
@@ -471,6 +534,12 @@ export const ThinkingAccordion = memo(
       return false;
     }
     if (prevProps.isReasoningComplete !== nextProps.isReasoningComplete) {
+      return false;
+    }
+    if (
+      prevProps.transactionInfo.hash !== nextProps.transactionInfo.hash ||
+      prevProps.transactionInfo.status !== nextProps.transactionInfo.status
+    ) {
       return false;
     }
     if (prevProps.isDebugMode !== nextProps.isDebugMode) {

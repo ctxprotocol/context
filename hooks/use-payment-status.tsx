@@ -24,6 +24,15 @@ export type ExecutionLogEntry = {
   timestamp: number;
 };
 
+export type TransactionStatus = "pending" | "submitted" | "confirmed" | "failed";
+
+export type TransactionInfo = {
+  hash: string | null;
+  status: TransactionStatus;
+  blockNumber?: number;
+  error?: string;
+};
+
 type PaymentStatusContextType = {
   stage: PaymentStage;
   toolName: string | null;
@@ -33,18 +42,26 @@ type PaymentStatusContextType = {
   // Reasoning/thinking support for models like Kimi K2, DeepSeek, etc.
   streamingReasoning: string | null;
   isReasoningComplete: boolean;
+  // Transaction tracking for blockchain payments
+  transactionInfo: TransactionInfo;
   setStage: (stage: PaymentStage, toolName?: string) => void;
   setStreamingCode: (code: string | null) => void;
   setDebugResult: (result: string | null) => void;
   addExecutionLog: (log: ExecutionLogEntry) => void;
   setStreamingReasoning: (reasoning: string | null) => void;
   setReasoningComplete: (complete: boolean) => void;
+  setTransactionInfo: (info: Partial<TransactionInfo>) => void;
   reset: () => void;
 };
 
 const PaymentStatusContext = createContext<
   PaymentStatusContextType | undefined
 >(undefined);
+
+const DEFAULT_TX_INFO: TransactionInfo = {
+  hash: null,
+  status: "pending",
+};
 
 export function PaymentStatusProvider({ children }: { children: ReactNode }) {
   const [stage, setStageState] = useState<PaymentStage>("idle");
@@ -57,6 +74,9 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     string | null
   >(null);
   const [isReasoningComplete, setIsReasoningComplete] = useState(false);
+  // Transaction tracking state
+  const [transactionInfo, setTransactionInfoState] =
+    useState<TransactionInfo>(DEFAULT_TX_INFO);
 
   const setStage = useCallback((newStage: PaymentStage, name?: string) => {
     setStageState(newStage);
@@ -71,6 +91,10 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     if (newStage === "planning") {
       setStreamingReasoningState(null);
       setIsReasoningComplete(false);
+    }
+    // Reset transaction info when starting a new payment
+    if (newStage === "confirming-payment") {
+      setTransactionInfoState(DEFAULT_TX_INFO);
     }
   }, []);
 
@@ -94,6 +118,10 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     setIsReasoningComplete(complete);
   }, []);
 
+  const setTransactionInfo = useCallback((info: Partial<TransactionInfo>) => {
+    setTransactionInfoState((prev) => ({ ...prev, ...info }));
+  }, []);
+
   const reset = useCallback(() => {
     setStageState("idle");
     setToolName(null);
@@ -102,6 +130,7 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     setExecutionLogs([]);
     setStreamingReasoningState(null);
     setIsReasoningComplete(false);
+    setTransactionInfoState(DEFAULT_TX_INFO);
   }, []);
 
   return (
@@ -114,12 +143,14 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
         executionLogs,
         streamingReasoning,
         isReasoningComplete,
+        transactionInfo,
         setStage,
         setStreamingCode,
         setDebugResult,
         addExecutionLog,
         setStreamingReasoning,
         setReasoningComplete,
+        setTransactionInfo,
         reset,
       }}
     >

@@ -132,7 +132,7 @@ function PureMultimodalInput({
   const { activeTools } = useSessionTools();
   const primaryTool: AITool | null = selectedTool ?? activeTools[0] ?? null;
   const [executingTool, setExecutingTool] = useState<AITool | null>(null);
-  const { stage, setStage, reset: resetPaymentStatus } = usePaymentStatus();
+  const { stage, setStage, setTransactionInfo, reset: resetPaymentStatus } = usePaymentStatus();
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
   const { fundWallet } = useFundWallet();
   const { isAutoPay, canAfford, recordSpend } = useAutoPay();
@@ -769,6 +769,8 @@ function PureMultimodalInput({
         // Send via smart wallet with AUTO-SIGNING
         // Pass showWalletUIs: false to skip the confirmation popup
         // This enables TRUE Auto Pay - no confirmation needed!
+        setTransactionInfo({ status: "pending", hash: null });
+        
         const txHash = await smartWalletClient.sendTransaction(
           {
             chain: base,
@@ -786,13 +788,18 @@ function PureMultimodalInput({
         );
         
         if (!txHash) {
+          setTransactionInfo({ status: "failed", error: "No hash returned" });
           toast.error("Transaction failed - no hash returned");
           cleanupPaymentState();
           return;
         }
         
         const hash = txHash as `0x${string}`;
+        setTransactionInfo({ status: "submitted", hash });
         setLastExecutedTx(hash);
+        
+        // Mark as confirmed (Privy waits for confirmation before returning)
+        setTransactionInfo({ status: "confirmed" });
         toast.success("Payment processed automatically!");
         
         // Submit the form with the transaction hash
@@ -894,6 +901,8 @@ function PureMultimodalInput({
       }
 
       // Send via smart wallet WITH confirmation popup (gas sponsored!)
+      setTransactionInfo({ status: "pending", hash: null });
+      
       const txHash = await smartWalletClient.sendTransaction(
         {
           chain: base,
@@ -911,7 +920,11 @@ function PureMultimodalInput({
 
       if (txHash) {
         const hash = txHash as `0x${string}`;
+        setTransactionInfo({ status: "submitted", hash });
         setLastExecutedTx(hash);
+        
+        // Mark as confirmed (Privy waits for confirmation before returning)
+        setTransactionInfo({ status: "confirmed" });
         toast.success("Payment confirmed!");
         
         // Submit the form with the transaction hash
@@ -940,6 +953,9 @@ function PureMultimodalInput({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
+
+      // Set transaction as failed with the error message
+      setTransactionInfo({ status: "failed", error: errorMessage });
 
       if (
         errorMessage.includes("User rejected") ||
@@ -983,6 +999,7 @@ function PureMultimodalInput({
     hasWalletMismatch,
     refetchAllowance,
     setStage,
+    setTransactionInfo,
     resetPaymentStatus,
     isAutoPay,
     smartWalletClient,
