@@ -155,8 +155,9 @@ function PureMultimodalInput({
     (process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS_SEPOLIA as `0x${string}`);
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 
-  // Disable input during payment flow (stages 1-3)
-  const isPaymentInProgress = stage !== "idle" && stage !== "thinking";
+  // Only disable input during actual payment stages (setting allowance and confirming payment)
+  // Once payment is confirmed, re-enable input even during planning/executing stages
+  const isPaymentInProgress = stage === "setting-cap" || stage === "confirming-payment";
 
   // Detect mismatch between Privy active wallet and wagmi account.
   // If this happens while we *think* we're using an embedded wallet,
@@ -1117,9 +1118,7 @@ function PureMultimodalInput({
             placeholder={
               isReadonly
                 ? "Connect your wallet to start chatting..."
-                : isPaymentInProgress
-                  ? "Processing payment..."
-                  : "Send a message..."
+                : "Send a message..."
             }
             ref={textareaRef}
             rows={1}
@@ -1153,23 +1152,37 @@ function PureMultimodalInput({
             />
           </PromptInputTools>
 
-          {status === "submitted" ? (
-            <StopButton setMessages={setMessages} stop={stop} />
-          ) : (
-            <PromptInputSubmit
-              className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
-              data-testid="send-button"
-              disabled={
-                isReadonly ||
-                isPaymentInProgress ||
-                !input.trim() ||
-                uploadQueue.length > 0
-              }
-              status={status}
-            >
-              <ArrowUpIcon size={14} />
-            </PromptInputSubmit>
-          )}
+          {(() => {
+            // Show stop button during active AI processing stages (planning, executing, etc.)
+            // This allows users to cancel at any time from Planning until the end
+            const isActiveProcessingStage =
+              stage === "planning" ||
+              stage === "executing" ||
+              stage === "thinking" ||
+              stage === "querying-tool";
+            const showStopButton =
+              status === "submitted" ||
+              status === "streaming" ||
+              isActiveProcessingStage;
+
+            return showStopButton ? (
+              <StopButton setMessages={setMessages} stop={stop} />
+            ) : (
+              <PromptInputSubmit
+                className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+                data-testid="send-button"
+                disabled={
+                  isReadonly ||
+                  isPaymentInProgress ||
+                  !input.trim() ||
+                  uploadQueue.length > 0
+                }
+                status={status}
+              >
+                <ArrowUpIcon size={14} />
+              </PromptInputSubmit>
+            );
+          })()}
         </PromptInputToolbar>
       </PromptInput>
       {(selectedTool || activeTools.length > 0) ? (

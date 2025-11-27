@@ -428,7 +428,7 @@ function PureThinkingAccordion({
           className={cn(
             "grid transition-all duration-300 ease-out",
             isExpanded
-              ? "grid-rows-[1fr] opacity-100"
+              ? "grid-rows-[minmax(0,_1fr)] opacity-100"
               : "grid-rows-[0fr] opacity-0"
           )}
         >
