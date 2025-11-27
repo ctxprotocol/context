@@ -1,9 +1,8 @@
 import equal from "fast-deep-equal";
 import { memo } from "react";
-import { toast as sonnerToast } from "sonner";
+import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
-import { toast } from "@/components/toast";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { Action, Actions } from "./elements/actions";
@@ -38,7 +37,7 @@ export function PureMessageActions({
 
   const handleCopy = async () => {
     if (!textFromParts) {
-      toast({ type: "error", description: "There's no text to copy!" });
+      toast.error("There's no text to copy!");
       return;
     }
 
@@ -49,7 +48,7 @@ export function PureMessageActions({
         : textFromParts;
 
     await copyToClipboard(textToCopy);
-    toast({ type: "success", description: "Copied to clipboard!" });
+    toast.success("Copied to clipboard!");
   };
 
   // User messages get edit (on hover) and copy actions
@@ -94,7 +93,7 @@ export function PureMessageActions({
             }),
           });
 
-          sonnerToast.promise(upvote, {
+          toast.promise(upvote, {
             loading: "Upvoting Response...",
             success: () => {
               mutate<Vote[]>(
@@ -143,7 +142,7 @@ export function PureMessageActions({
             }),
           });
 
-          sonnerToast.promise(downvote, {
+          toast.promise(downvote, {
             loading: "Downvoting Response...",
             success: () => {
               mutate<Vote[]>(

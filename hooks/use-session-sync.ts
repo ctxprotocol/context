@@ -4,7 +4,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useRef } from "react";
-import { toast } from "@/components/toast";
+import { toast } from "sonner";
 
 export function useSessionSync() {
   const { ready, authenticated, user, getAccessToken } = usePrivy();
@@ -37,10 +37,7 @@ export function useSessionSync() {
 
             if (result?.error) {
               console.error("Session sync sign-in failed:", result.error);
-              toast({
-                type: "error",
-                description: "Authentication failed. Please try again.",
-              });
+              toast.error("Authentication failed. Please try again.");
             } else {
               router.refresh(); // Refresh to update server components
             }

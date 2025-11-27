@@ -140,6 +140,7 @@ function FadedResultPreview({ result }: { result: string }) {
 }
 
 // Execution logs preview - shows real-time tool queries and results as they arrive
+// Mirrors the planning stage behavior: "executing..." disappears when content appears
 function ExecutionLogsPreview({ 
   logs,
   isExecuting 
@@ -156,54 +157,41 @@ function ExecutionLogsPreview({
     }
   }, [logs]);
 
-  if (logs.length === 0 && isExecuting) {
+  // Show "executing..." only when no logs yet (mirrors "generating code..." behavior)
+  if (logs.length === 0) {
     return (
       <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-        <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+        <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
         <span className="font-mono">executing...</span>
       </div>
     );
   }
 
+  // Once logs arrive, show them without dots (matches code preview style)
   return (
     <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
       <div
         ref={containerRef}
-        className="overflow-y-auto text-xs leading-relaxed"
+        className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
         style={{ maxHeight: "8rem" }}
       >
-        <div className="space-y-1 p-2">
+        <pre className="whitespace-pre-wrap break-words p-3">
           {logs.map((log, index) => (
-            <div
+            <span
               key={`${log.timestamp}-${index}`}
-              className="flex items-start gap-2 font-mono"
+              className={cn(
+                log.type === "error" && "text-destructive"
+              )}
             >
-              {/* Status dot */}
-              <div className={cn(
-                "mt-1 size-1.5 shrink-0 rounded-full",
-                log.type === "query" && "bg-blue-500/70",
-                log.type === "result" && "bg-green-500/70",
-                log.type === "error" && "bg-red-500/70"
-              )} />
-              {/* Message - appears naturally as server sends it */}
-              <span className={cn(
-                "break-words",
-                log.type === "query" && "text-muted-foreground/70",
-                log.type === "result" && "text-green-600/70 dark:text-green-400/70",
-                log.type === "error" && "text-red-600/70 dark:text-red-400/70"
-              )}>
-                {log.message}
-              </span>
-            </div>
+              {log.message}
+              {index < logs.length - 1 && "\n"}
+            </span>
           ))}
-          {/* Pulsing indicator while still executing */}
+          {/* Pulsing cursor while still executing (matches code streaming cursor) */}
           {isExecuting && (
-            <div className="flex items-center gap-2">
-              <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-              <span className="font-mono text-muted-foreground/50">executing...</span>
-            </div>
+            <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
           )}
-        </div>
+        </pre>
       </div>
       
       {/* Fade gradient overlay */}

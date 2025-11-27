@@ -26,7 +26,7 @@ import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
 import { CheckIcon, CopyIcon, LoaderIcon } from "./icons";
-import { toast } from "./toast";
+import { toast } from "sonner";
 import { WithdrawDialog } from "./withdraw-dialog";
 
 export function SidebarUserNav() {
@@ -91,7 +91,7 @@ export function SidebarUserNav() {
     onComplete: ({ user }) => {
       console.log("Privy login complete", user);
       // That's it! The session sync hook will handle NextAuth sign-in
-      toast({ type: "success", description: "Successfully signed in!" });
+      toast.success("Successfully signed in!");
     },
     onError: (error) => {
       // "exited_auth_flow" is not a real error - it just means the user closed the modal
@@ -99,7 +99,7 @@ export function SidebarUserNav() {
         return;
       }
       console.error("Privy login error:", error);
-      toast({ type: "error", description: "Failed to log in with Privy." });
+      toast.error("Failed to log in with Privy.");
     },
   });
 
@@ -124,17 +124,11 @@ export function SidebarUserNav() {
     try {
       await navigator.clipboard.writeText(address);
       setCopied(true);
-      toast({
-        type: "success",
-        description: `${label} copied to clipboard!`,
-      });
+      toast.success(`${label} copied to clipboard!`);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Copy error:", error);
-      toast({
-        type: "error",
-        description: "Failed to copy address.",
-      });
+      toast.error("Failed to copy address.");
     }
   };
 
@@ -143,10 +137,7 @@ export function SidebarUserNav() {
       await exportWallet();
     } catch (error) {
       console.error("Export wallet error:", error);
-      toast({
-        type: "error",
-        description: "Failed to export wallet. Please try again.",
-      });
+      toast.error("Failed to export wallet. Please try again.");
     }
   };
 
@@ -277,12 +268,7 @@ export function SidebarUserNav() {
                 className="w-full cursor-pointer"
                 onClick={() => {
                   if (status === "loading") {
-                    toast({
-                      type: "error",
-                      description:
-                        "Checking authentication status, please try again!",
-                    });
-
+                    toast.error("Checking authentication status, please try again!");
                     return;
                   }
 

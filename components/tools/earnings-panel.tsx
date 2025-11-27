@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
-import { toast } from "@/components/toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -41,27 +41,19 @@ export function EarningsPanel({ developerAddress }: EarningsPanelProps) {
 
   const handleClaim = async () => {
     if (!developerAddress) {
-      toast({
-        type: "error",
-        description: "Connect your wallet to claim earnings",
-      });
+      toast.error("Connect your wallet to claim earnings");
       return;
     }
 
     try {
       await writeContract({});
       setLastTxHash(txHash);
-      toast({
-        type: "success",
-        description: "Claim transaction submitted!",
-      });
+      toast.success("Claim transaction submitted!");
     } catch (error) {
       console.error("Claim failed:", error);
-      toast({
-        type: "error",
-        description:
-          error instanceof Error ? error.message : "Failed to claim earnings",
-      });
+      toast.error(
+        error instanceof Error ? error.message : "Failed to claim earnings"
+      );
     }
   };
 

@@ -32,7 +32,7 @@ import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
-import { toast } from "./toast";
+import { toast } from "sonner";
 import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -180,19 +180,14 @@ export function Chat({
         ) {
           setShowCreditCardAlert(true);
         } else {
-          toast({
-            type: "error",
-            description: error.message,
-          });
+          toast.error(error.message);
         }
       } else {
-        toast({
-          type: "error",
-          description:
-            error instanceof Error
-              ? error.message
-              : "An unexpected error occurred while streaming the response.",
-        });
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred while streaming the response."
+        );
       }
     },
   });

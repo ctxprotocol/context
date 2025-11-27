@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
-import { toast } from "./toast";
+import { toast } from "sonner";
 
 type WithdrawDialogProps = {
   onOpenChange: (open: boolean) => void;
@@ -81,36 +81,24 @@ export function WithdrawDialog({
 
   const handleWithdraw = async () => {
     if (!smartWalletClient || !destinationAddress || !amount) {
-      toast({
-        type: "error",
-        description: "Please fill in all fields.",
-      });
+      toast.error("Please fill in all fields.");
       return;
     }
 
     // Validate address
     if (!destinationAddress.match(/^0x[a-fA-F0-9]{40}$/)) {
-      toast({
-        type: "error",
-        description: "Invalid destination address.",
-      });
+      toast.error("Invalid destination address.");
       return;
     }
 
     const withdrawAmount = Number.parseFloat(amount);
     if (Number.isNaN(withdrawAmount) || withdrawAmount <= 0) {
-      toast({
-        type: "error",
-        description: "Please enter a valid amount.",
-      });
+      toast.error("Please enter a valid amount.");
       return;
     }
 
     if (withdrawAmount > balanceNumber) {
-      toast({
-        type: "error",
-        description: "Insufficient balance.",
-      });
+      toast.error("Insufficient balance.");
       return;
     }
 
@@ -138,10 +126,7 @@ export function WithdrawDialog({
 
       console.log("[withdraw] Transaction sent:", txHash);
 
-      toast({
-        type: "success",
-        description: `Successfully withdrew ${amount} USDC to ${formatWalletAddress(destinationAddress)}`,
-      });
+      toast.success(`Successfully withdrew ${amount} USDC to ${formatWalletAddress(destinationAddress)}`);
 
       // Refresh balance
       await refetchBalance();
@@ -150,10 +135,7 @@ export function WithdrawDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("[withdraw] Error:", error);
-      toast({
-        type: "error",
-        description: error instanceof Error ? error.message : "Withdrawal failed. Please try again.",
-      });
+      toast.error(error instanceof Error ? error.message : "Withdrawal failed. Please try again.");
     } finally {
       setIsWithdrawing(false);
     }

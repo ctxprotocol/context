@@ -20,7 +20,7 @@ import {
   User,
 } from "lucide-react";
 import * as React from "react";
-import { toast } from "@/components/toast";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -853,11 +853,7 @@ export default function DesignSystemPage() {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => {
-                      toast({
-                        type: "success",
-                        description:
-                          "Your changes have been saved successfully!",
-                      });
+                      toast.success("Your changes have been saved successfully!");
                     }}
                     type="button"
                     variant="outline"
@@ -866,11 +862,7 @@ export default function DesignSystemPage() {
                   </Button>
                   <Button
                     onClick={() => {
-                      toast({
-                        type: "error",
-                        description:
-                          "An error occurred while processing your request.",
-                      });
+                      toast.error("An error occurred while processing your request.");
                     }}
                     type="button"
                     variant="outline"

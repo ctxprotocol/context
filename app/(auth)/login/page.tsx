@@ -3,7 +3,7 @@
 import { useLogin, usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { toast } from "@/components/toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 function PrivyLoginComponent() {
@@ -31,22 +31,16 @@ function PrivyLoginComponent() {
         });
 
         if (result?.error) {
-          toast({
-            type: "error",
-            description: "Could not sign you in. Please try again.",
-          });
+          toast.error("Could not sign you in. Please try again.");
           return;
         }
 
-        toast({ type: "success", description: "Successfully signed in!" });
+        toast.success("Successfully signed in!");
         router.refresh(); // Refresh to update server components with new session
         router.push("/"); // Redirect to the main chat page
       } catch (error) {
         console.error("Sign-in process failed:", error);
-        toast({
-          type: "error",
-          description: "An error occurred during sign in.",
-        });
+        toast.error("An error occurred during sign in.");
       }
     },
     onError: (error) => {
@@ -55,7 +49,7 @@ function PrivyLoginComponent() {
         return;
       }
       console.error("Privy login error:", error);
-      toast({ type: "error", description: "Failed to log in with Privy." });
+      toast.error("Failed to log in with Privy.");
     },
   });
 
