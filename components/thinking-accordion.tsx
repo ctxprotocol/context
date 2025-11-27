@@ -3,8 +3,8 @@
 import { ChevronDownIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
-  getPaymentStatusMessage,
   type ExecutionLogEntry,
+  getPaymentStatusMessage,
   type PaymentStage,
 } from "@/hooks/use-payment-status";
 import { cn } from "@/lib/utils";
@@ -21,16 +21,23 @@ type ThinkingAccordionProps = {
 // Extract code block from planning response
 // Handles both complete blocks (with closing ```) and partial blocks (still streaming)
 const COMPLETE_CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
+const LANG_IDENTIFIER_REGEX = /^(ts|typescript)\s*/i;
+const WHITESPACE_REGEX = /^\s*/;
 
-function extractCodeFromPlanningText(text: string | null, isStreaming: boolean): string | null {
-  if (!text) return null;
-  
+function extractCodeFromPlanningText(
+  text: string | null,
+  isStreaming: boolean
+): string | null {
+  if (!text) {
+    return null;
+  }
+
   // First try to match a complete code block (has closing ```)
   const completeMatch = COMPLETE_CODE_BLOCK_REGEX.exec(text);
   if (completeMatch) {
     return completeMatch[1].trim();
   }
-  
+
   // If streaming and no complete block, try to match a partial block (no closing ```)
   // Look for opening ``` and capture everything after it
   if (isStreaming) {
@@ -39,26 +46,26 @@ function extractCodeFromPlanningText(text: string | null, isStreaming: boolean):
       // Find where the code starts (after ```ts or ```typescript or just ```)
       let codeStart = openingIndex + 3;
       const afterBackticks = text.slice(codeStart);
-      
+
       // Skip language identifier if present
-      const langMatch = afterBackticks.match(/^(ts|typescript)\s*/i);
+      const langMatch = LANG_IDENTIFIER_REGEX.exec(afterBackticks);
       if (langMatch) {
         codeStart += langMatch[0].length;
       } else {
         // Skip any leading whitespace/newline after ```
-        const whitespaceMatch = afterBackticks.match(/^\s*/);
+        const whitespaceMatch = WHITESPACE_REGEX.exec(afterBackticks);
         if (whitespaceMatch) {
           codeStart += whitespaceMatch[0].length;
         }
       }
-      
+
       const partialCode = text.slice(codeStart);
       if (partialCode.length > 0) {
         return partialCode;
       }
     }
   }
-  
+
   return null;
 }
 
@@ -75,28 +82,30 @@ function isActivePhase(stage: PaymentStage): boolean {
 }
 
 // Faded code preview with bottom gradient fade
-function FadedCodePreview({ 
-  code, 
-  isStreaming 
-}: { 
-  code: string; 
+function FadedCodePreview({
+  code,
+  isStreaming,
+}: {
+  code: string;
   isStreaming: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const codeLength = code.length;
 
   // Auto-scroll to bottom as code streams
+  // biome-ignore lint/correctness/useExhaustiveDependencies: codeLength triggers scroll when code changes
   useEffect(() => {
     if (containerRef.current && isStreaming) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [code, isStreaming]);
+  }, [codeLength, isStreaming]);
 
   return (
     <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
       {/* Code content */}
       <div
-        ref={containerRef}
         className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
+        ref={containerRef}
         style={{ maxHeight: "8rem" }}
       >
         <pre className="whitespace-pre-wrap break-words p-3">
@@ -106,7 +115,7 @@ function FadedCodePreview({
           )}
         </pre>
       </div>
-      
+
       {/* Fade gradient overlay - fades from transparent at top to background at bottom */}
       <div className="fade-to-background pointer-events-none absolute inset-0" />
     </div>
@@ -132,7 +141,7 @@ function FadedResultPreview({ result }: { result: string }) {
           {displayResult.length > 500 && "..."}
         </pre>
       </div>
-      
+
       {/* Fade gradient overlay */}
       <div className="fade-to-background pointer-events-none absolute inset-0" />
     </div>
@@ -141,27 +150,30 @@ function FadedResultPreview({ result }: { result: string }) {
 
 // Execution logs preview - shows real-time tool queries and results as they arrive
 // Mirrors the planning stage behavior: "executing..." disappears when content appears
-function ExecutionLogsPreview({ 
+function ExecutionLogsPreview({
   logs,
-  isExecuting 
-}: { 
+  isExecuting,
+}: {
   logs: ExecutionLogEntry[];
   isExecuting: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const logsCount = logs.length;
+
   // Auto-scroll to bottom as new logs arrive
+  // biome-ignore lint/correctness/useExhaustiveDependencies: logsCount triggers scroll when logs change
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logsCount]);
 
   // Show "executing..." only when no logs yet (mirrors "generating code..." behavior)
   if (logs.length === 0) {
     return (
       <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-        <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
+        <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
         <span className="font-mono">executing...</span>
       </div>
     );
@@ -171,17 +183,15 @@ function ExecutionLogsPreview({
   return (
     <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
       <div
-        ref={containerRef}
         className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
+        ref={containerRef}
         style={{ maxHeight: "8rem" }}
       >
         <pre className="whitespace-pre-wrap break-words p-3">
           {logs.map((log, index) => (
             <span
+              className={cn(log.type === "error" && "text-destructive")}
               key={`${log.timestamp}-${index}`}
-              className={cn(
-                log.type === "error" && "text-destructive"
-              )}
             >
               {log.message}
               {index < logs.length - 1 && "\n"}
@@ -193,7 +203,7 @@ function ExecutionLogsPreview({
           )}
         </pre>
       </div>
-      
+
       {/* Fade gradient overlay */}
       <div className="fade-to-background pointer-events-none absolute inset-0" />
     </div>
@@ -215,7 +225,7 @@ function PureThinkingAccordion({
 
   // Determine if we're actively streaming code
   const isStreamingCode = stage === "planning";
-  
+
   // Extract just the code block from the full planning text
   // Pass isStreaming to handle partial code blocks during streaming
   const extractedCode = useMemo(
@@ -226,8 +236,10 @@ function PureThinkingAccordion({
   // Auto-expand when entering active stages (unless user manually collapsed)
   // Auto-collapse when returning to idle (unless debug mode is on)
   useEffect(() => {
-    if (userToggled) return; // Respect user's manual toggle
-    
+    if (userToggled) {
+      return; // Respect user's manual toggle
+    }
+
     if (isActive) {
       setIsExpanded(true);
     } else if (!isDebugMode && stage === "idle") {
@@ -236,6 +248,7 @@ function PureThinkingAccordion({
   }, [isActive, isDebugMode, stage, userToggled]);
 
   // Reset userToggled when stage changes to allow auto-expand on new queries
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stage is used as a trigger
   useEffect(() => {
     setUserToggled(false);
   }, [stage]);
@@ -289,7 +302,9 @@ function PureThinkingAccordion({
         <div
           className={cn(
             "grid transition-all duration-300 ease-out",
-            isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+            isExpanded
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0"
           )}
         >
           <div className="overflow-hidden">
@@ -297,23 +312,24 @@ function PureThinkingAccordion({
             {stage === "setting-cap" && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                 <div className="size-1.5 animate-pulse rounded-full bg-blue-500/70" />
-                <span className="font-mono">approving spending allowance...</span>
+                <span className="font-mono">
+                  approving spending allowance...
+                </span>
               </div>
             )}
 
             {stage === "confirming-payment" && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                 <div className="size-1.5 animate-pulse rounded-full bg-green-500/70" />
-                <span className="font-mono">processing blockchain transaction...</span>
+                <span className="font-mono">
+                  processing blockchain transaction...
+                </span>
               </div>
             )}
 
             {/* Code preview with fade - only show during planning stage */}
             {stage === "planning" && extractedCode && (
-              <FadedCodePreview
-                code={extractedCode}
-                isStreaming={true}
-              />
+              <FadedCodePreview code={extractedCode} isStreaming={true} />
             )}
 
             {/* Show generating indicator if planning but no code yet */}
@@ -326,10 +342,7 @@ function PureThinkingAccordion({
 
             {/* Executing - show real-time execution logs */}
             {stage === "executing" && (
-              <ExecutionLogsPreview
-                logs={executionLogs}
-                isExecuting={true}
-              />
+              <ExecutionLogsPreview isExecuting={true} logs={executionLogs} />
             )}
 
             {/* Thinking indicator */}
@@ -344,12 +357,14 @@ function PureThinkingAccordion({
             {stage === "querying-tool" && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                 <div className="size-1.5 animate-pulse rounded-full bg-cyan-500/70" />
-                <span className="font-mono">querying {toolName ?? "tool"}...</span>
+                <span className="font-mono">
+                  querying {toolName ?? "tool"}...
+                </span>
               </div>
             )}
 
-            {/* Result preview with fade */}
-            {hasResult && stage !== "executing" && (
+            {/* Result preview with fade - only show meaningful results */}
+            {hasResult && stage !== "executing" && stage !== "thinking" && (
               <FadedResultPreview result={debugResult ?? ""} />
             )}
           </div>
@@ -362,12 +377,24 @@ function PureThinkingAccordion({
 export const ThinkingAccordion = memo(
   PureThinkingAccordion,
   (prevProps, nextProps) => {
-    if (prevProps.stage !== nextProps.stage) return false;
-    if (prevProps.toolName !== nextProps.toolName) return false;
-    if (prevProps.streamingCode !== nextProps.streamingCode) return false;
-    if (prevProps.debugResult !== nextProps.debugResult) return false;
-    if (prevProps.executionLogs.length !== nextProps.executionLogs.length) return false;
-    if (prevProps.isDebugMode !== nextProps.isDebugMode) return false;
+    if (prevProps.stage !== nextProps.stage) {
+      return false;
+    }
+    if (prevProps.toolName !== nextProps.toolName) {
+      return false;
+    }
+    if (prevProps.streamingCode !== nextProps.streamingCode) {
+      return false;
+    }
+    if (prevProps.debugResult !== nextProps.debugResult) {
+      return false;
+    }
+    if (prevProps.executionLogs.length !== nextProps.executionLogs.length) {
+      return false;
+    }
+    if (prevProps.isDebugMode !== nextProps.isDebugMode) {
+      return false;
+    }
     return true;
   }
 );
