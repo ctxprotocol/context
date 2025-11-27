@@ -60,7 +60,14 @@ export function Chat({
 
   const { mutate } = useSWRConfig();
   const { setDataStream } = useDataStream();
-  const { setStage, setStreamingCode, setDebugResult, addExecutionLog } = usePaymentStatus();
+  const {
+    setStage,
+    setStreamingCode,
+    setDebugResult,
+    addExecutionLog,
+    setStreamingReasoning,
+    setReasoningComplete,
+  } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
   const debugModeRef = useRef(isDebugMode);
 
@@ -162,6 +169,14 @@ export function Chat({
           timestamp: number;
         };
         addExecutionLog({ type, toolName, message, timestamp });
+      }
+      // Stream reasoning/thinking content from models that support it
+      if (part.type === "data-reasoning" && typeof part.data === "string") {
+        setStreamingReasoning(part.data);
+      }
+      // Signal that reasoning is complete and code generation is starting
+      if (part.type === "data-reasoningComplete" && part.data === true) {
+        setReasoningComplete(true);
       }
     },
     onFinish: () => {

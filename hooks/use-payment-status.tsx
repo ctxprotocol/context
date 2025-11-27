@@ -30,10 +30,15 @@ type PaymentStatusContextType = {
   streamingCode: string | null;
   debugResult: string | null;
   executionLogs: ExecutionLogEntry[];
+  // Reasoning/thinking support for models like Kimi K2, DeepSeek, etc.
+  streamingReasoning: string | null;
+  isReasoningComplete: boolean;
   setStage: (stage: PaymentStage, toolName?: string) => void;
   setStreamingCode: (code: string | null) => void;
   setDebugResult: (result: string | null) => void;
   addExecutionLog: (log: ExecutionLogEntry) => void;
+  setStreamingReasoning: (reasoning: string | null) => void;
+  setReasoningComplete: (complete: boolean) => void;
   reset: () => void;
 };
 
@@ -47,6 +52,11 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
   const [streamingCode, setStreamingCodeState] = useState<string | null>(null);
   const [debugResult, setDebugResultState] = useState<string | null>(null);
   const [executionLogs, setExecutionLogs] = useState<ExecutionLogEntry[]>([]);
+  // Reasoning/thinking state
+  const [streamingReasoning, setStreamingReasoningState] = useState<
+    string | null
+  >(null);
+  const [isReasoningComplete, setIsReasoningComplete] = useState(false);
 
   const setStage = useCallback((newStage: PaymentStage, name?: string) => {
     setStageState(newStage);
@@ -56,6 +66,11 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     // Clear execution logs when starting a new execution
     if (newStage === "executing") {
       setExecutionLogs([]);
+    }
+    // Clear reasoning state when starting planning
+    if (newStage === "planning") {
+      setStreamingReasoningState(null);
+      setIsReasoningComplete(false);
     }
   }, []);
 
@@ -71,12 +86,22 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     setExecutionLogs((prev) => [...prev, log]);
   }, []);
 
+  const setStreamingReasoning = useCallback((reasoning: string | null) => {
+    setStreamingReasoningState(reasoning);
+  }, []);
+
+  const setReasoningComplete = useCallback((complete: boolean) => {
+    setIsReasoningComplete(complete);
+  }, []);
+
   const reset = useCallback(() => {
     setStageState("idle");
     setToolName(null);
     setStreamingCodeState(null);
     setDebugResultState(null);
     setExecutionLogs([]);
+    setStreamingReasoningState(null);
+    setIsReasoningComplete(false);
   }, []);
 
   return (
@@ -87,10 +112,14 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
         streamingCode,
         debugResult,
         executionLogs,
+        streamingReasoning,
+        isReasoningComplete,
         setStage,
         setStreamingCode,
         setDebugResult,
         addExecutionLog,
+        setStreamingReasoning,
+        setReasoningComplete,
         reset,
       }}
     >

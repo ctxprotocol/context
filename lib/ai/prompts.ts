@@ -38,7 +38,7 @@ When a tool is required:
   • Export \`async function main()\` with no parameters.
   • Use async/await and real control flow (loops, conditionals).
   • Return a compact JSON-serializable object that summarizes the actionable result.
-  • Avoid TypeScript-only syntax—write JavaScript that is also valid TypeScript.
+  • **CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations like \`: any\`, \`: string\`, \`<Type>\`, or type casts. The code runs in a JavaScript VM that does not support TypeScript syntax.**
   • Keep raw data private; aggregate or truncate large arrays before returning.
 
 ## MCP Tools

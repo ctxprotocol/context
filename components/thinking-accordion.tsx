@@ -15,6 +15,9 @@ type ThinkingAccordionProps = {
   streamingCode: string | null;
   debugResult: string | null;
   executionLogs: ExecutionLogEntry[];
+  // Reasoning/thinking support
+  streamingReasoning: string | null;
+  isReasoningComplete: boolean;
   isDebugMode: boolean;
 };
 
@@ -122,6 +125,47 @@ function FadedCodePreview({
   );
 }
 
+// Faded reasoning/thoughts preview - clean design-system aligned styling
+function FadedReasoningPreview({
+  reasoning,
+  isStreaming,
+}: {
+  reasoning: string;
+  isStreaming: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const reasoningLength = reasoning.length;
+
+  // Auto-scroll to bottom as reasoning streams
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reasoningLength triggers scroll when reasoning changes
+  useEffect(() => {
+    if (containerRef.current && isStreaming) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [reasoningLength, isStreaming]);
+
+  return (
+    <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
+      {/* Reasoning content - muted foreground, standard text (not monospace) */}
+      <div
+        className="overflow-y-auto text-muted-foreground/60 text-xs leading-relaxed"
+        ref={containerRef}
+        style={{ maxHeight: "8rem" }}
+      >
+        <div className="whitespace-pre-wrap break-words p-3">
+          {reasoning}
+          {isStreaming && (
+            <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
+          )}
+        </div>
+      </div>
+
+      {/* Fade gradient overlay */}
+      <div className="fade-to-background pointer-events-none absolute inset-0" />
+    </div>
+  );
+}
+
 // Faded result preview
 function FadedResultPreview({ result }: { result: string }) {
   // Try to format JSON for better readability
@@ -216,6 +260,8 @@ function PureThinkingAccordion({
   streamingCode,
   debugResult,
   executionLogs,
+  streamingReasoning,
+  isReasoningComplete,
   isDebugMode,
 }: ThinkingAccordionProps) {
   // Auto-expand during active stages, or if debug mode is on
@@ -225,6 +271,8 @@ function PureThinkingAccordion({
 
   // Determine if we're actively streaming code
   const isStreamingCode = stage === "planning";
+  const hasReasoning = Boolean(streamingReasoning);
+  const isStreamingReasoning = hasReasoning && !isReasoningComplete;
 
   // Extract just the code block from the full planning text
   // Pass isStreaming to handle partial code blocks during streaming
@@ -257,10 +305,11 @@ function PureThinkingAccordion({
   const hasCode = Boolean(extractedCode);
   const hasResult = Boolean(debugResult);
   const hasLogs = executionLogs.length > 0;
-  const showExpandOption = hasCode || hasResult || hasLogs || isActive;
+  const showExpandOption =
+    hasCode || hasResult || hasLogs || hasReasoning || isActive;
 
   // Don't render anything if we're idle with no content
-  if (stage === "idle" && !hasCode && !hasResult) {
+  if (stage === "idle" && !hasCode && !hasResult && !hasReasoning) {
     return null;
   }
 
@@ -327,17 +376,43 @@ function PureThinkingAccordion({
               </div>
             )}
 
-            {/* Code preview with fade - only show during planning stage */}
-            {stage === "planning" && extractedCode && (
-              <FadedCodePreview code={extractedCode} isStreaming={true} />
-            )}
+            {/* Planning stage with reasoning support:
+                1. "thinking..." when reasoning starts but no content yet
+                2. Reasoning content as it streams
+                3. "generating code..." when reasoning complete but code not started
+                4. Code as it streams
+            */}
+            {stage === "planning" && (
+              <>
+                {/* Show reasoning content if available */}
+                {hasReasoning && (
+                  <FadedReasoningPreview
+                    isStreaming={isStreamingReasoning}
+                    reasoning={streamingReasoning ?? ""}
+                  />
+                )}
 
-            {/* Show generating indicator if planning but no code yet */}
-            {stage === "planning" && !extractedCode && (
-              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
-                <span className="font-mono">generating code...</span>
-              </div>
+                {/* Show "thinking..." if planning started but no reasoning/code yet */}
+                {!hasReasoning && !extractedCode && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                    <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+                    <span className="font-mono">thinking...</span>
+                  </div>
+                )}
+
+                {/* Show "generating code..." after reasoning completes but before code appears */}
+                {isReasoningComplete && !extractedCode && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                    <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
+                    <span className="font-mono">generating code...</span>
+                  </div>
+                )}
+
+                {/* Show code as it streams */}
+                {extractedCode && (
+                  <FadedCodePreview code={extractedCode} isStreaming={true} />
+                )}
+              </>
             )}
 
             {/* Executing - show real-time execution logs */}
@@ -348,7 +423,7 @@ function PureThinkingAccordion({
             {/* Thinking indicator */}
             {stage === "thinking" && !hasResult && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
+                <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
                 <span className="font-mono">analyzing results...</span>
               </div>
             )}
@@ -390,6 +465,12 @@ export const ThinkingAccordion = memo(
       return false;
     }
     if (prevProps.executionLogs.length !== nextProps.executionLogs.length) {
+      return false;
+    }
+    if (prevProps.streamingReasoning !== nextProps.streamingReasoning) {
+      return false;
+    }
+    if (prevProps.isReasoningComplete !== nextProps.isReasoningComplete) {
       return false;
     }
     if (prevProps.isDebugMode !== nextProps.isDebugMode) {

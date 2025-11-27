@@ -567,6 +567,9 @@ export async function POST(request: Request) {
 
           // STREAMING PLANNER:
           // Use streamText so dev mode can see the code "as it's being written".
+          // NOTE: extractReasoningMiddleware is available but currently disabled as it
+          // requires specific model support for <think> tags. For now, use textStream
+          // which works reliably with all models including Kimi K2.
           const planningResult = streamText({
             model: myProvider.languageModel(selectedChatModel),
             system: planningSystemInstructions,
@@ -579,6 +582,7 @@ export async function POST(request: Request) {
           });
 
           let planningText = "";
+
           // Stream each chunk of planning code to the client for real-time display
           for await (const delta of planningResult.textStream) {
             planningText += delta;
