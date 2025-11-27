@@ -2,11 +2,101 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
 import { contributeFormSchema, type ContributeFormState } from "./schema";
+
+/**
+ * Determine the appropriate transport type based on endpoint URL pattern
+ * - `/sse` suffix → SSE transport
+ * - `/mcp` suffix → HTTP Streaming transport
+ * - Other paths → HTTP Streaming (modern default)
+ */
+function detectTransportType(endpoint: string): "sse" | "http-streaming" {
+  const url = new URL(endpoint);
+  const pathname = url.pathname.toLowerCase();
+  
+  if (pathname.endsWith('/sse') || pathname.includes('sse')) {
+    return "sse";
+  }
+  
+  return "http-streaming";
+}
+
+/**
+ * Connect to an MCP server and list available tools
+ * Tries HTTP Streaming first, falls back to SSE if that fails
+ */
+async function connectAndListTools(endpoint: string): Promise<{
+  client: Client;
+  tools: Array<{ name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }>;
+  transportUsed: string;
+}> {
+  const url = new URL(endpoint);
+  const transportType = detectTransportType(endpoint);
+  
+  // Try primary transport first
+  const primaryTransport = transportType === "sse"
+    ? new SSEClientTransport(url)
+    : new StreamableHTTPClientTransport(url);
+  
+  const client = new Client(
+    { name: "context-verification", version: "1.0.0" },
+    { capabilities: {} }
+  );
+
+  try {
+    await client.connect(primaryTransport);
+    const result = await client.listTools();
+    
+    return {
+      client,
+      tools: result.tools.map((t) => ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema,
+        outputSchema: t.outputSchema,
+      })),
+      transportUsed: transportType,
+    };
+  } catch (primaryError) {
+    // If primary fails and it was HTTP Streaming, try SSE fallback
+    if (transportType === "http-streaming") {
+      console.log("[contribute] HTTP Streaming failed, trying SSE fallback for:", endpoint);
+      
+      const fallbackClient = new Client(
+        { name: "context-verification", version: "1.0.0" },
+        { capabilities: {} }
+      );
+      
+      try {
+        const sseTransport = new SSEClientTransport(url);
+        await fallbackClient.connect(sseTransport);
+        const result = await fallbackClient.listTools();
+        
+        return {
+          client: fallbackClient,
+          tools: result.tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+            outputSchema: t.outputSchema,
+          })),
+          transportUsed: "sse (fallback)",
+        };
+      } catch {
+        // Both failed, throw original error
+        throw primaryError;
+      }
+    }
+    
+    // SSE was primary and failed, no fallback
+    throw primaryError;
+  }
+}
 
 export async function submitTool(
   _prevState: ContributeFormState,
@@ -107,17 +197,13 @@ export async function submitTool(
     }
 
     try {
-      const transport = new SSEClientTransport(new URL(parsed.data.endpoint));
-      const client = new Client(
-        { name: "context-verification", version: "1.0.0" },
-        { capabilities: {} }
-      );
-
-      await client.connect(transport);
-      const result = await client.listTools();
+      // Auto-detect and use appropriate transport (HTTP Streaming or SSE)
+      const { client, tools, transportUsed } = await connectAndListTools(parsed.data.endpoint);
+      console.log(`[contribute] Connected via ${transportUsed} to:`, parsed.data.endpoint);
+      
       await client.close();
 
-      if (!result.tools || result.tools.length === 0) {
+      if (!tools || tools.length === 0) {
         return {
           status: "error",
           message: "MCP server has no tools. Please expose at least one tool.",
@@ -127,12 +213,7 @@ export async function submitTool(
       }
 
       // Cache the discovered tools (including outputSchema for AI to understand response structure)
-      mcpTools = result.tools.map((t) => ({
-        name: t.name,
-        description: t.description,
-        inputSchema: t.inputSchema,
-        outputSchema: t.outputSchema,
-      }));
+      mcpTools = tools;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       return {

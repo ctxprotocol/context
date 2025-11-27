@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getSkillRuntime } from "@/lib/ai/skills/runtime";
 import { getAIToolById, recordToolQuery, updateAIToolSchema } from "@/lib/db/queries";
 import type { AITool } from "@/lib/db/schema";
@@ -17,6 +18,12 @@ import type { AITool } from "@/lib/db/schema";
  * - User pays for an "MCP Tool" once per chat turn
  * - Agent can call `callMcpSkill()` up to 100 times within that paid turn
  * - Each call invokes a specific tool on the remote MCP server
+ * 
+ * Supported Transports:
+ * - SSE (Server-Sent Events): Endpoints ending with `/sse`
+ * - HTTP Streaming (Streamable HTTP): Endpoints ending with `/mcp` or other paths
+ * 
+ * The transport is auto-detected based on the endpoint URL pattern.
  */
 
 type CallMcpSkillParams = {
@@ -34,7 +41,8 @@ const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
 
 // Connection cache TTL - connections are reused within this window
-const CONNECTION_CACHE_TTL_MS = 30_000; // 30 seconds
+// Set to 2 minutes to outlast the MCP SDK's 60-second internal timeout
+const CONNECTION_CACHE_TTL_MS = 120_000; // 2 minutes
 
 // Cache MCP clients per endpoint with TTL to avoid reconnecting on every call
 type CachedClient = {
@@ -130,9 +138,65 @@ function unwrapMcpContent(content: unknown): unknown {
 }
 
 /**
+ * Determine the appropriate transport type based on endpoint URL pattern
+ * 
+ * Transport selection rules:
+ * - `/sse` suffix → SSE transport (legacy, widely supported)
+ * - `/mcp` suffix → HTTP Streaming (modern, recommended)
+ * - Other paths → Try HTTP Streaming first (newer default), fall back to SSE
+ * 
+ * Examples:
+ * - https://mcp.api.coingecko.com/sse → SSE
+ * - https://mcp.api.coingecko.com/mcp → HTTP Streaming
+ * - http://localhost:4001/sse → SSE
+ */
+type TransportType = "sse" | "http-streaming";
+
+function detectTransportType(endpoint: string): TransportType {
+  const url = new URL(endpoint);
+  const pathname = url.pathname.toLowerCase();
+  
+  // Explicit SSE endpoint
+  if (pathname.endsWith('/sse')) {
+    return "sse";
+  }
+  
+  // Explicit MCP HTTP streaming endpoint
+  if (pathname.endsWith('/mcp')) {
+    return "http-streaming";
+  }
+  
+  // Default: prefer HTTP streaming for unknown paths (modern default)
+  // But most community servers use /sse, so check for common patterns
+  if (pathname.includes('sse')) {
+    return "sse";
+  }
+  
+  return "http-streaming";
+}
+
+/**
+ * Create the appropriate MCP transport based on endpoint URL
+ */
+function createMcpTransport(endpoint: string): SSEClientTransport | StreamableHTTPClientTransport {
+  const url = new URL(endpoint);
+  const transportType = detectTransportType(endpoint);
+  
+  if (transportType === "sse") {
+    console.log("[mcp-skill] Using SSE transport for:", endpoint);
+    return new SSEClientTransport(url);
+  }
+  
+  console.log("[mcp-skill] Using HTTP Streaming transport for:", endpoint);
+  return new StreamableHTTPClientTransport(url);
+}
+
+/**
  * Get or create an MCP client for the given endpoint
- * Uses TTL-based caching (30 seconds) to reuse connections within a code execution
+ * Uses TTL-based caching (2 minutes) to reuse connections within a code execution
  * while still ensuring connections don't become stale across requests.
+ * 
+ * Auto-detects transport type (SSE vs HTTP Streaming) based on endpoint URL.
  */
 async function getMcpClient(endpoint: string): Promise<Client> {
   const now = Date.now();
@@ -156,9 +220,10 @@ async function getMcpClient(endpoint: string): Promise<Client> {
   }
 
   console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
+  const transportType = detectTransportType(endpoint);
 
   try {
-    const transport = new SSEClientTransport(new URL(endpoint));
+    const transport = createMcpTransport(endpoint);
     const client = new Client(
       {
         name: "context-protocol",
@@ -170,13 +235,32 @@ async function getMcpClient(endpoint: string): Promise<Client> {
     );
 
     await client.connect(transport);
-    console.log("[mcp-skill] Successfully connected to:", endpoint);
+    console.log("[mcp-skill] Successfully connected via", transportType, "to:", endpoint);
 
     // Cache the connection with timestamp
     clientCache.set(endpoint, { client, createdAt: now });
 
     return client;
   } catch (error) {
+    // If HTTP Streaming fails, try SSE as fallback (for servers that don't support HTTP Streaming)
+    if (transportType === "http-streaming") {
+      console.log("[mcp-skill] HTTP Streaming failed, trying SSE fallback for:", endpoint);
+      try {
+        const sseTransport = new SSEClientTransport(new URL(endpoint));
+        const client = new Client(
+          { name: "context-protocol", version: "1.0.0" },
+          { capabilities: {} }
+        );
+        await client.connect(sseTransport);
+        console.log("[mcp-skill] Successfully connected via SSE fallback to:", endpoint);
+        clientCache.set(endpoint, { client, createdAt: now });
+        return client;
+      } catch (fallbackError) {
+        console.error("[mcp-skill] SSE fallback also failed:", fallbackError);
+        // Throw original error for better diagnostics
+      }
+    }
+    
     console.error("[mcp-skill] Failed to connect to MCP server:", endpoint, error);
     throw error;
   }

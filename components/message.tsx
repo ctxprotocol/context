@@ -371,7 +371,7 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
             // Normal chat: simple animated gradient text
             <div className="payment-status-gradient animate-status-gradient bg-size-200 text-gradient text-sm">
               Thinking...
-            </div>
+          </div>
           )}
         </div>
       </div>

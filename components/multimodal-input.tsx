@@ -337,7 +337,7 @@ function PureMultimodalInput({
 
   // Track if we should auto-execute payment (when Auto Pay is enabled)
   const [pendingAutoPayment, setPendingAutoPayment] = useState(false);
-  
+
   const submitForm = useCallback(
     (toolInvocation?: ToolInvocationPayload | BatchToolInvocationPayload) => {
       const trimmedInput = input.trim();
@@ -374,8 +374,8 @@ function PureMultimodalInput({
           }
           
           // Show payment dialog (normal flow or Auto Pay budget exceeded)
-          setShowPayDialog(true);
-          return;
+        setShowPayDialog(true);
+        return;
         }
       }
 
@@ -620,7 +620,7 @@ function PureMultimodalInput({
 
     // Fund the smart wallet (not the EOA) so funds are available for gas-sponsored txs
     const addressToFund = smartWalletAddress || activeWallet.address;
-    
+
     try {
       setIsFundingWallet(true);
       await fundWallet({
@@ -641,7 +641,7 @@ function PureMultimodalInput({
       if (isAutoPay && canAfford(Number(fundingRequest.amount))) {
         setPendingAutoPayment(true);
       } else {
-        setShowPayDialog(true);
+      setShowPayDialog(true);
       }
     } catch (error) {
       const message =
@@ -862,7 +862,7 @@ function PureMultimodalInput({
       }
 
       setStage("confirming-payment", toolNames);
-      
+
       // Record the spend in our budget tracker (Manual payments also track against budget)
       const totalCostUSD = Number(totalAmount) / 1_000_000;
       recordSpend(totalCostUSD);

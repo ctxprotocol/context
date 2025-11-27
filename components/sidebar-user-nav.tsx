@@ -2,7 +2,7 @@
 
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
-import { ChevronUp } from "lucide-react";
+import { ArrowUpRight, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -27,6 +27,7 @@ import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
 import { CheckIcon, CopyIcon, LoaderIcon } from "./icons";
 import { toast } from "./toast";
+import { WithdrawDialog } from "./withdraw-dialog";
 
 export function SidebarUserNav() {
   const { status } = useSession();
@@ -42,6 +43,7 @@ export function SidebarUserNav() {
   const isConnected = authenticated;
   const userEmail = privyUser?.email?.address;
   const [copied, setCopied] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const { activeWallet } = useWalletIdentity();
   const { client: smartWalletClient } = useSmartWallets();
 
@@ -67,9 +69,18 @@ export function SidebarUserNav() {
   });
 
   // Format USDC balance (6 decimals)
-  const formattedBalance = usdcBalance
-    ? (Number(usdcBalance) / 1_000_000).toFixed(2)
-    : "0.00";
+  // Show actual balance with up to 4 decimals for micropayment precision
+  const formattedBalance = (() => {
+    if (!usdcBalance) return "0.00";
+    const balanceNumber = Number(usdcBalance) / 1_000_000;
+    if (balanceNumber === 0) return "0.00";
+    const twoDecimals = balanceNumber.toFixed(2);
+    const fourDecimals = balanceNumber.toFixed(4);
+    // If 2 decimals loses precision, show 4
+    return Number.parseFloat(twoDecimals) !== Number.parseFloat(fourDecimals)
+      ? fourDecimals.replace(/0+$/, "").replace(/\.$/, "")
+      : twoDecimals;
+  })();
 
   // Display email if available, otherwise show formatted wallet address
   const displayName = isConnected
@@ -225,6 +236,19 @@ export function SidebarUserNav() {
                     )}
                   </span>
                 </DropdownMenuItem>
+                {/* Withdraw funds from smart wallet */}
+                {smartWalletAddress && (
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    data-testid="user-nav-item-withdraw"
+                    onSelect={() => setWithdrawOpen(true)}
+                  >
+                    <span className="flex items-center gap-2">
+                      <ArrowUpRight size={14} />
+                      Withdraw funds
+                    </span>
+                  </DropdownMenuItem>
+                )}
                 {/* Export the signer (EOA) which controls the smart wallet */}
                 <DropdownMenuItem
                   className="cursor-pointer"
@@ -247,7 +271,7 @@ export function SidebarUserNav() {
                 )}
               </>
             )}
-            <DropdownMenuSeparator />
+              <DropdownMenuSeparator />
             <DropdownMenuItem asChild data-testid="user-nav-item-auth">
               <button
                 className="w-full cursor-pointer"
@@ -275,6 +299,14 @@ export function SidebarUserNav() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Withdraw dialog */}
+        <WithdrawDialog
+          onOpenChange={setWithdrawOpen}
+          open={withdrawOpen}
+          signerAddress={signerAddress}
+          smartWalletAddress={smartWalletAddress}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   );

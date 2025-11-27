@@ -55,9 +55,9 @@ export function AddFundsDialog({
               spent automatically.
             </p>
             <p className="text-muted-foreground">
-              Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
+            Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
               (smart wallet, controlled by your embedded signer).
-            </p>
+          </p>
           </div>
         ) : null}
 

@@ -210,6 +210,22 @@ function PureThinkingAccordion({
               </div>
             )}
 
+            {/* Thinking indicator */}
+            {stage === "thinking" && !hasResult && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
+                <span className="font-mono">analyzing results...</span>
+              </div>
+            )}
+
+            {/* Querying tool indicator */}
+            {stage === "querying-tool" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-cyan-500/70" />
+                <span className="font-mono">querying {toolName ?? "tool"}...</span>
+              </div>
+            )}
+
             {/* Result preview with fade */}
             {hasResult && stage !== "executing" && (
               <FadedResultPreview result={debugResult ?? ""} />

@@ -246,7 +246,7 @@ Design workflows to minimize external API calls.`;
 
           <div className="space-y-2">
             <Label htmlFor="endpoint">
-              {kind === "mcp" ? "MCP Endpoint (SSE)" : "Module Path"}
+              {kind === "mcp" ? "MCP Endpoint" : "Module Path"}
             </Label>
             <Input
               aria-invalid={endpointError ? true : undefined}
@@ -259,7 +259,7 @@ Design workflows to minimize external API calls.`;
               name="endpoint"
               placeholder={
                 kind === "mcp"
-                  ? "https://your-mcp-server.com/sse"
+                  ? "https://your-mcp-server.com/sse or /mcp"
                   : "@/lib/ai/skills/community/my-skill"
               }
               type={kind === "mcp" ? "url" : "text"}
@@ -267,8 +267,11 @@ Design workflows to minimize external API calls.`;
             <p className="text-muted-foreground text-xs">
               {kind === "mcp" ? (
                 <>
-                  Your MCP server&apos;s SSE endpoint. We&apos;ll connect and
-                  auto-discover your skills via <code>listTools()</code>. See{" "}
+                  Your MCP server endpoint. We support both{" "}
+                  <strong>HTTP Streaming</strong> (<code>/mcp</code>) and{" "}
+                  <strong>SSE</strong> (<code>/sse</code>) transports.
+                  We&apos;ll auto-discover your skills via{" "}
+                  <code>listTools()</code>. See{" "}
                   <a
                     className="underline"
                     href="https://github.com/ctxprotocol/context/tree/main/examples/blocknative-contributor"

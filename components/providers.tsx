@@ -127,9 +127,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           >
             <SessionProvider>
               <AutoPayProvider>
-                <PaymentStatusProvider>
-                  <SessionSyncManager>{children}</SessionSyncManager>
-                </PaymentStatusProvider>
+              <PaymentStatusProvider>
+                <SessionSyncManager>{children}</SessionSyncManager>
+              </PaymentStatusProvider>
               </AutoPayProvider>
             </SessionProvider>
           </WagmiProvider>
