@@ -16,13 +16,48 @@ type ThinkingAccordionProps = {
   isDebugMode: boolean;
 };
 
-// Extract code block from planning response (same regex as server)
-const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
+// Extract code block from planning response
+// Handles both complete blocks (with closing ```) and partial blocks (still streaming)
+const COMPLETE_CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 
-function extractCodeFromPlanningText(text: string | null): string | null {
+function extractCodeFromPlanningText(text: string | null, isStreaming: boolean): string | null {
   if (!text) return null;
-  const match = CODE_BLOCK_REGEX.exec(text);
-  return match ? match[1].trim() : null;
+  
+  // First try to match a complete code block (has closing ```)
+  const completeMatch = COMPLETE_CODE_BLOCK_REGEX.exec(text);
+  if (completeMatch) {
+    return completeMatch[1].trim();
+  }
+  
+  // If streaming and no complete block, try to match a partial block (no closing ```)
+  // Look for opening ``` and capture everything after it
+  if (isStreaming) {
+    const openingIndex = text.indexOf("```");
+    if (openingIndex !== -1) {
+      // Find where the code starts (after ```ts or ```typescript or just ```)
+      let codeStart = openingIndex + 3;
+      const afterBackticks = text.slice(codeStart);
+      
+      // Skip language identifier if present
+      const langMatch = afterBackticks.match(/^(ts|typescript)\s*/i);
+      if (langMatch) {
+        codeStart += langMatch[0].length;
+      } else {
+        // Skip any leading whitespace/newline after ```
+        const whitespaceMatch = afterBackticks.match(/^\s*/);
+        if (whitespaceMatch) {
+          codeStart += whitespaceMatch[0].length;
+        }
+      }
+      
+      const partialCode = text.slice(codeStart);
+      if (partialCode.length > 0) {
+        return partialCode;
+      }
+    }
+  }
+  
+  return null;
 }
 
 // Check if we're in an active phase (show chevron for expandable content)
@@ -112,10 +147,14 @@ function PureThinkingAccordion({
   // Default: collapsed unless in debug mode
   const [isExpanded, setIsExpanded] = useState(isDebugMode);
 
+  // Determine if we're actively streaming code
+  const isStreamingCode = stage === "planning";
+  
   // Extract just the code block from the full planning text
+  // Pass isStreaming to handle partial code blocks during streaming
   const extractedCode = useMemo(
-    () => extractCodeFromPlanningText(streamingCode),
-    [streamingCode]
+    () => extractCodeFromPlanningText(streamingCode, isStreamingCode),
+    [streamingCode, isStreamingCode]
   );
 
   // Update expanded state when debug mode changes
