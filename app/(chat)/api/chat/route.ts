@@ -440,6 +440,7 @@ export async function POST(request: Request) {
       const systemInstructions = systemPrompt({
         selectedChatModel,
         requestHints,
+        isDebugMode, // Pass debug mode to control if coding agent prompt is included
       });
 
       const stream = createUIMessageStream({
@@ -552,6 +553,7 @@ export async function POST(request: Request) {
             selectedChatModel,
             requestHints,
             enabledTools: enabledToolSummaries,
+            isDebugMode, // Pass debug mode for consistency
           });
 
           // Signal planning status so UI shows "Planning..."

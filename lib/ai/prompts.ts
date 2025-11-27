@@ -10,7 +10,12 @@ export type EnabledToolSummary = {
   usage?: string;
   kind: "skill" | "mcp";
   // MCP-specific: list of tools available on this server
-  mcpTools?: { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[];
+  mcpTools?: {
+    name: string;
+    description?: string;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+  }[];
 };
 
 const codingAgentPrompt = `
@@ -87,6 +92,7 @@ Rules:
 - Do not embed fallback or default numeric values just to be helpful. If the API returns no usable data, propagate that fact in the returned object.
 - Free tools (price = $0.00) can be used immediately. Paid tools require user authorization.
 - **CRITICAL: Do NOT wrap tool calls in try/catch blocks that swallow errors.** Let errors propagate naturally so the system can diagnose issues. If you must handle errors, re-throw them with context.
+- When handling numeric values from tool responses, preserve precision. Avoid parseInt() on values that may be decimals or scientific notation (e.g., 0.02, 1e-7). Use the raw number directly or parseFloat() if string parsing is needed.
 `;
 
 export const regularPrompt =
@@ -124,12 +130,32 @@ export const systemPrompt = ({
   selectedChatModel,
   requestHints,
   enabledTools = [],
+  isDebugMode = false,
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
   enabledTools?: EnabledToolSummary[];
+  isDebugMode?: boolean;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
+
+  // Only include the coding agent prompt when:
+  // 1. Developer Mode is ON, OR
+  // 2. There are enabled tools to use
+  const hasTools = enabledTools.length > 0;
+  const shouldUseCodingAgent = isDebugMode || hasTools;
+
+  if (!shouldUseCodingAgent) {
+    // Normal chat mode - no code generation, just helpful responses
+    const basePrompt = `${regularPrompt}\n\n${requestPrompt}`;
+
+    if (selectedChatModel === "chat-model-reasoning") {
+      return `${basePrompt}\n\n${reasoningPrompt}`;
+    }
+    return basePrompt;
+  }
+
+  // Developer Mode or tools enabled - include coding agent
   const toolsPrompt =
     enabledTools.length === 0
       ? "No paid marketplace skills are authorized for this turn. Do not attempt to import them."
@@ -146,13 +172,23 @@ export const systemPrompt = ({
   return basePrompt;
 };
 
-function formatMcpToolDetails(t: { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }) {
-  const inputProps = (t.inputSchema as { properties?: Record<string, unknown> })?.properties;
-  const outputProps = (t.outputSchema as { properties?: Record<string, unknown> })?.properties;
-  
+function formatMcpToolDetails(t: {
+  name: string;
+  description?: string;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
+}) {
+  const inputProps = (t.inputSchema as { properties?: Record<string, unknown> })
+    ?.properties;
+  const outputProps = (
+    t.outputSchema as { properties?: Record<string, unknown> }
+  )?.properties;
+
   const inputKeys = inputProps ? Object.keys(inputProps).join(", ") : "none";
-  const outputKeys = outputProps ? Object.keys(outputProps).join(", ") : "unknown";
-  
+  const outputKeys = outputProps
+    ? Object.keys(outputProps).join(", ")
+    : "unknown";
+
   return `      - ${t.name}: ${t.description || "No description"}
         Input: { ${inputKeys} }
         Output: { ${outputKeys} }`;
@@ -166,9 +202,7 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
   // MCP Tools (The Standard)
   if (tool.kind === "mcp") {
     const mcpToolsList = tool.mcpTools?.length
-      ? tool.mcpTools
-          .map((t) => formatMcpToolDetails(t))
-          .join("\n")
+      ? tool.mcpTools.map((t) => formatMcpToolDetails(t)).join("\n")
       : "      (No tools discovered)";
 
     return `${index + 1}. ${tool.name} (MCP Tool • ${priceLabel})

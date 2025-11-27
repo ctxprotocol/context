@@ -338,6 +338,10 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
   const role = "assistant";
   const { stage, toolName, streamingCode, debugResult } = usePaymentStatus();
 
+  // For normal chat (no tools), stage stays "idle" - show simple gradient text
+  // For tool flows, use ThinkingAccordion with expandable content
+  const hasToolContent = Boolean(streamingCode) || Boolean(debugResult) || stage !== "idle";
+
   return (
     <motion.div
       animate={{ opacity: 1 }}
@@ -354,14 +358,21 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          {/* Always use ThinkingAccordion - shows animated gradient text with optional expandable preview */}
-          <ThinkingAccordion
-            debugResult={debugResult}
-            isDebugMode={isDebugMode}
-            stage={stage}
-            streamingCode={streamingCode}
-            toolName={toolName}
-          />
+          {hasToolContent ? (
+            // Tool flow: use ThinkingAccordion with expandable content
+            <ThinkingAccordion
+              debugResult={debugResult}
+              isDebugMode={isDebugMode}
+              stage={stage}
+              streamingCode={streamingCode}
+              toolName={toolName}
+            />
+          ) : (
+            // Normal chat: simple animated gradient text
+            <div className="payment-status-gradient animate-status-gradient bg-size-200 text-gradient text-sm">
+              Thinking...
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

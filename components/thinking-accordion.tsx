@@ -171,6 +171,21 @@ function PureThinkingAccordion({
           )}
         >
           <div className="overflow-hidden">
+            {/* Payment stages - show status indicators */}
+            {stage === "setting-cap" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-blue-500/70" />
+                <span className="font-mono">approving spending allowance...</span>
+              </div>
+            )}
+
+            {stage === "confirming-payment" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-green-500/70" />
+                <span className="font-mono">processing blockchain transaction...</span>
+              </div>
+            )}
+
             {/* Code preview with fade */}
             {(hasCode || stage === "planning") && extractedCode && (
               <FadedCodePreview
