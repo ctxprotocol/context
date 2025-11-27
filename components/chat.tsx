@@ -33,6 +33,7 @@ import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "sonner";
+import { useContextSidebar } from "@/hooks/use-context-sidebar";
 import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -88,7 +89,7 @@ export function Chat({
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
-  const [isContextSidebarOpen, setIsContextSidebarOpen] = useState(false);
+  const { isOpen: isContextSidebarOpen, toggle: toggleContextSidebar, close: closeContextSidebar } = useContextSidebar();
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
@@ -246,9 +247,7 @@ export function Chat({
           <ChatHeader
             chatId={id}
             isReadonly={isReadonly}
-            onToggleContextSidebar={() =>
-              setIsContextSidebarOpen(!isContextSidebarOpen)
-            }
+            onToggleContextSidebar={toggleContextSidebar}
             selectedVisibilityType={initialVisibilityType}
           />
 
@@ -273,9 +272,7 @@ export function Chat({
               isReadonly={isReadonly}
               messages={messages}
               onModelChange={setCurrentModelId}
-              onToggleContextSidebar={() =>
-                setIsContextSidebarOpen(!isContextSidebarOpen)
-              }
+              onToggleContextSidebar={toggleContextSidebar}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
               sendMessage={sendMessage}
@@ -293,7 +290,7 @@ export function Chat({
           className="md:sticky md:top-0 md:h-dvh"
           isDebugMode={isDebugMode}
           isOpen={isContextSidebarOpen}
-          onClose={() => setIsContextSidebarOpen(false)}
+          onClose={closeContextSidebar}
           onToggleDebugMode={toggleDebugMode}
         />
       </div>

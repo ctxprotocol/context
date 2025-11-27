@@ -12,6 +12,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import { AutoPayProvider } from "@/hooks/use-auto-pay";
+import { ContextSidebarProvider } from "@/hooks/use-context-sidebar";
 import { PaymentStatusProvider } from "@/hooks/use-payment-status";
 import { isEmbeddedWallet, usePrivyWalletSync } from "@/hooks/use-privy-wallet-sync";
 import { useSessionSync } from "@/hooks/use-session-sync";
@@ -127,9 +128,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           >
             <SessionProvider>
               <AutoPayProvider>
-              <PaymentStatusProvider>
-                <SessionSyncManager>{children}</SessionSyncManager>
-              </PaymentStatusProvider>
+                <ContextSidebarProvider>
+                  <PaymentStatusProvider>
+                    <SessionSyncManager>{children}</SessionSyncManager>
+                  </PaymentStatusProvider>
+                </ContextSidebarProvider>
               </AutoPayProvider>
             </SessionProvider>
           </WagmiProvider>
