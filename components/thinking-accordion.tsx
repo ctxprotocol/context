@@ -144,8 +144,10 @@ function PureThinkingAccordion({
   debugResult,
   isDebugMode,
 }: ThinkingAccordionProps) {
-  // Default: collapsed unless in debug mode
-  const [isExpanded, setIsExpanded] = useState(isDebugMode);
+  // Auto-expand during active stages, or if debug mode is on
+  const isActive = isActivePhase(stage);
+  const [isExpanded, setIsExpanded] = useState(isDebugMode || isActive);
+  const [userToggled, setUserToggled] = useState(false);
 
   // Determine if we're actively streaming code
   const isStreamingCode = stage === "planning";
@@ -157,15 +159,26 @@ function PureThinkingAccordion({
     [streamingCode, isStreamingCode]
   );
 
-  // Update expanded state when debug mode changes
+  // Auto-expand when entering active stages (unless user manually collapsed)
+  // Auto-collapse when returning to idle (unless debug mode is on)
   useEffect(() => {
-    setIsExpanded(isDebugMode);
-  }, [isDebugMode]);
+    if (userToggled) return; // Respect user's manual toggle
+    
+    if (isActive) {
+      setIsExpanded(true);
+    } else if (!isDebugMode && stage === "idle") {
+      setIsExpanded(false);
+    }
+  }, [isActive, isDebugMode, stage, userToggled]);
+
+  // Reset userToggled when stage changes to allow auto-expand on new queries
+  useEffect(() => {
+    setUserToggled(false);
+  }, [stage]);
 
   const statusMessage = getPaymentStatusMessage(stage, toolName);
   const hasCode = Boolean(extractedCode);
   const hasResult = Boolean(debugResult);
-  const isActive = isActivePhase(stage);
   const showExpandOption = hasCode || hasResult || isActive;
 
   // Don't render anything if we're idle with no content
@@ -182,7 +195,12 @@ function PureThinkingAccordion({
           showExpandOption && "cursor-pointer"
         )}
         disabled={!showExpandOption}
-        onClick={() => showExpandOption && setIsExpanded(!isExpanded)}
+        onClick={() => {
+          if (showExpandOption) {
+            setUserToggled(true);
+            setIsExpanded(!isExpanded);
+          }
+        }}
         type="button"
       >
         {/* Animated gradient status text */}
