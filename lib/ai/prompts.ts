@@ -178,20 +178,17 @@ function formatMcpToolDetails(t: {
   inputSchema?: unknown;
   outputSchema?: unknown;
 }) {
-  const inputProps = (t.inputSchema as { properties?: Record<string, unknown> })
-    ?.properties;
-  const outputProps = (
-    t.outputSchema as { properties?: Record<string, unknown> }
-  )?.properties;
-
-  const inputKeys = inputProps ? Object.keys(inputProps).join(", ") : "none";
-  const outputKeys = outputProps
-    ? Object.keys(outputProps).join(", ")
+  // Include full schema so the AI knows exact structure and possible values
+  const inputSchemaStr = t.inputSchema
+    ? JSON.stringify(t.inputSchema, null, 2)
+    : "{}";
+  const outputSchemaStr = t.outputSchema
+    ? JSON.stringify(t.outputSchema, null, 2)
     : "unknown";
 
   return `      - ${t.name}: ${t.description || "No description"}
-        Input: { ${inputKeys} }
-        Output: { ${outputKeys} }`;
+        inputSchema: ${inputSchemaStr}
+        outputSchema: ${outputSchemaStr}`;
 }
 
 function formatEnabledTool(tool: EnabledToolSummary, index: number) {
