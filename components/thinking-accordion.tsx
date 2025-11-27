@@ -139,56 +139,7 @@ function FadedResultPreview({ result }: { result: string }) {
   );
 }
 
-// Typewriter effect for a single log message
-function TypewriterText({ 
-  text, 
-  isLatest,
-  className 
-}: { 
-  text: string; 
-  isLatest: boolean;
-  className?: string;
-}) {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isComplete, setIsComplete] = useState(false);
-
-  useEffect(() => {
-    // If not the latest message, show full text immediately
-    if (!isLatest) {
-      setDisplayedText(text);
-      setIsComplete(true);
-      return;
-    }
-
-    // Reset for new text
-    setDisplayedText("");
-    setIsComplete(false);
-    
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedText(text.slice(0, index + 1));
-        index++;
-      } else {
-        setIsComplete(true);
-        clearInterval(interval);
-      }
-    }, 15); // 15ms per character for fast but visible typing
-
-    return () => clearInterval(interval);
-  }, [text, isLatest]);
-
-  return (
-    <span className={className}>
-      {displayedText}
-      {isLatest && !isComplete && (
-        <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current opacity-70" />
-      )}
-    </span>
-  );
-}
-
-// Execution logs preview - shows real-time tool queries and results with typing effect
+// Execution logs preview - shows real-time tool queries and results as they arrive
 function ExecutionLogsPreview({ 
   logs,
   isExecuting 
@@ -209,9 +160,7 @@ function ExecutionLogsPreview({
     return (
       <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
         <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-        <span className="font-mono">
-          <TypewriterText text="starting execution..." isLatest={true} />
-        </span>
+        <span className="font-mono">executing...</span>
       </div>
     );
   }
@@ -224,42 +173,34 @@ function ExecutionLogsPreview({
         style={{ maxHeight: "8rem" }}
       >
         <div className="space-y-1 p-2">
-          {logs.map((log, index) => {
-            const isLatest = index === logs.length - 1;
-            return (
-              <div
-                key={`${log.timestamp}-${index}`}
-                className="flex items-start gap-2 font-mono"
-              >
-                {/* Status dot */}
-                <div className={cn(
-                  "mt-1 size-1.5 shrink-0 rounded-full",
-                  log.type === "query" && "bg-blue-500/70",
-                  log.type === "result" && "bg-green-500/70",
-                  log.type === "error" && "bg-red-500/70",
-                  isLatest && "animate-pulse"
-                )} />
-                {/* Message with typewriter effect for latest */}
-                <TypewriterText 
-                  text={log.message}
-                  isLatest={isLatest && isExecuting}
-                  className={cn(
-                    "break-words",
-                    log.type === "query" && "text-muted-foreground/70",
-                    log.type === "result" && "text-green-600/70 dark:text-green-400/70",
-                    log.type === "error" && "text-red-600/70 dark:text-red-400/70"
-                  )}
-                />
-              </div>
-            );
-          })}
-          {/* Pulsing indicator if still executing and last log is complete */}
-          {isExecuting && logs.length > 0 && (
+          {logs.map((log, index) => (
+            <div
+              key={`${log.timestamp}-${index}`}
+              className="flex items-start gap-2 font-mono"
+            >
+              {/* Status dot */}
+              <div className={cn(
+                "mt-1 size-1.5 shrink-0 rounded-full",
+                log.type === "query" && "bg-blue-500/70",
+                log.type === "result" && "bg-green-500/70",
+                log.type === "error" && "bg-red-500/70"
+              )} />
+              {/* Message - appears naturally as server sends it */}
+              <span className={cn(
+                "break-words",
+                log.type === "query" && "text-muted-foreground/70",
+                log.type === "result" && "text-green-600/70 dark:text-green-400/70",
+                log.type === "error" && "text-red-600/70 dark:text-red-400/70"
+              )}>
+                {log.message}
+              </span>
+            </div>
+          ))}
+          {/* Pulsing indicator while still executing */}
+          {isExecuting && (
             <div className="flex items-center gap-2">
               <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-              <span className="text-muted-foreground/50">
-                <TypewriterText text="waiting..." isLatest={true} />
-              </span>
+              <span className="font-mono text-muted-foreground/50">executing...</span>
             </div>
           )}
         </div>
