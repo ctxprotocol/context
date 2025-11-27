@@ -51,6 +51,17 @@
   -webkit-text-fill-color: transparent;
 }
 
+@utility fade-to-background {
+  /* Fade from transparent at top to background color at bottom */
+  /* Creates a "hint" preview effect for code/text */
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    transparent 40%,
+    var(--background) 100%
+  );
+}
+
 /* define design tokens (light mode) */
 :root {
   --background: hsl(0 0% 100%);

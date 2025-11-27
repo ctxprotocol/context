@@ -9,7 +9,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { formatWalletAddress } from "@/lib/utils";
+import { formatPrice, formatWalletAddress } from "@/lib/utils";
 
 type AddFundsDialogProps = {
   amountLabel: string;
@@ -32,8 +32,8 @@ export function AddFundsDialog({
   toolName,
   walletAddress,
 }: AddFundsDialogProps) {
-  const normalizedAmount =
-    Number(amountLabel) > 0 ? Number(amountLabel).toFixed(2) : amountLabel;
+  // Use formatPrice to properly display micropayments (e.g., $0.0001)
+  const normalizedAmount = formatPrice(amountLabel);
 
   return (
     <AlertDialog onOpenChange={onOpenChange} open={open}>
@@ -48,10 +48,17 @@ export function AddFundsDialog({
         </AlertDialogHeader>
 
         {walletAddress ? (
-          <p className="text-muted-foreground text-sm">
-            Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
-            (embedded wallet).
-          </p>
+          <div className="flex flex-col gap-3 text-sm">
+            <p className="text-muted-foreground">
+              Context is a pay-per-query marketplace where you pay only for
+              the AI tools you use. Funds are held in your smart wallet and
+              spent automatically.
+            </p>
+            <p className="text-muted-foreground">
+              Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
+              (smart wallet, controlled by your embedded signer).
+            </p>
+          </div>
         ) : null}
 
         <AlertDialogFooter className="mt-4">

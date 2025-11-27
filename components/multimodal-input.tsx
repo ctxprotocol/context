@@ -2,6 +2,7 @@
 
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { useFundWallet } from "@privy-io/react-auth";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
@@ -19,7 +20,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
-import { parseUnits } from "viem";
+import { encodeFunctionData, parseUnits, type Hex } from "viem";
 import { base } from "viem/chains";
 import {
   useAccount,
@@ -40,12 +41,13 @@ import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
 import type { AITool } from "@/lib/db/schema";
 import {
+  contextRouterAbi,
   useWriteContextRouterExecutePaidQuery,
   useWriteContextRouterExecuteBatchPaidQuery,
 } from "@/lib/generated";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import { Context } from "./elements/context";
 import {
   PromptInput,
@@ -134,6 +136,7 @@ function PureMultimodalInput({
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
   const { fundWallet } = useFundWallet();
   const { isAutoPay, canAfford, recordSpend } = useAutoPay();
+  const { client: smartWalletClient } = useSmartWallets();
 
   // Wallet and contract addresses
   // Rename address to wagmiAddress to avoid confusion
@@ -141,6 +144,11 @@ function PureMultimodalInput({
   const chainId = chain?.id; // Use the actual connected chain, not the configured one
   // Use activeWallet.address as the source of truth for the UI
   const walletAddress = activeWallet?.address as `0x${string}` | undefined;
+  
+  // Smart wallet address - this is where USDC should be held for gas-sponsored txs
+  const smartWalletAddress = smartWalletClient?.account?.address as `0x${string}` | undefined;
+  // Use smart wallet for balance/allowance checks when available
+  const effectiveWalletAddress = smartWalletAddress || walletAddress;
   const { switchChainAsync } = useSwitchChain();
   const routerAddress =
     (process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`) ||
@@ -160,21 +168,21 @@ function PureMultimodalInput({
     Boolean(wagmiAddress) &&
     walletAddress?.toLowerCase() !== wagmiAddress?.toLowerCase();
 
-  // USDC balance check
+  // USDC balance check - use smart wallet address when available
   const { refetch: refetchBalance } = useReadContract({
     address: usdcAddress,
     abi: ERC20_ABI,
     functionName: "balanceOf",
-    args: walletAddress ? [walletAddress] : undefined,
+    args: effectiveWalletAddress ? [effectiveWalletAddress] : undefined,
     query: { enabled: false },
   });
 
-  // USDC allowance (manual refetch before spending)
+  // USDC allowance (manual refetch before spending) - use smart wallet address
   const { refetch: refetchAllowance } = useReadContract({
     address: usdcAddress,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: walletAddress ? [walletAddress, routerAddress] : undefined,
+    args: effectiveWalletAddress ? [effectiveWalletAddress, routerAddress] : undefined,
     query: { enabled: false },
   });
   const { writeContractAsync: writeErc20Async } = useWriteContract();
@@ -340,28 +348,35 @@ function PureMultimodalInput({
         !isReadonly &&
         (selectedTool || activeTools.length > 0)
       ) {
-        // Calculate total cost
+        // Calculate total cost - only paid tools need payment
         const toolsToPay = selectedTool ? [selectedTool] : activeTools;
-        const totalCost = toolsToPay.reduce(
+        const paidTools = toolsToPay.filter(t => Number(t.pricePerQuery ?? 0) > 0);
+        const totalCost = paidTools.reduce(
           (sum, t) => sum + Number(t.pricePerQuery ?? 0),
           0
         );
         
-        // If Auto Pay is enabled and within budget, trigger auto-payment
-        if (isAutoPay) {
-          if (canAfford(totalCost)) {
-            // Set flag to trigger auto-payment via useEffect
-            setPendingAutoPayment(true);
-            return;
-          } else {
-            // Budget exceeded - show toast and fall back to dialog
-            toast.error(`Budget exceeded. Need $${totalCost.toFixed(2)} but only have remaining budget.`);
+        // If no paid tools, skip payment flow entirely
+        if (paidTools.length === 0) {
+          // Free tools - no payment needed, continue to send message
+          // Fall through to normal message sending
+        } else {
+          // If Auto Pay is enabled and within budget, trigger auto-payment
+          if (isAutoPay) {
+            if (canAfford(totalCost)) {
+              // Set flag to trigger auto-payment via useEffect
+              setPendingAutoPayment(true);
+              return;
+            } else {
+              // Budget exceeded - show toast and fall back to dialog
+              toast.error(`Budget exceeded. Need $${totalCost.toFixed(2)} but only have remaining budget.`);
+            }
           }
+          
+          // Show payment dialog (normal flow or Auto Pay budget exceeded)
+          setShowPayDialog(true);
+          return;
         }
-        
-        // Show payment dialog (normal flow or Auto Pay budget exceeded)
-        setShowPayDialog(true);
-        return;
       }
 
       window.history.pushState({}, "", `/chat/${chatId}`);
@@ -560,46 +575,8 @@ function PureMultimodalInput({
     return () => textarea.removeEventListener("paste", handlePaste);
   }, [handlePaste]);
 
-  // After execute success: verify + execute tool server-side and then send the augmented message
-  useEffect(() => {
-    const isSuccess = isExecSuccess || isBatchExecSuccess;
-    if (!isSuccess || !lastExecutedTx) {
-      return;
-    }
-
-    // Calculate total cost for recording spend (Auto Pay budget tracking)
-    const toolsUsed = executingTools.length > 1 ? executingTools : (executingTool ? [executingTool] : []);
-    const totalCost = toolsUsed.reduce(
-      (sum, t) => sum + Number(t.pricePerQuery ?? 0),
-      0
-    );
-    
-    // Record spend against Auto Pay budget if enabled
-    if (isAutoPay && totalCost > 0) {
-      recordSpend(totalCost);
-    }
-
-    // Handle batch execution (multiple tools)
-    if (executingTools.length > 1) {
-      const toolNames = executingTools.map((t) => t.name).join(", ");
-      setStage("planning", toolNames);
-      submitForm({
-        toolInvocations: executingTools.map((tool) => ({
-          toolId: tool.id,
-          transactionHash: lastExecutedTx,
-        })),
-        fallbackText: `Using ${toolNames}`,
-      });
-    } else if (executingTool) {
-      // Handle single tool execution
-      setStage("planning", executingTool.name);
-      submitForm({
-        toolId: executingTool.id,
-        transactionHash: lastExecutedTx,
-        fallbackText: `Using ${executingTool.name}`,
-      });
-    }
-
+  // Helper to clean up payment state after transaction
+  const cleanupPaymentState = useCallback(() => {
     setIsPaying(false);
     setShowPayDialog(false);
     setLastExecutedTx(undefined);
@@ -607,19 +584,7 @@ function PureMultimodalInput({
     setExecutingTools([]);
     resetExecute();
     resetBatchExecute();
-  }, [
-    executingTool,
-    executingTools,
-    isExecSuccess,
-    isBatchExecSuccess,
-    lastExecutedTx,
-    setStage,
-    submitForm,
-    resetExecute,
-    resetBatchExecute,
-    isAutoPay,
-    recordSpend,
-  ]);
+  }, [resetExecute, resetBatchExecute]);
 
   const handleSwitchNetwork = useCallback(async () => {
     try {
@@ -653,10 +618,13 @@ function PureMultimodalInput({
         ? parsedAmount.toFixed(2)
         : "1.00";
 
+    // Fund the smart wallet (not the EOA) so funds are available for gas-sponsored txs
+    const addressToFund = smartWalletAddress || activeWallet.address;
+    
     try {
       setIsFundingWallet(true);
       await fundWallet({
-        address: activeWallet.address,
+        address: addressToFund,
         options: {
           chain: base,
           asset: "USDC",
@@ -664,10 +632,17 @@ function PureMultimodalInput({
         },
       });
       await refetchBalance();
-      toast.success("Funds added. You can try the tool again.");
+      toast.success("Funds added to your smart wallet. You can try the tool again.");
       setShowAddFundsDialog(false);
       setFundingRequest(null);
-      setShowPayDialog(true);
+      
+      // If Auto Pay is enabled and can afford, trigger auto-payment
+      // Otherwise show the payment dialog
+      if (isAutoPay && canAfford(Number(fundingRequest.amount))) {
+        setPendingAutoPayment(true);
+      } else {
+        setShowPayDialog(true);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Funding flow cancelled.";
@@ -680,7 +655,7 @@ function PureMultimodalInput({
     } finally {
       setIsFundingWallet(false);
     }
-  }, [activeWallet?.address, fundWallet, fundingRequest, refetchBalance]);
+  }, [activeWallet?.address, smartWalletAddress, fundWallet, fundingRequest, refetchBalance]);
 
   useEffect(() => {
     if (status === "ready") {
@@ -692,7 +667,8 @@ function PureMultimodalInput({
     // Determine which tools to pay for
     const toolsToPay = selectedTool ? [selectedTool] : activeTools;
     
-    if (toolsToPay.length === 0 || !walletAddress || !routerAddress || !usdcAddress) {
+    // Use smart wallet address for checks (same as balance/allowance)
+    if (toolsToPay.length === 0 || !effectiveWalletAddress || !routerAddress || !usdcAddress) {
       toast.error("Missing wallet or contract configuration.");
       return;
     }
@@ -723,7 +699,7 @@ function PureMultimodalInput({
       const { data: balanceData } = await refetchBalance();
       const balance = (balanceData as bigint | undefined) ?? 0n;
 
-      const totalAmountStr = (Number(totalAmount) / 1_000_000).toFixed(2);
+      const totalAmountStr = formatPrice(Number(totalAmount) / 1_000_000);
       const toolNames = toolsToPay.map((t) => t.name).join(", ");
 
       if (balance < totalAmount) {
@@ -756,44 +732,211 @@ function PureMultimodalInput({
         return;
       }
 
-      // Check and handle allowance
+      // AUTO PAY PATH: Use smart wallet with auto-signing (no popups!)
+      if (isAutoPay && smartWalletClient) {
+        setStage("confirming-payment", toolNames);
+        
+        // Record the spend in our budget tracker
+        const totalCostUSD = Number(totalAmount) / 1_000_000;
+        recordSpend(totalCostUSD);
+        
+        // Encode the contract call
+        let txData: Hex;
+        if (toolsToPay.length === 1) {
+          const tool = toolsToPay[0];
+          setExecutingTool(tool);
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executePaidQuery",
+            args: [0n, tool.developerWallet as `0x${string}`, totalAmount],
+          });
+        } else {
+          setExecutingTools(toolsToPay);
+          const toolIds = toolsToPay.map(() => 0n);
+          const developerWallets = toolsToPay.map(
+            (t) => t.developerWallet as `0x${string}`
+          );
+          const amounts = toolsToPay.map((t) =>
+            parseUnits(t.pricePerQuery ?? "0.00", 6)
+          );
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchPaidQuery",
+            args: [toolIds, developerWallets, amounts],
+          });
+        }
+        
+        // Send via smart wallet with AUTO-SIGNING
+        // Pass showWalletUIs: false to skip the confirmation popup
+        // This enables TRUE Auto Pay - no confirmation needed!
+        const txHash = await smartWalletClient.sendTransaction(
+          {
+            chain: base,
+            to: routerAddress,
+            data: txData,
+            value: BigInt(0),
+          },
+          {
+            // Disable Privy's confirmation modal for auto-pay
+            // Security is handled by the ERC-20 spending cap approval
+            uiOptions: {
+              showWalletUIs: false,
+            },
+          }
+        );
+        
+        if (!txHash) {
+          toast.error("Transaction failed - no hash returned");
+          cleanupPaymentState();
+          return;
+        }
+        
+        const hash = txHash as `0x${string}`;
+        setLastExecutedTx(hash);
+        toast.success("Payment processed automatically!");
+        
+        // Submit the form with the transaction hash
+        if (toolsToPay.length > 1) {
+          const toolNames = toolsToPay.map((t) => t.name).join(", ");
+          setStage("planning", toolNames);
+          submitForm({
+            toolInvocations: toolsToPay.map((tool) => ({
+              toolId: tool.id,
+              transactionHash: hash,
+            })),
+            fallbackText: `Using ${toolNames}`,
+          });
+        } else if (toolsToPay.length === 1) {
+          const tool = toolsToPay[0];
+          setStage("planning", tool.name);
+          submitForm({
+            toolId: tool.id,
+            transactionHash: hash,
+            fallbackText: `Using ${tool.name}`,
+          });
+        }
+        
+        cleanupPaymentState();
+        return;
+      }
+
+      // MANUAL PATH: Use smart wallet WITH confirmation popup
+      // This ensures gas sponsorship while still requiring user approval
+      if (!smartWalletClient) {
+        toast.error("Smart wallet not available. Please try again.");
+        setIsPaying(false);
+        setShowPayDialog(false);
+        return;
+      }
+
+      // Check and handle allowance (using smart wallet for gas sponsorship)
       const allowanceRes = await refetchAllowance();
       const allowance = (allowanceRes.data as bigint | undefined) ?? 0n;
       if (allowance < totalAmount) {
         setStage("setting-cap", toolNames);
-        await writeErc20Async({
-          address: usdcAddress,
+        
+        // Encode approve call
+        const approveData = encodeFunctionData({
           abi: ERC20_ABI,
           functionName: "approve",
           args: [routerAddress, maxAllowance],
         });
+        
+        // Use smart wallet for approval (gas sponsored, with popup)
+        await smartWalletClient.sendTransaction(
+          {
+            chain: base,
+            to: usdcAddress,
+            data: approveData,
+            value: BigInt(0),
+          },
+          {
+            // Show confirmation popup for manual payments
+            uiOptions: {
+              showWalletUIs: true,
+            },
+          }
+        );
+        
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
       setStage("confirming-payment", toolNames);
+      
+      // Record the spend in our budget tracker (Manual payments also track against budget)
+      const totalCostUSD = Number(totalAmount) / 1_000_000;
+      recordSpend(totalCostUSD);
 
-      // Single tool: use single execute
+      // Encode the payment transaction
+      let txData: Hex;
       if (toolsToPay.length === 1) {
         const tool = toolsToPay[0];
         setExecutingTool(tool);
-        writeExecute({
+        txData = encodeFunctionData({
+          abi: contextRouterAbi,
+          functionName: "executePaidQuery",
           args: [0n, tool.developerWallet as `0x${string}`, totalAmount],
         });
       } else {
-        // Multiple tools: use batch execute
         setExecutingTools(toolsToPay);
-        const toolIds = toolsToPay.map(() => 0n); // Using 0n for MVP
+        const toolIds = toolsToPay.map(() => 0n);
         const developerWallets = toolsToPay.map(
           (t) => t.developerWallet as `0x${string}`
         );
         const amounts = toolsToPay.map((t) =>
           parseUnits(t.pricePerQuery ?? "0.00", 6)
         );
-
-        writeBatchExecute({
+        txData = encodeFunctionData({
+          abi: contextRouterAbi,
+          functionName: "executeBatchPaidQuery",
           args: [toolIds, developerWallets, amounts],
         });
       }
+
+      // Send via smart wallet WITH confirmation popup (gas sponsored!)
+      const txHash = await smartWalletClient.sendTransaction(
+        {
+          chain: base,
+          to: routerAddress,
+          data: txData,
+          value: BigInt(0),
+        },
+        {
+          // Show confirmation popup for manual payments
+          uiOptions: {
+            showWalletUIs: true,
+          },
+        }
+      );
+
+      if (txHash) {
+        const hash = txHash as `0x${string}`;
+        setLastExecutedTx(hash);
+        toast.success("Payment confirmed!");
+        
+        // Submit the form with the transaction hash
+        if (toolsToPay.length > 1) {
+          const toolNames = toolsToPay.map((t) => t.name).join(", ");
+          setStage("planning", toolNames);
+          submitForm({
+            toolInvocations: toolsToPay.map((tool) => ({
+              toolId: tool.id,
+              transactionHash: hash,
+            })),
+            fallbackText: `Using ${toolNames}`,
+          });
+        } else if (toolsToPay.length === 1) {
+          const tool = toolsToPay[0];
+          setStage("planning", tool.name);
+          submitForm({
+            toolId: tool.id,
+            transactionHash: hash,
+            fallbackText: `Using ${tool.name}`,
+          });
+        }
+      }
+
+      cleanupPaymentState();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -811,7 +954,7 @@ function PureMultimodalInput({
         const toolNames = toolsToPay.map((t) => t.name).join(", ");
         if (isEmbeddedWallet) {
           setFundingRequest({
-            amount: (Number(totalAmount) / 1_000_000).toFixed(2),
+            amount: formatPrice(Number(totalAmount) / 1_000_000),
             toolName: toolNames,
           });
           setShowAddFundsDialog(true);
@@ -820,6 +963,7 @@ function PureMultimodalInput({
           toast.error("Insufficient USDC balance");
         }
       } else {
+        console.error("Payment error:", error);
         toast.error("Payment failed. Please try again.");
       }
 
@@ -830,7 +974,7 @@ function PureMultimodalInput({
   }, [
     selectedTool,
     activeTools,
-    walletAddress,
+    effectiveWalletAddress,
     chainId,
     routerAddress,
     usdcAddress,
@@ -838,11 +982,13 @@ function PureMultimodalInput({
     isEmbeddedWallet,
     hasWalletMismatch,
     refetchAllowance,
-    writeErc20Async,
-    writeExecute,
-    writeBatchExecute,
     setStage,
     resetPaymentStatus,
+    isAutoPay,
+    smartWalletClient,
+    recordSpend,
+    cleanupPaymentState,
+    submitForm,
   ]);
 
   // Auto-execute payment when Auto Pay is enabled and triggered
@@ -1053,7 +1199,7 @@ function PureMultimodalInput({
         }}
         open={Boolean(fundingRequest) && showAddFundsDialog}
         toolName={fundingRequest?.toolName ?? primaryTool?.name}
-        walletAddress={activeWallet?.address}
+        walletAddress={effectiveWalletAddress}
       />
     </div>
   );

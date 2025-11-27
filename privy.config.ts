@@ -11,6 +11,9 @@ export const privyConfig: PrivyClientConfig = {
     ethereum: {
       createOnLogin: "all-users", // Every user gets an embedded wallet
     },
+    // NOTE: We use per-transaction uiOptions to control popups:
+    // - Auto Pay OFF: Show confirmation popup (default behavior)
+    // - Auto Pay ON: Pass { showWalletUIs: false } to auto-sign
   },
   // Supported chains - must match wagmi config
   // We transact only on Base, but Privy may use mainnet for

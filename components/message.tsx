@@ -3,10 +3,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
-import {
-  getPaymentStatusMessage,
-  usePaymentStatus,
-} from "@/hooks/use-payment-status";
+import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
@@ -340,13 +337,6 @@ type ThinkingMessageProps = {
 export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) => {
   const role = "assistant";
   const { stage, toolName, streamingCode, debugResult } = usePaymentStatus();
-  const statusMessage = getPaymentStatusMessage(stage, toolName);
-
-  // Show the accordion when we have streaming code or are in planning/executing stages
-  const showAccordion =
-    streamingCode !== null ||
-    stage === "planning" ||
-    stage === "executing";
 
   return (
     <motion.div
@@ -364,19 +354,14 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          {showAccordion ? (
-            <ThinkingAccordion
-              debugResult={debugResult}
-              isDebugMode={isDebugMode}
-              stage={stage}
-              streamingCode={streamingCode}
-              toolName={toolName}
-            />
-          ) : (
-            <div className="payment-status-gradient animate-status-gradient bg-size-200 p-0 text-gradient text-sm">
-              {statusMessage}
-            </div>
-          )}
+          {/* Always use ThinkingAccordion - shows animated gradient text with optional expandable preview */}
+          <ThinkingAccordion
+            debugResult={debugResult}
+            isDebugMode={isDebugMode}
+            stage={stage}
+            streamingCode={streamingCode}
+            toolName={toolName}
+          />
         </div>
       </div>
     </motion.div>

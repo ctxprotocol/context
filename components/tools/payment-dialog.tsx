@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { base } from "viem/chains";
 import { CheckIcon } from "@/components/icons";
+import { formatPrice } from "@/lib/utils";
 
 export function PaymentDialog({
   open,
@@ -53,7 +54,7 @@ export function PaymentDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Confirm payment</AlertDialogTitle>
           <AlertDialogDescription>
-            Execute "{toolName}" for ${price} USDC?
+            Execute "{toolName}" for ${formatPrice(price)} USDC?
           </AlertDialogDescription>
         </AlertDialogHeader>
 

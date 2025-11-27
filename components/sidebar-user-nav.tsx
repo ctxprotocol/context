@@ -100,17 +100,22 @@ export function SidebarUserNav() {
     await signOut({ callbackUrl: "/" });
   };
 
-  const handleCopyAddress = async () => {
-    if (!walletAddress) {
+  // The display address is the smart wallet (where funds are)
+  const displayAddress = smartWalletAddress || walletAddress;
+  // The signer address is the EOA (what gets exported)
+  const signerAddress = walletAddress;
+
+  const handleCopyAddress = async (address: string | undefined, label: string) => {
+    if (!address) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(walletAddress);
+      await navigator.clipboard.writeText(address);
       setCopied(true);
       toast({
         type: "success",
-        description: "Address copied to clipboard!",
+        description: `${label} copied to clipboard!`,
       });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -158,10 +163,10 @@ export function SidebarUserNav() {
                 data-testid="user-nav-button"
               >
                 <Image
-                  alt={walletAddress ? "Wallet Avatar" : "User Avatar"}
+                  alt={displayAddress ? "Wallet Avatar" : "User Avatar"}
                   className="rounded-full"
                   height={24}
-                  src={`https://avatar.vercel.sh/${walletAddress ?? "default"}`}
+                  src={`https://avatar.vercel.sh/${displayAddress ?? "default"}`}
                   width={24}
                 />
                 <span className="truncate" data-testid="user-email">
@@ -191,7 +196,7 @@ export function SidebarUserNav() {
                 Contribute a tool
               </Link>
             </DropdownMenuItem>
-            {isConnected && walletAddress && (
+            {isConnected && displayAddress && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel className="flex items-center justify-between font-normal text-muted-foreground text-xs">
@@ -200,10 +205,11 @@ export function SidebarUserNav() {
                     ${formattedBalance} USDC
                   </span>
                 </DropdownMenuLabel>
+                {/* Smart wallet address - where funds are held */}
                 <DropdownMenuItem
                   className="cursor-pointer"
                   data-testid="user-nav-item-copy"
-                  onSelect={handleCopyAddress}
+                  onSelect={() => handleCopyAddress(displayAddress, "Wallet address")}
                 >
                   <span className="flex items-center gap-2">
                     {copied ? (
@@ -214,18 +220,31 @@ export function SidebarUserNav() {
                     ) : (
                       <>
                         <CopyIcon size={14} />
-                        {formatWalletAddress(walletAddress)}
+                        {formatWalletAddress(displayAddress)}
                       </>
                     )}
                   </span>
                 </DropdownMenuItem>
+                {/* Export the signer (EOA) which controls the smart wallet */}
                 <DropdownMenuItem
                   className="cursor-pointer"
                   data-testid="user-nav-item-export"
                   onSelect={handleExportWallet}
                 >
-                  Export wallet
+                  Export signer key
                 </DropdownMenuItem>
+                {/* Show signer address for advanced users */}
+                {smartWalletAddress && signerAddress && smartWalletAddress !== signerAddress && (
+                  <DropdownMenuItem
+                    className="cursor-pointer text-muted-foreground text-xs"
+                    onSelect={() => handleCopyAddress(signerAddress, "Signer address")}
+                  >
+                    <span className="flex items-center gap-2">
+                      <CopyIcon size={12} />
+                      <span>Signer: {formatWalletAddress(signerAddress)}</span>
+                    </span>
+                  </DropdownMenuItem>
+                )}
               </>
             )}
             <DropdownMenuSeparator />

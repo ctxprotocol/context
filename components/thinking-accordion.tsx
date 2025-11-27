@@ -1,18 +1,12 @@
 "use client";
 
-import { ChevronDownIcon, CodeIcon, PlayIcon, SparklesIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   getPaymentStatusMessage,
   type PaymentStage,
 } from "@/hooks/use-payment-status";
 import { cn } from "@/lib/utils";
-import { CodeBlock } from "./elements/code-block";
 
 type ThinkingAccordionProps = {
   stage: PaymentStage;
@@ -31,59 +25,80 @@ function extractCodeFromPlanningText(text: string | null): string | null {
   return match ? match[1].trim() : null;
 }
 
-// Streaming code display component - shows code as it streams in with cursor
-function StreamingCodeDisplay({ 
+// Check if we're in an active phase (show chevron for expandable content)
+function isActivePhase(stage: PaymentStage): boolean {
+  return (
+    stage === "setting-cap" ||
+    stage === "confirming-payment" ||
+    stage === "planning" ||
+    stage === "executing" ||
+    stage === "thinking" ||
+    stage === "querying-tool"
+  );
+}
+
+// Faded code preview with bottom gradient fade
+function FadedCodePreview({ 
   code, 
   isStreaming 
 }: { 
   code: string; 
   isStreaming: boolean;
 }) {
-  const containerRef = useRef<HTMLPreElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom as code streams
   useEffect(() => {
-    if (containerRef.current) {
+    if (containerRef.current && isStreaming) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
-  }, [code]);
+  }, [code, isStreaming]);
 
   return (
-    <div className="relative overflow-hidden rounded-md border bg-background">
-      {/* Header bar matching CodeBlock style */}
-      <div className="flex items-center justify-between border-b bg-muted px-4 py-2">
-        <span className="font-medium text-muted-foreground text-xs lowercase">
-          typescript
-        </span>
-        {isStreaming && (
-          <span className="font-mono text-muted-foreground/60 text-xs">
-            streaming...
-          </span>
-        )}
-      </div>
-      {/* Code content with streaming cursor */}
-      <pre
+    <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
+      {/* Code content */}
+      <div
         ref={containerRef}
-        className="max-h-64 overflow-auto p-4 font-mono text-foreground text-sm"
+        className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
+        style={{ maxHeight: "8rem" }}
       >
-        <code className="whitespace-pre-wrap break-words">
+        <pre className="whitespace-pre-wrap break-words p-3">
           {code}
           {isStreaming && (
-            <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-primary" />
+            <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
           )}
-        </code>
-      </pre>
+        </pre>
+      </div>
+      
+      {/* Fade gradient overlay - fades from transparent at top to background at bottom */}
+      <div className="fade-to-background pointer-events-none absolute inset-0" />
     </div>
   );
 }
 
-// Check if we're in an active planning/execution phase
-function isActivePhase(stage: PaymentStage): boolean {
+// Faded result preview
+function FadedResultPreview({ result }: { result: string }) {
+  // Try to format JSON for better readability
+  let displayResult = result;
+  try {
+    const parsed = JSON.parse(result);
+    displayResult = JSON.stringify(parsed, null, 2);
+  } catch {
+    // Keep original if not valid JSON
+  }
+
   return (
-    stage === "planning" ||
-    stage === "executing" ||
-    stage === "thinking" ||
-    stage === "querying-tool"
+    <div className="relative mt-2 max-h-24 overflow-hidden rounded-md">
+      <div className="overflow-hidden font-mono text-muted-foreground/60 text-xs leading-relaxed">
+        <pre className="whitespace-pre-wrap break-words p-3">
+          {displayResult.slice(0, 500)}
+          {displayResult.length > 500 && "..."}
+        </pre>
+      </div>
+      
+      {/* Fade gradient overlay */}
+      <div className="fade-to-background pointer-events-none absolute inset-0" />
+    </div>
   );
 }
 
@@ -94,9 +109,8 @@ function PureThinkingAccordion({
   debugResult,
   isDebugMode,
 }: ThinkingAccordionProps) {
-  // Default open state based on Developer Mode
-  const [isOpen, setIsOpen] = useState(isDebugMode);
-  const codeContainerRef = useRef<HTMLDivElement>(null);
+  // Default: collapsed unless in debug mode
+  const [isExpanded, setIsExpanded] = useState(isDebugMode);
 
   // Extract just the code block from the full planning text
   const extractedCode = useMemo(
@@ -104,143 +118,91 @@ function PureThinkingAccordion({
     [streamingCode]
   );
 
-  // Auto-scroll code container to bottom as new code streams in
+  // Update expanded state when debug mode changes
   useEffect(() => {
-    if (codeContainerRef.current && isOpen && extractedCode) {
-      codeContainerRef.current.scrollTop = codeContainerRef.current.scrollHeight;
-    }
-  }, [extractedCode, isOpen]);
-
-  // Update open state when debug mode changes
-  useEffect(() => {
-    setIsOpen(isDebugMode);
+    setIsExpanded(isDebugMode);
   }, [isDebugMode]);
 
   const statusMessage = getPaymentStatusMessage(stage, toolName);
   const hasCode = Boolean(extractedCode);
   const hasResult = Boolean(debugResult);
-  const showAccordion = isActivePhase(stage) || hasCode || hasResult;
+  const isActive = isActivePhase(stage);
+  const showExpandOption = hasCode || hasResult || isActive;
 
-  if (!showAccordion) {
+  // Don't render anything if we're idle with no content
+  if (stage === "idle" && !hasCode && !hasResult) {
     return null;
   }
 
-  // Get status indicator
-  const getStatusIcon = () => {
-    switch (stage) {
-      case "planning":
-        return <CodeIcon className="size-3.5 animate-pulse text-blue-500" />;
-      case "executing":
-        return <PlayIcon className="size-3.5 animate-pulse text-amber-500" />;
-      case "thinking":
-        return <SparklesIcon className="size-3.5 animate-pulse" />;
-      default:
-        return <SparklesIcon className="size-3.5" />;
-    }
-  };
-
-  // Get summary text for collapsed state
-  const getSummaryText = () => {
-    if (stage === "planning" || stage === "executing" || stage === "thinking") {
-      return statusMessage;
-    }
-    if (hasCode && hasResult) {
-      return "Executed code successfully";
-    }
-    if (hasCode) {
-      return "Generated code";
-    }
-    return statusMessage;
-  };
-
   return (
-    <Collapsible
-      className="w-full rounded-lg border bg-card/50"
-      onOpenChange={setIsOpen}
-      open={isOpen}
-    >
-      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
-        <div className="flex items-center gap-2">
-          {getStatusIcon()}
-          <span className="font-medium text-muted-foreground text-sm">
-            {getSummaryText()}
-          </span>
+    <div className="w-full">
+      {/* Main status row with animated gradient text */}
+      <button
+        className={cn(
+          "group flex w-full items-center gap-2 text-left transition-all duration-200",
+          showExpandOption && "cursor-pointer"
+        )}
+        disabled={!showExpandOption}
+        onClick={() => showExpandOption && setIsExpanded(!isExpanded)}
+        type="button"
+      >
+        {/* Animated gradient status text */}
+        <span className="payment-status-gradient animate-status-gradient bg-size-200 text-gradient text-sm">
+          {statusMessage}
+        </span>
+
+        {/* Chevron indicator */}
+        {showExpandOption && (
+          <ChevronDownIcon
+            className={cn(
+              "size-3.5 text-muted-foreground/50 transition-transform duration-200",
+              isExpanded && "rotate-180"
+            )}
+          />
+        )}
+      </button>
+
+      {/* Expandable preview section */}
+      {showExpandOption && (
+        <div
+          className={cn(
+            "grid transition-all duration-300 ease-out",
+            isExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+          )}
+        >
+          <div className="overflow-hidden">
+            {/* Code preview with fade */}
+            {(hasCode || stage === "planning") && extractedCode && (
+              <FadedCodePreview
+                code={extractedCode}
+                isStreaming={stage === "planning"}
+              />
+            )}
+
+            {/* Show generating indicator if planning but no code yet */}
+            {stage === "planning" && !extractedCode && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-muted-foreground/50" />
+                <span className="font-mono">generating code...</span>
+              </div>
+            )}
+
+            {/* Executing indicator */}
+            {stage === "executing" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+                <span className="font-mono">executing...</span>
+              </div>
+            )}
+
+            {/* Result preview with fade */}
+            {hasResult && stage !== "executing" && (
+              <FadedResultPreview result={debugResult ?? ""} />
+            )}
+          </div>
         </div>
-        <ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
-
-      <CollapsibleContent className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden">
-        <div className="space-y-3 px-3 pb-3">
-          {/* Streaming Code Display */}
-          {(hasCode || stage === "planning") && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <CodeIcon className="size-3 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  {stage === "planning" ? "Writing Code" : "Generated Code"}
-                </span>
-              </div>
-              <div
-                ref={codeContainerRef}
-                className="overflow-hidden rounded-md"
-              >
-                {stage === "planning" ? (
-                  // While streaming: show raw code with cursor animation
-                  extractedCode ? (
-                    <StreamingCodeDisplay
-                      code={extractedCode}
-                      isStreaming={true}
-                    />
-                  ) : (
-                    <div className="rounded-md border bg-muted/50 p-4">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <div className="size-2 animate-pulse rounded-full bg-blue-500" />
-                        <span>Generating code...</span>
-                      </div>
-                    </div>
-                  )
-                ) : hasCode ? (
-                  // After streaming complete: show syntax highlighted code
-                  <CodeBlock
-                    code={extractedCode ?? ""}
-                    language="typescript"
-                    showLineNumbers
-                  />
-                ) : null}
-              </div>
-            </div>
-          )}
-
-          {/* Execution Status */}
-          {stage === "executing" && (
-            <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/50">
-              <PlayIcon className="size-3.5 animate-pulse text-amber-600 dark:text-amber-400" />
-              <span className="font-medium text-amber-700 text-sm dark:text-amber-300">
-                Executing code...
-              </span>
-            </div>
-          )}
-
-          {/* Execution Result */}
-          {hasResult && stage !== "executing" && (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <SparklesIcon className="size-3 text-muted-foreground" />
-                <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  Execution Result
-                </span>
-              </div>
-              <div className="max-h-48 overflow-auto rounded-md">
-                <CodeBlock
-                  code={debugResult}
-                  language="json"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+    </div>
   );
 }
 
@@ -257,4 +219,3 @@ export const ThinkingAccordion = memo(
 );
 
 ThinkingAccordion.displayName = "ThinkingAccordion";
-
