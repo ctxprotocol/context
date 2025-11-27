@@ -336,11 +336,11 @@ type ThinkingMessageProps = {
 
 export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) => {
   const role = "assistant";
-  const { stage, toolName, streamingCode, debugResult } = usePaymentStatus();
+  const { stage, toolName, streamingCode, debugResult, executionLogs } = usePaymentStatus();
 
   // For normal chat (no tools), stage stays "idle" - show simple gradient text
   // For tool flows, use ThinkingAccordion with expandable content
-  const hasToolContent = Boolean(streamingCode) || Boolean(debugResult) || stage !== "idle";
+  const hasToolContent = Boolean(streamingCode) || Boolean(debugResult) || executionLogs.length > 0 || stage !== "idle";
 
   return (
     <motion.div
@@ -362,6 +362,7 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
             // Tool flow: use ThinkingAccordion with expandable content
             <ThinkingAccordion
               debugResult={debugResult}
+              executionLogs={executionLogs}
               isDebugMode={isDebugMode}
               stage={stage}
               streamingCode={streamingCode}

@@ -17,14 +17,23 @@ export type PaymentStage =
   | "executing"
   | "thinking";
 
+export type ExecutionLogEntry = {
+  type: "query" | "result" | "error";
+  toolName: string;
+  message: string;
+  timestamp: number;
+};
+
 type PaymentStatusContextType = {
   stage: PaymentStage;
   toolName: string | null;
   streamingCode: string | null;
   debugResult: string | null;
+  executionLogs: ExecutionLogEntry[];
   setStage: (stage: PaymentStage, toolName?: string) => void;
   setStreamingCode: (code: string | null) => void;
   setDebugResult: (result: string | null) => void;
+  addExecutionLog: (log: ExecutionLogEntry) => void;
   reset: () => void;
 };
 
@@ -37,11 +46,16 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
   const [toolName, setToolName] = useState<string | null>(null);
   const [streamingCode, setStreamingCodeState] = useState<string | null>(null);
   const [debugResult, setDebugResultState] = useState<string | null>(null);
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLogEntry[]>([]);
 
   const setStage = useCallback((newStage: PaymentStage, name?: string) => {
     setStageState(newStage);
     if (name) {
       setToolName(name);
+    }
+    // Clear execution logs when starting a new execution
+    if (newStage === "executing") {
+      setExecutionLogs([]);
     }
   }, []);
 
@@ -53,11 +67,16 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     setDebugResultState(result);
   }, []);
 
+  const addExecutionLog = useCallback((log: ExecutionLogEntry) => {
+    setExecutionLogs((prev) => [...prev, log]);
+  }, []);
+
   const reset = useCallback(() => {
     setStageState("idle");
     setToolName(null);
     setStreamingCodeState(null);
     setDebugResultState(null);
+    setExecutionLogs([]);
   }, []);
 
   return (
@@ -67,9 +86,11 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
         toolName,
         streamingCode,
         debugResult,
+        executionLogs,
         setStage,
         setStreamingCode,
         setDebugResult,
+        addExecutionLog,
         reset,
       }}
     >

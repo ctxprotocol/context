@@ -4,6 +4,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   getPaymentStatusMessage,
+  type ExecutionLogEntry,
   type PaymentStage,
 } from "@/hooks/use-payment-status";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ type ThinkingAccordionProps = {
   toolName: string | null;
   streamingCode: string | null;
   debugResult: string | null;
+  executionLogs: ExecutionLogEntry[];
   isDebugMode: boolean;
 };
 
@@ -137,11 +139,144 @@ function FadedResultPreview({ result }: { result: string }) {
   );
 }
 
+// Typewriter effect for a single log message
+function TypewriterText({ 
+  text, 
+  isLatest,
+  className 
+}: { 
+  text: string; 
+  isLatest: boolean;
+  className?: string;
+}) {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isComplete, setIsComplete] = useState(false);
+
+  useEffect(() => {
+    // If not the latest message, show full text immediately
+    if (!isLatest) {
+      setDisplayedText(text);
+      setIsComplete(true);
+      return;
+    }
+
+    // Reset for new text
+    setDisplayedText("");
+    setIsComplete(false);
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedText(text.slice(0, index + 1));
+        index++;
+      } else {
+        setIsComplete(true);
+        clearInterval(interval);
+      }
+    }, 15); // 15ms per character for fast but visible typing
+
+    return () => clearInterval(interval);
+  }, [text, isLatest]);
+
+  return (
+    <span className={className}>
+      {displayedText}
+      {isLatest && !isComplete && (
+        <span className="ml-0.5 inline-block h-3 w-1 animate-pulse bg-current opacity-70" />
+      )}
+    </span>
+  );
+}
+
+// Execution logs preview - shows real-time tool queries and results with typing effect
+function ExecutionLogsPreview({ 
+  logs,
+  isExecuting 
+}: { 
+  logs: ExecutionLogEntry[];
+  isExecuting: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom as new logs arrive
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [logs]);
+
+  if (logs.length === 0 && isExecuting) {
+    return (
+      <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+        <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+        <span className="font-mono">
+          <TypewriterText text="starting execution..." isLatest={true} />
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
+      <div
+        ref={containerRef}
+        className="overflow-y-auto text-xs leading-relaxed"
+        style={{ maxHeight: "8rem" }}
+      >
+        <div className="space-y-1 p-2">
+          {logs.map((log, index) => {
+            const isLatest = index === logs.length - 1;
+            return (
+              <div
+                key={`${log.timestamp}-${index}`}
+                className="flex items-start gap-2 font-mono"
+              >
+                {/* Status dot */}
+                <div className={cn(
+                  "mt-1 size-1.5 shrink-0 rounded-full",
+                  log.type === "query" && "bg-blue-500/70",
+                  log.type === "result" && "bg-green-500/70",
+                  log.type === "error" && "bg-red-500/70",
+                  isLatest && "animate-pulse"
+                )} />
+                {/* Message with typewriter effect for latest */}
+                <TypewriterText 
+                  text={log.message}
+                  isLatest={isLatest && isExecuting}
+                  className={cn(
+                    "break-words",
+                    log.type === "query" && "text-muted-foreground/70",
+                    log.type === "result" && "text-green-600/70 dark:text-green-400/70",
+                    log.type === "error" && "text-red-600/70 dark:text-red-400/70"
+                  )}
+                />
+              </div>
+            );
+          })}
+          {/* Pulsing indicator if still executing and last log is complete */}
+          {isExecuting && logs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+              <span className="text-muted-foreground/50">
+                <TypewriterText text="waiting..." isLatest={true} />
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Fade gradient overlay */}
+      <div className="fade-to-background pointer-events-none absolute inset-0" />
+    </div>
+  );
+}
+
 function PureThinkingAccordion({
   stage,
   toolName,
   streamingCode,
   debugResult,
+  executionLogs,
   isDebugMode,
 }: ThinkingAccordionProps) {
   // Auto-expand during active stages, or if debug mode is on
@@ -179,7 +314,8 @@ function PureThinkingAccordion({
   const statusMessage = getPaymentStatusMessage(stage, toolName);
   const hasCode = Boolean(extractedCode);
   const hasResult = Boolean(debugResult);
-  const showExpandOption = hasCode || hasResult || isActive;
+  const hasLogs = executionLogs.length > 0;
+  const showExpandOption = hasCode || hasResult || hasLogs || isActive;
 
   // Don't render anything if we're idle with no content
   if (stage === "idle" && !hasCode && !hasResult) {
@@ -243,11 +379,11 @@ function PureThinkingAccordion({
               </div>
             )}
 
-            {/* Code preview with fade */}
-            {(hasCode || stage === "planning") && extractedCode && (
+            {/* Code preview with fade - only show during planning stage */}
+            {stage === "planning" && extractedCode && (
               <FadedCodePreview
                 code={extractedCode}
-                isStreaming={stage === "planning"}
+                isStreaming={true}
               />
             )}
 
@@ -259,12 +395,12 @@ function PureThinkingAccordion({
               </div>
             )}
 
-            {/* Executing indicator */}
+            {/* Executing - show real-time execution logs */}
             {stage === "executing" && (
-              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-                <span className="font-mono">executing...</span>
-              </div>
+              <ExecutionLogsPreview
+                logs={executionLogs}
+                isExecuting={true}
+              />
             )}
 
             {/* Thinking indicator */}
@@ -301,6 +437,7 @@ export const ThinkingAccordion = memo(
     if (prevProps.toolName !== nextProps.toolName) return false;
     if (prevProps.streamingCode !== nextProps.streamingCode) return false;
     if (prevProps.debugResult !== nextProps.debugResult) return false;
+    if (prevProps.executionLogs.length !== nextProps.executionLogs.length) return false;
     if (prevProps.isDebugMode !== nextProps.isDebugMode) return false;
     return true;
   }

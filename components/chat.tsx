@@ -60,7 +60,7 @@ export function Chat({
 
   const { mutate } = useSWRConfig();
   const { setDataStream } = useDataStream();
-  const { setStage, setStreamingCode, setDebugResult } = usePaymentStatus();
+  const { setStage, setStreamingCode, setDebugResult, addExecutionLog } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
   const debugModeRef = useRef(isDebugMode);
 
@@ -152,6 +152,16 @@ export function Chat({
       // Stream execution result for display
       if (part.type === "data-debugResult" && typeof part.data === "string") {
         setDebugResult(part.data);
+      }
+      // Stream execution progress (tool queries, results, errors)
+      if (part.type === "data-executionProgress" && typeof part.data === "object") {
+        const { type, toolName, message, timestamp } = part.data as {
+          type: "query" | "result" | "error";
+          toolName: string;
+          message: string;
+          timestamp: number;
+        };
+        addExecutionLog({ type, toolName, message, timestamp });
       }
     },
     onFinish: () => {

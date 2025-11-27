@@ -292,6 +292,42 @@ function isFreeTool(tool: AITool): boolean {
 }
 
 /**
+ * Get a human-readable preview of the result for execution progress
+ */
+function getResultPreview(content: unknown): string {
+  if (content === null || content === undefined) {
+    return "empty response";
+  }
+  
+  if (typeof content === "string") {
+    return content.length > 50 ? `${content.slice(0, 50)}...` : content;
+  }
+  
+  if (Array.isArray(content)) {
+    return `${content.length} item${content.length !== 1 ? "s" : ""}`;
+  }
+  
+  if (typeof content === "object") {
+    const keys = Object.keys(content);
+    // Look for common patterns
+    if ("chains" in content && Array.isArray((content as Record<string, unknown>).chains)) {
+      const chains = (content as Record<string, unknown[]>).chains;
+      return `${chains.length} chain${chains.length !== 1 ? "s" : ""}`;
+    }
+    if ("estimates" in content && Array.isArray((content as Record<string, unknown>).estimates)) {
+      return "gas estimates";
+    }
+    if ("error" in content) {
+      return `error: ${String((content as Record<string, unknown>).error).slice(0, 30)}`;
+    }
+    // Generic object
+    return `${keys.length} field${keys.length !== 1 ? "s" : ""} (${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""})`;
+  }
+  
+  return String(content).slice(0, 50);
+}
+
+/**
  * Call a skill on an MCP Tool's server
  *
  * This is the execution function for MCP Tools. Users pay once per "Tool" per turn,
@@ -350,6 +386,22 @@ export async function callMcpSkill({
 
   console.log("[mcp-skill] Calling tool:", { toolId, toolName, args, endpoint });
 
+  // Helper to emit execution progress to the UI
+  const emitProgress = (type: "query" | "result" | "error", message: string) => {
+    if (runtime.dataStream) {
+      runtime.dataStream.write({
+        type: "data-executionProgress",
+        data: { type, toolName, message, timestamp: Date.now() },
+      });
+    }
+  };
+
+  // Emit query start
+  const argsPreview = Object.keys(args).length > 0 
+    ? ` with ${Object.keys(args).join(", ")}`
+    : "";
+  emitProgress("query", `Querying ${toolName}${argsPreview}...`);
+
   try {
     // Get or create MCP client
     const client = await getMcpClient(endpoint);
@@ -374,6 +426,10 @@ export async function callMcpSkill({
       const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
       console.log("[mcp-skill] Unwrapped content:", JSON.stringify(unwrappedContent).slice(0, 500));
 
+      // Emit result progress - show a preview of what was returned
+      const resultPreview = getResultPreview(unwrappedContent);
+      emitProgress("result", `${toolName} returned: ${resultPreview}`);
+
       // Record the query for analytics
       await recordToolQuery({
         toolId,
@@ -391,6 +447,7 @@ export async function callMcpSkill({
       // Return unwrapped content directly so agent code can access it naturally
       // e.g., result.data.chains instead of result.content[0].text
       if (result.isError) {
+        emitProgress("error", `${toolName} failed: ${typeof unwrappedContent === 'string' ? unwrappedContent : 'Unknown error'}`);
         throw new Error(typeof unwrappedContent === 'string' ? unwrappedContent : JSON.stringify(unwrappedContent));
       }
 
@@ -400,6 +457,10 @@ export async function callMcpSkill({
     }
   } catch (error) {
     console.error("[mcp-skill] Tool call failed:", { toolId, toolName, error });
+
+    // Emit error progress
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    emitProgress("error", `${toolName} failed: ${errorMessage.slice(0, 100)}`);
 
     // Record failed query
     await recordToolQuery({
