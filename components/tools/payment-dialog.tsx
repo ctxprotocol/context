@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { base } from "viem/chains";
+import { CheckIcon } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,15 +14,21 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { base } from "viem/chains";
-import { CheckIcon } from "@/components/icons";
+import { Separator } from "@/components/ui/separator";
 import { formatPrice } from "@/lib/utils";
+
+export type PaymentBreakdown = {
+  toolCost: number;
+  modelCost: number;
+  totalCost: number;
+};
 
 export function PaymentDialog({
   open,
   onOpenChange,
   toolName,
   price,
+  breakdown,
   isBusy,
   onConfirm,
   chainId,
@@ -30,7 +38,10 @@ export function PaymentDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   toolName: string;
+  /** @deprecated Use breakdown instead for itemized costs */
   price: string;
+  /** Itemized cost breakdown (tool + model) */
+  breakdown?: PaymentBreakdown;
   isBusy?: boolean;
   onConfirm: () => void;
   chainId?: number;
@@ -48,15 +59,52 @@ export function PaymentDialog({
   const isOnBaseMainnet = currentChainId === base.id;
   const canProceed = isOnBaseMainnet && !isBusy;
 
+  // Use breakdown if provided, otherwise fall back to legacy price
+  const displayTotal = breakdown
+    ? formatPrice(breakdown.totalCost)
+    : formatPrice(price);
+
   return (
     <AlertDialog onOpenChange={onOpenChange} open={open}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Confirm payment</AlertDialogTitle>
           <AlertDialogDescription>
-            Execute "{toolName}" for ${formatPrice(price)} USDC?
+            Execute "{toolName}" for ${displayTotal} USDC?
           </AlertDialogDescription>
         </AlertDialogHeader>
+
+        {/* Cost breakdown - only show if we have itemized costs */}
+        {breakdown && (breakdown.toolCost > 0 || breakdown.modelCost > 0) && (
+          <div className="rounded-md border border-border bg-muted/30 p-3">
+            <div className="space-y-2 text-sm">
+              {breakdown.toolCost > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tool fee</span>
+                  <span className="font-mono">
+                    ${formatPrice(breakdown.toolCost)}
+                  </span>
+                </div>
+              )}
+              {breakdown.modelCost > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    AI model{" "}
+                    <span className="text-muted-foreground/60">(est.)</span>
+                  </span>
+                  <span className="font-mono">
+                    ~${formatPrice(breakdown.modelCost)}
+                  </span>
+                </div>
+              )}
+              <Separator className="my-1" />
+              <div className="flex items-center justify-between font-medium">
+                <span>Total</span>
+                <span className="font-mono">${displayTotal}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Network Status Indicator - matches content width (no extra padding needed) */}
         <div className="space-y-3">
@@ -113,5 +161,3 @@ export function PaymentDialog({
     </AlertDialog>
   );
 }
-
-

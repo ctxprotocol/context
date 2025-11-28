@@ -24,7 +24,7 @@ import {
   REGISTERED_SKILL_MODULES,
 } from "@/lib/ai/code-executor";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
-import type { ChatModel } from "@/lib/ai/models";
+import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   type EnabledToolSummary,
   type RequestHints,
@@ -175,7 +175,12 @@ function getMcpTools(tool: AITool) {
   }
   const tools = (schema as Record<string, unknown>).tools;
   if (Array.isArray(tools)) {
-    return tools as { name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[];
+    return tools as {
+      name: string;
+      description?: string;
+      inputSchema?: unknown;
+      outputSchema?: unknown;
+    }[];
   }
   return;
 }
@@ -188,7 +193,6 @@ function getToolUsage(tool: AITool) {
   const usage = (schema as Record<string, unknown>).usage;
   return typeof usage === "string" ? usage : undefined;
 }
-
 
 const getTokenlensCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
@@ -297,14 +301,19 @@ export async function POST(request: Request) {
             const wasRefreshed = await refreshMcpToolSchema(tool);
             if (wasRefreshed) {
               // Re-fetch the tool to get the updated schema
-              const refreshedTool = await getAIToolById({ id: invocation.toolId });
+              const refreshedTool = await getAIToolById({
+                id: invocation.toolId,
+              });
               if (refreshedTool) {
                 tool = refreshedTool;
               }
             }
           } catch (err) {
             // Don't fail the request if schema refresh fails
-            console.warn(`[chat-api] Schema refresh failed for ${tool.name}:`, err);
+            console.warn(
+              `[chat-api] Schema refresh failed for ${tool.name}:`,
+              err
+            );
           }
 
           return {
@@ -525,6 +534,26 @@ export async function POST(request: Request) {
               await updateChatLastContextById({
                 chatId: id,
                 context: finalMergedUsage,
+              });
+
+              // Phase 2: Track estimated vs actual cost for model cost baking
+              const estimatedCost = getEstimatedModelCost(selectedChatModel);
+              const actualCost =
+                finalMergedUsage.costUSD?.totalUSD !== undefined
+                  ? Number(finalMergedUsage.costUSD.totalUSD)
+                  : 0;
+              const costDelta = actualCost - estimatedCost;
+
+              console.log("[cost-tracking] Model cost comparison:", {
+                chatId: id,
+                model: selectedChatModel,
+                estimatedCost: `$${estimatedCost.toFixed(6)}`,
+                actualCost: `$${actualCost.toFixed(6)}`,
+                delta: `$${costDelta.toFixed(6)}`,
+                deltaPercent:
+                  estimatedCost > 0
+                    ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
+                    : "N/A",
               });
             } catch (err) {
               console.warn("Unable to persist last usage for chat", id, err);
@@ -971,6 +1000,26 @@ ${devPrefix}`;
               chatId: id,
               context: finalMergedUsage,
             });
+
+            // Phase 2: Track estimated vs actual cost for model cost baking
+            const estimatedCost = getEstimatedModelCost(selectedChatModel);
+            const actualCost =
+              finalMergedUsage.costUSD?.totalUSD !== undefined
+                ? Number(finalMergedUsage.costUSD.totalUSD)
+                : 0;
+            const costDelta = actualCost - estimatedCost;
+
+            console.log("[cost-tracking] Model cost comparison (paid tools):", {
+              chatId: id,
+              model: selectedChatModel,
+              estimatedCost: `$${estimatedCost.toFixed(6)}`,
+              actualCost: `$${actualCost.toFixed(6)}`,
+              delta: `$${costDelta.toFixed(6)}`,
+              deltaPercent:
+                estimatedCost > 0
+                  ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
+                  : "N/A",
+            });
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);
           }
@@ -980,16 +1029,6 @@ ${devPrefix}`;
         return "Oops, an error occurred!";
       },
     });
-
-    // const streamContext = getStreamContext();
-
-    // if (streamContext) {
-    //   return new Response(
-    //     await streamContext.resumableStream(streamId, () =>
-    //       stream.pipeThrough(new JsonToSseTransformStream())
-    //     )
-    //   );
-    // }
 
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {

@@ -9,17 +9,19 @@ type Entitlements = {
 export const entitlementsByUserType: Record<UserType, Entitlements> = {
   /*
    * For users without an account
+   * High ceiling for anti-abuse only - actual limiting is via micropayments
    */
   guest: {
-    maxMessagesPerDay: 500,
+    maxMessagesPerDay: 10_000,
     availableChatModelIds: ["chat-model", "chat-model-reasoning"],
   },
 
   /*
    * For users with an account
+   * High ceiling for anti-abuse only - actual limiting is via micropayments
    */
   regular: {
-    maxMessagesPerDay: 1000,
+    maxMessagesPerDay: 10_000,
     availableChatModelIds: ["chat-model", "chat-model-reasoning"],
   },
 
