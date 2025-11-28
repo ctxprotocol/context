@@ -128,7 +128,7 @@ function FadedCodePreview({
   );
 }
 
-// Faded reasoning/thoughts preview - clean design-system aligned styling
+// Faded reasoning/thoughts preview - matches code/execution styling for consistency
 function FadedReasoningPreview({
   reasoning,
   isStreaming,
@@ -149,18 +149,18 @@ function FadedReasoningPreview({
 
   return (
     <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
-      {/* Reasoning content - muted foreground, standard text (not monospace) */}
+      {/* Reasoning content - matches code/execution styling */}
       <div
-        className="overflow-y-auto text-muted-foreground/60 text-xs leading-relaxed"
+        className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
         ref={containerRef}
         style={{ maxHeight: "8rem" }}
       >
-        <div className="whitespace-pre-wrap break-words p-3">
+        <pre className="whitespace-pre-wrap break-words p-3">
           {reasoning}
           {isStreaming && (
             <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
           )}
-        </div>
+        </pre>
       </div>
 
       {/* Fade gradient overlay */}
@@ -448,22 +448,23 @@ function PureThinkingAccordion({
             )}
 
             {/* Planning stage with reasoning support:
-                1. "thinking..." when reasoning starts but no content yet
+                Sequential flow - only show ONE section at a time:
+                1. "thinking..." indicator when nothing yet
                 2. Reasoning content as it streams
-                3. "generating code..." when reasoning complete but code not started
-                4. Code as it streams
+                3. "generating code..." when reasoning done but no code yet
+                4. Code as it streams (reasoning hidden)
             */}
             {stage === "planning" && (
               <>
-                {/* Show reasoning content if available */}
-                {hasReasoning && (
+                {/* Phase 1: Show reasoning while it's streaming (before code starts) */}
+                {hasReasoning && !extractedCode && (
                   <FadedReasoningPreview
                     isStreaming={isStreamingReasoning}
                     reasoning={streamingReasoning ?? ""}
                   />
                 )}
 
-                {/* Show "generating code..." when waiting for code (before code starts streaming) */}
+                {/* Phase 2: Show "generating code..." when waiting for code */}
                 {!extractedCode && !hasReasoning && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
@@ -471,7 +472,7 @@ function PureThinkingAccordion({
                   </div>
                 )}
 
-                {/* Show code as it streams */}
+                {/* Phase 3: Show code when it starts streaming (reasoning hidden) */}
                 {extractedCode && (
                   <FadedCodePreview code={extractedCode} isStreaming={true} />
                 )}

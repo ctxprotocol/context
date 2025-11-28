@@ -741,35 +741,6 @@ function PureMultimodalInput({
         const totalCostUSD = Number(totalAmount) / 1_000_000;
         recordSpend(totalCostUSD);
         
-        // Check allowance before attempting payment
-        const allowanceRes = await refetchAllowance();
-        const currentAllowance = (allowanceRes.data as bigint | undefined) ?? 0n;
-        
-        // Convert to human-readable for logging
-        const allowanceUSD = Number(currentAllowance) / 1_000_000;
-        const amountUSD = Number(totalAmount) / 1_000_000;
-        
-        console.log("[auto-pay] Checking allowance:", {
-          currentAllowance: currentAllowance.toString(),
-          currentAllowanceUSD: `$${allowanceUSD.toFixed(6)}`,
-          totalAmount: totalAmount.toString(),
-          totalAmountUSD: `$${amountUSD.toFixed(6)}`,
-          hasEnoughAllowance: currentAllowance >= totalAmount,
-          smartWalletAddress: smartWalletClient?.account?.address,
-          routerAddress,
-        });
-        
-        // If allowance is insufficient, we need to show the manual flow
-        // Auto Pay cannot silently approve more spending - that would bypass user's spending cap intent
-        if (currentAllowance < totalAmount) {
-          console.warn("[auto-pay] Insufficient allowance, falling back to manual approval");
-          toast.error("USDC allowance exhausted. Please approve more spending.");
-          // Fall through to manual path by setting isAutoPay-like state to false for this call
-          setIsPaying(false);
-          setShowPayDialog(true);
-          return;
-        }
-        
         // Encode the contract call
         let txData: Hex;
         if (toolsToPay.length === 1) {
@@ -795,12 +766,6 @@ function PureMultimodalInput({
             args: [toolIds, developerWallets, amounts],
           });
         }
-        
-        console.log("[auto-pay] Sending transaction:", {
-          to: routerAddress,
-          toolNames,
-          totalAmount: totalAmount.toString(),
-        });
         
         // Send via smart wallet with AUTO-SIGNING
         // Pass showWalletUIs: false to skip the confirmation popup
@@ -1015,12 +980,7 @@ function PureMultimodalInput({
           toast.error("Insufficient USDC balance");
         }
       } else {
-        console.error("[auto-pay] Payment error:", error);
-        console.error("[auto-pay] Full error details:", {
-          message: errorMessage,
-          name: error instanceof Error ? error.name : "unknown",
-          stack: error instanceof Error ? error.stack : undefined,
-        });
+        console.error("Payment error:", error);
         toast.error("Payment failed. Please try again.");
       }
 
