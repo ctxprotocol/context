@@ -64,6 +64,8 @@ const BUILTIN_MODULES: AllowedModule[] = [
   "@/lib/ai/skills/document",
   "@/lib/ai/skills/suggestions",
   "@/lib/ai/skills/weather",
+  // Marketplace search is always free
+  "@/lib/ai/skills/marketplace",
 ];
 
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
@@ -446,9 +448,9 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
 
-    // Branch 1: no paid tools selected → simple streaming chat (no planning/execution loop).
-    // In Auto Mode, AI can still discover and use tools dynamically.
-    if (paidTools.length === 0) {
+    // Branch 1: no paid tools selected AND Auto Mode is OFF → simple streaming chat.
+    // When Auto Mode is ON, we need the agentic loop to execute searchMarketplace().
+    if (paidTools.length === 0 && !isAutoMode) {
       const systemInstructions = systemPrompt({
         selectedChatModel,
         requestHints,
@@ -713,6 +715,13 @@ export async function POST(request: Request) {
                   }
                 } else if (BUILTIN_MODULE_SET.has(moduleName)) {
                   allowedModules.add(moduleName);
+                } else if (isAutoMode && moduleName === MCP_TOOL_MODULE) {
+                  // In Auto Mode, allow MCP module for discovered tools
+                  // callMcpSkill will handle authorization and cost tracking
+                  allowedModules.add(moduleName);
+                  console.log(
+                    "[chat-api] Auto Mode: allowing MCP module for dynamic tool discovery"
+                  );
                 } else {
                   throw new ChatSDKError(
                     "forbidden:chat",
@@ -770,6 +779,7 @@ export async function POST(request: Request) {
                     allowedTools: allowedToolMap.size
                       ? allowedToolMap
                       : undefined,
+                    isAutoMode,
                   },
                 });
 

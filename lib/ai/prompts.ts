@@ -34,7 +34,8 @@ When no tools are needed:
 When a tool is required:
 - Respond with one TypeScript code block and nothing else.
 - The code must:
-  • Use named imports from the approved modules listed below.
+  • Use **static** named imports at the top of the file from the approved modules listed below.
+  • **CRITICAL: Do NOT use dynamic imports like \`await import(...)\`. Only use static imports at the top.**
   • Export \`async function main()\` with no parameters.
   • Use async/await and real control flow (loops, conditionals).
   • Return a compact JSON-serializable object that summarizes the actionable result.
@@ -73,12 +74,31 @@ const result3 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 3
 ## Tool Discovery (Auto Mode)
 When Auto Mode is enabled, you can search the marketplace and use discovered tools:
 \`\`\`ts
+// Import BOTH modules at the top - no dynamic imports!
 import { searchMarketplace } from "@/lib/ai/skills/marketplace";
-const tools = await searchMarketplace("weather forecast");
-// Returns: [{ id, name, description, price, kind }]
+import { callMcpSkill } from "@/lib/ai/skills/mcp";
+
+export async function main() {
+  const tools = await searchMarketplace("weather forecast");
+  // Returns: [{ id, name, description, price, kind, category, isVerified }]
+  
+  if (tools.length === 0) {
+    return { error: "No tools found" };
+  }
+  
+  const tool = tools[0];
+  // Use the tool directly - payment is automatic in Auto Mode
+  const result = await callMcpSkill({
+    toolId: tool.id,
+    toolName: "get_weather", // Check the tool's skills
+    args: { city: "London" }
+  });
+  
+  return result;
+}
 \`\`\`
 - Searching is FREE
-- In Auto Mode: Use discovered tools directly by importing and calling them. Payment is automatic.
+- In Auto Mode: Import both modules at the TOP, search, then use tools. Payment is automatic.
 - NOT in Auto Mode: Do NOT search for tools. The user manually selects tools from the sidebar.
 
 Rules:

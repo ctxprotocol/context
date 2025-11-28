@@ -16,6 +16,11 @@ export type SkillRuntime = {
   requestId?: string;
   chatId?: string;
   allowedTools?: Map<string, AllowedToolContext>;
+  // Auto Mode: AI can discover and use tools dynamically
+  // When true, callMcpSkill will allow any active tool
+  isAutoMode?: boolean;
+  // Track tools used in Auto Mode for billing
+  autoModeToolsUsed?: Map<string, { tool: AITool; callCount: number }>;
 };
 
 let currentRuntime: SkillRuntime | null = null;

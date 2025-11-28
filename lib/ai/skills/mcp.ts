@@ -364,26 +364,58 @@ export async function callMcpSkill({
   // Check payment authorization for paid tools
   const isFree = isFreeTool(tool);
   if (!isFree) {
-    // For paid tools, check if it's in the allowed tools map
-    if (!runtime.allowedTools?.has(toolId)) {
+    // Check if tool is pre-authorized (manual selection with payment)
+    const isPreAuthorized = runtime.allowedTools?.has(toolId);
+    
+    // In Auto Mode, tools can be used dynamically (payment via Auto Pay)
+    const isAutoModeEnabled = runtime.isAutoMode === true;
+    
+    if (!isPreAuthorized && !isAutoModeEnabled) {
       throw new Error(
         `Tool "${tool.name}" requires payment ($${tool.pricePerQuery}/query). Please enable it in the sidebar and confirm payment.`
       );
     }
 
-    const toolContext = runtime.allowedTools.get(toolId);
-    if (!toolContext) {
-      throw new Error(`Tool context not found for ${tool.name}.`);
-    }
+    if (isPreAuthorized) {
+      // Pre-authorized tool: use existing context
+      const toolContext = runtime.allowedTools?.get(toolId);
+      if (!toolContext) {
+        throw new Error(`Tool context not found for ${tool.name}.`);
+      }
 
-    // Enforce call limit for paid tools
-    if (toolContext.executionCount >= MAX_CALLS_PER_TURN) {
-      throw new Error(
-        `Tool ${tool.name} has reached its limit of ${MAX_CALLS_PER_TURN} calls per turn.`
-      );
-    }
+      // Enforce call limit for paid tools
+      if (toolContext.executionCount >= MAX_CALLS_PER_TURN) {
+        throw new Error(
+          `Tool ${tool.name} has reached its limit of ${MAX_CALLS_PER_TURN} calls per turn.`
+        );
+      }
 
-    toolContext.executionCount++;
+      toolContext.executionCount++;
+    } else if (isAutoModeEnabled) {
+      // Auto Mode: track tool usage for billing
+      if (!runtime.autoModeToolsUsed) {
+        runtime.autoModeToolsUsed = new Map();
+      }
+      
+      const existing = runtime.autoModeToolsUsed.get(toolId);
+      if (existing) {
+        if (existing.callCount >= MAX_CALLS_PER_TURN) {
+          throw new Error(
+            `Tool ${tool.name} has reached its limit of ${MAX_CALLS_PER_TURN} calls per turn.`
+          );
+        }
+        existing.callCount++;
+      } else {
+        runtime.autoModeToolsUsed.set(toolId, { tool, callCount: 1 });
+      }
+      
+      console.log("[mcp-skill] Auto Mode: using tool", { 
+        toolId, 
+        toolName: tool.name, 
+        price: tool.pricePerQuery,
+        totalToolsUsed: runtime.autoModeToolsUsed.size 
+      });
+    }
   }
 
   // Get the MCP endpoint

@@ -101,7 +101,10 @@ async function searchMarketplaceVector(
     LIMIT ${limit}
   `);
 
-  return (results.rows as Array<Record<string, unknown>>).map((tool) => ({
+  // drizzle-orm/postgres-js returns rows directly as array or in .rows
+  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
+  
+  return rows.map((tool) => ({
     id: tool.id as string,
     name: tool.name as string,
     description: tool.description as string,
@@ -140,7 +143,10 @@ async function searchMarketplaceFallback(
     LIMIT ${limit}
   `);
 
-  return (results.rows as Array<Record<string, unknown>>).map((tool) => ({
+  // drizzle-orm/postgres-js returns rows directly as array or in .rows
+  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
+  
+  return rows.map((tool) => ({
     id: tool.id as string,
     name: tool.name as string,
     description: tool.description as string,
