@@ -33,6 +33,9 @@ export const postRequestBodySchema = z.object({
   // instrumentation (TypeScript plan + JSON result) included inline
   // in the final assistant markdown response.
   isDebugMode: z.boolean().optional(),
+  // Auto Mode: AI can discover and use tools automatically
+  // When combined with Auto Pay, enables Full Agentic Mode
+  isAutoMode: z.boolean().optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

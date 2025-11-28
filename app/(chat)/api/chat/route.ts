@@ -248,6 +248,7 @@ export async function POST(request: Request) {
       selectedVisibilityType,
       toolInvocations = [],
       isDebugMode = false,
+      isAutoMode = false,
     }: {
       id: string;
       message: ChatMessage;
@@ -255,6 +256,7 @@ export async function POST(request: Request) {
       selectedVisibilityType: VisibilityType;
       toolInvocations?: { toolId: string; transactionHash: string }[];
       isDebugMode?: boolean;
+      isAutoMode?: boolean;
     } = requestBody;
 
     if (process.env.NODE_ENV === "development") {
@@ -445,11 +447,13 @@ export async function POST(request: Request) {
     let finalMergedUsage: AppUsage | undefined;
 
     // Branch 1: no paid tools selected → simple streaming chat (no planning/execution loop).
+    // In Auto Mode, AI can still discover and use tools dynamically.
     if (paidTools.length === 0) {
       const systemInstructions = systemPrompt({
         selectedChatModel,
         requestHints,
         isDebugMode, // Pass debug mode to control if coding agent prompt is included
+        isAutoMode, // Pass auto mode for dynamic tool discovery
       });
 
       const stream = createUIMessageStream({
@@ -583,6 +587,7 @@ export async function POST(request: Request) {
             requestHints,
             enabledTools: enabledToolSummaries,
             isDebugMode, // Pass debug mode for consistency
+            isAutoMode, // Pass auto mode for dynamic tool discovery
           });
 
           // Signal planning status so UI shows "Planning..."

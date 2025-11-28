@@ -17,6 +17,11 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
+import {
+  buildSearchText,
+  formatEmbeddingForPg,
+  generateEmbedding,
+} from "../ai/embeddings";
 import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
@@ -640,6 +645,7 @@ export async function findOrCreateUserByPrivyDid(
 /**
  * Create a new AI tool listing
  * Automatically marks the user as a developer on their first tool creation
+ * Generates semantic embedding for vector search
  */
 export async function createAITool({
   name,
@@ -663,22 +669,62 @@ export async function createAITool({
   iconUrl?: string;
 }) {
   try {
-    // Create the tool
-    const [newTool] = await db
-      .insert(aiTool)
-      .values({
-        name,
-        description,
-        developerId,
-        developerWallet,
-        pricePerQuery,
-        toolSchema,
-        apiEndpoint,
-        category,
-        iconUrl,
-        isActive: true,
-      })
-      .returning();
+    // Build search text and generate embedding for vector search
+    const searchText = buildSearchText({
+      name,
+      description,
+      category,
+      toolSchema,
+    });
+
+    let embeddingStr: string | null = null;
+    try {
+      const embedding = await generateEmbedding(searchText);
+      embeddingStr = formatEmbeddingForPg(embedding);
+    } catch (embeddingError) {
+      // Log but don't fail tool creation if embedding fails
+      console.warn(
+        "[createAITool] Failed to generate embedding, tool will use fallback search:",
+        embeddingError
+      );
+    }
+
+    // Create the tool with embedding if available
+    let newTool;
+    if (embeddingStr) {
+      const result = await db.execute(sql`
+        INSERT INTO "AITool" (
+          name, description, developer_id, developer_wallet, 
+          price_per_query, tool_schema, api_endpoint, category, 
+          icon_url, is_active, search_text, embedding
+        ) VALUES (
+          ${name}, ${description}, ${developerId}, ${developerWallet},
+          ${pricePerQuery}, ${JSON.stringify(toolSchema)}::jsonb, ${apiEndpoint}, 
+          ${category}, ${iconUrl}, true, ${searchText}, ${embeddingStr}::vector
+        )
+        RETURNING *
+      `);
+      newTool = result.rows[0];
+    } else {
+      // Fallback: create without embedding
+      const result = await db
+        .insert(aiTool)
+        .values({
+          name,
+          description,
+          developerId,
+          developerWallet,
+          pricePerQuery,
+          toolSchema,
+          apiEndpoint,
+          category,
+          iconUrl,
+          isActive: true,
+          searchText,
+        })
+        .returning();
+      newTool = result[0];
+    }
 
     // Mark user as developer if not already
     await db
@@ -813,6 +859,57 @@ export async function updateAIToolSchema({
       "bad_request:database",
       "Failed to update tool schema"
     );
+  }
+}
+
+/**
+ * Update tool embedding for vector search
+ * Called after schema refresh to keep embeddings in sync
+ */
+export async function updateAIToolEmbedding({
+  id,
+  searchText,
+  embedding,
+}: {
+  id: string;
+  searchText: string;
+  embedding: number[];
+}) {
+  try {
+    const embeddingStr = formatEmbeddingForPg(embedding);
+    return await db.execute(sql`
+      UPDATE "AITool"
+      SET 
+        search_text = ${searchText},
+        embedding = ${embeddingStr}::vector,
+        updated_at = NOW()
+      WHERE id = ${id}
+    `);
+  } catch (error) {
+    console.error("Failed to update tool embedding:", error);
+    // Don't throw - embedding update failures shouldn't break the app
+  }
+}
+
+/**
+ * Get tool data needed for embedding generation
+ */
+export async function getAIToolForEmbedding({ id }: { id: string }) {
+  try {
+    const tools = await db
+      .select({
+        id: aiTool.id,
+        name: aiTool.name,
+        description: aiTool.description,
+        category: aiTool.category,
+        toolSchema: aiTool.toolSchema,
+      })
+      .from(aiTool)
+      .where(eq(aiTool.id, id));
+    return tools[0];
+  } catch (error) {
+    console.error("Failed to get tool for embedding:", error);
+    return null;
   }
 }
 

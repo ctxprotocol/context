@@ -15,6 +15,7 @@
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
+    "db:backfill-embeddings": "npx tsx scripts/backfill-embeddings.ts",
     "wagmi": "wagmi generate",
     "wagmi:watch": "wagmi generate --watch",
     "test:unit": "tsx --import ./tests/unit/server-only-shim.ts --test ./tests/unit/**/*.test.ts",

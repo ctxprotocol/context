@@ -71,15 +71,15 @@ const result3 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 3
 \`\`\`
 
 ## Tool Discovery (Auto Mode)
-When Auto Mode is enabled, you can search the marketplace for relevant tools:
+When Auto Mode is enabled, you can search the marketplace and use discovered tools:
 \`\`\`ts
 import { searchMarketplace } from "@/lib/ai/skills/marketplace";
 const tools = await searchMarketplace("weather forecast");
 // Returns: [{ id, name, description, price, kind }]
 \`\`\`
-- This is FREE and always available
-- Use it to find tools that match the user's request
-- For paid tools found via search, inform the user they need to enable them in the sidebar
+- Searching is FREE
+- In Auto Mode: Use discovered tools directly by importing and calling them. Payment is automatic.
+- NOT in Auto Mode: Do NOT search for tools. The user manually selects tools from the sidebar.
 
 Rules:
 - Never import or execute modules outside the approved list.
@@ -131,19 +131,22 @@ export const systemPrompt = ({
   requestHints,
   enabledTools = [],
   isDebugMode = false,
+  isAutoMode = false,
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
   enabledTools?: EnabledToolSummary[];
   isDebugMode?: boolean;
+  isAutoMode?: boolean;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
   // Only include the coding agent prompt when:
   // 1. Developer Mode is ON, OR
-  // 2. There are enabled tools to use
+  // 2. There are enabled tools to use, OR
+  // 3. Auto Mode is ON (AI can discover tools dynamically)
   const hasTools = enabledTools.length > 0;
-  const shouldUseCodingAgent = isDebugMode || hasTools;
+  const shouldUseCodingAgent = isDebugMode || hasTools || isAutoMode;
 
   if (!shouldUseCodingAgent) {
     // Normal chat mode - no code generation, just helpful responses
@@ -155,13 +158,29 @@ export const systemPrompt = ({
     return basePrompt;
   }
 
-  // Developer Mode or tools enabled - include coding agent
-  const toolsPrompt =
-    enabledTools.length === 0
-      ? "No paid marketplace skills are authorized for this turn. Do not attempt to import them."
-      : `Paid marketplace tools authorized for this turn:\n${enabledTools
-          .map((tool, index) => formatEnabledTool(tool, index))
-          .join("\n")}`;
+  // Developer Mode, tools enabled, or Auto Mode - include coding agent
+  let toolsPrompt: string;
+
+  if (isAutoMode) {
+    // Auto Mode: AI can discover and use tools dynamically
+    const manualToolsSection =
+      enabledTools.length > 0
+        ? `\n\nManually selected tools (already authorized):\n${enabledTools
+            .map((tool, index) => formatEnabledTool(tool, index))
+            .join("\n")}`
+        : "";
+
+    toolsPrompt = `**AUTO MODE ENABLED** - You can search the marketplace to discover relevant tools.
+Use searchMarketplace() to find tools, then use them directly. Payment is handled automatically.
+${manualToolsSection}`;
+  } else if (enabledTools.length === 0) {
+    toolsPrompt =
+      "No paid marketplace skills are authorized for this turn. Do not attempt to import them.";
+  } else {
+    toolsPrompt = `Paid marketplace tools authorized for this turn:\n${enabledTools
+      .map((tool, index) => formatEnabledTool(tool, index))
+      .join("\n")}`;
+  }
 
   const basePrompt = `${regularPrompt}\n\n${codingAgentPrompt}\n\n${toolsPrompt}\n\n${requestPrompt}`;
 

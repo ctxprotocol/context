@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useArtifactSelector } from "@/hooks/use-artifact";
+import { useAutoPay } from "@/hooks/use-auto-pay";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { useDebugMode } from "@/hooks/use-debug-mode";
@@ -71,10 +72,16 @@ export function Chat({
   } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
   const debugModeRef = useRef(isDebugMode);
+  const { isAutoMode } = useAutoPay();
+  const autoModeRef = useRef(isAutoMode);
 
   useEffect(() => {
     debugModeRef.current = isDebugMode;
   }, [isDebugMode]);
+
+  useEffect(() => {
+    autoModeRef.current = isAutoMode;
+  }, [isAutoMode]);
 
   if (process.env.NODE_ENV === "development") {
     // eslint-disable-next-line no-console
@@ -118,9 +125,10 @@ export function Chat({
             message: request.messages.at(-1),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
-            // Use the ref so we always send the latest dev-mode value,
+            // Use refs so we always send the latest values,
             // even though the transport closure was created earlier.
             isDebugMode: debugModeRef.current,
+            isAutoMode: autoModeRef.current,
             ...request.body,
           },
         };

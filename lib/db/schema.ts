@@ -224,6 +224,11 @@ export const aiTool = pgTable("AITool", {
     "0"
   ),
 
+  // Vector search fields (pgvector)
+  // Note: The 'embedding' column is vector(1536) - managed via raw SQL
+  // since Drizzle doesn't natively support the vector type
+  searchText: text("search_text"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

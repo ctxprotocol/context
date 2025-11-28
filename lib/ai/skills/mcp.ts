@@ -1,8 +1,14 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { buildSearchText, generateEmbedding } from "@/lib/ai/embeddings";
 import { getSkillRuntime } from "@/lib/ai/skills/runtime";
-import { getAIToolById, recordToolQuery, updateAIToolSchema } from "@/lib/db/queries";
+import {
+  getAIToolById,
+  recordToolQuery,
+  updateAIToolEmbedding,
+  updateAIToolSchema,
+} from "@/lib/db/queries";
 import type { AITool } from "@/lib/db/schema";
 
 /**
@@ -586,6 +592,26 @@ export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
       id: tool.id,
       toolSchema: updatedSchema,
     });
+
+    // Regenerate embedding with updated schema info
+    try {
+      const searchText = buildSearchText({
+        name: tool.name,
+        description: tool.description,
+        category: tool.category,
+        toolSchema: updatedSchema,
+      });
+      const embedding = await generateEmbedding(searchText);
+      await updateAIToolEmbedding({
+        id: tool.id,
+        searchText,
+        embedding,
+      });
+      console.log(`[mcp-refresh] Regenerated embedding for ${tool.name}`);
+    } catch (embeddingError) {
+      // Log but don't fail if embedding regeneration fails
+      console.warn(`[mcp-refresh] Failed to regenerate embedding for ${tool.name}:`, embeddingError);
+    }
 
     schemaRefreshCache.set(tool.id, Date.now());
     console.log(`[mcp-refresh] Successfully updated schema for ${tool.name}`);

@@ -161,34 +161,34 @@ function PureMessages({
             }
 
             return (
-                <PreviewMessage
-                  chatId={chatId}
-                  // Developer Mode now relies on the inline markdown emitted by
-                  // the final assistant response. We keep the flag so UI pieces
-                  // that care about the mode (e.g. sidebar toggle) still work,
-                  // but we no longer thread separate debugCode/debugResult
-                  // streams into the message component.
-                  isDebugMode={isDebugMode}
-                  isLoading={
-                    status === "streaming" && messages.length - 1 === index
-                  }
-                  isReadonly={isReadonly}
-                  key={message.id}
-                  message={message}
-                  regenerate={regenerate}
-                  requiresScrollPadding={
+              <PreviewMessage
+                chatId={chatId}
+                // Developer Mode now relies on the inline markdown emitted by
+                // the final assistant response. We keep the flag so UI pieces
+                // that care about the mode (e.g. sidebar toggle) still work,
+                // but we no longer thread separate debugCode/debugResult
+                // streams into the message component.
+                isDebugMode={isDebugMode}
+                isLoading={
+                  status === "streaming" && messages.length - 1 === index
+                }
+                isReadonly={isReadonly}
+                key={message.id}
+                message={message}
+                regenerate={regenerate}
+                requiresScrollPadding={
                     // Don't apply scroll padding if ThinkingMessage is showing below,
                     // as that would create extra whitespace between the last message
                     // and the thinking indicator
                     hasSentMessage && index === messages.length - 1 && !shouldShowThinking
-                  }
-                  setMessages={setMessages}
-                  vote={
-                    votes
-                      ? votes.find((vote) => vote.messageId === message.id)
-                      : undefined
-                  }
-                />
+                }
+                setMessages={setMessages}
+                vote={
+                  votes
+                    ? votes.find((vote) => vote.messageId === message.id)
+                    : undefined
+                }
+              />
             );
           })}
 

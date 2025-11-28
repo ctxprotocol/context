@@ -18,10 +18,7 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  SPENDING_CAP_OPTIONS,
-  useAutoPay,
-} from "@/hooks/use-auto-pay";
+import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
@@ -53,7 +50,7 @@ export function ContextSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const { activeWallet } = useWalletIdentity();
   const { client: smartWalletClient } = useSmartWallets();
-  
+
   // Auto Pay and Auto Mode from global context
   const {
     isAutoPay,
@@ -66,34 +63,45 @@ export function ContextSidebar({
     setIsAutoMode,
     resetSpentAmount,
   } = useAutoPay();
-  
+
   // State for showing the approval dialog
   const [showApprovalDialog, setShowApprovalDialog] = useState(false);
   const [pendingCapChange, setPendingCapChange] = useState<number | null>(null);
   // Track if approval was triggered from Auto Mode toggle
   const [pendingAutoMode, setPendingAutoMode] = useState(false);
-  
+
   // Get addresses for allowance check
   const walletAddress = activeWallet?.address;
   const smartWalletAddress = smartWalletClient?.account?.address;
-  const allowanceCheckAddress = (smartWalletAddress || walletAddress) as `0x${string}` | undefined;
-  const routerAddress = process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
+  const allowanceCheckAddress = (smartWalletAddress || walletAddress) as
+    | `0x${string}`
+    | undefined;
+  const routerAddress = process.env
+    .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
-  
+
   // Check current on-chain allowance
-  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
-    address: usdcAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: allowanceCheckAddress ? [allowanceCheckAddress, routerAddress] : undefined,
-    query: {
-      enabled: Boolean(allowanceCheckAddress && routerAddress && usdcAddress && isAutoPay),
-    },
-  });
-  
+  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract(
+    {
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      functionName: "allowance",
+      args: allowanceCheckAddress
+        ? [allowanceCheckAddress, routerAddress]
+        : undefined,
+      query: {
+        enabled: Boolean(
+          allowanceCheckAddress && routerAddress && usdcAddress && isAutoPay
+        ),
+      },
+    }
+  );
+
   // Convert allowance to dollars (USDC has 6 decimals)
-  const currentAllowanceUSD = currentAllowance ? Number(currentAllowance) / 1_000_000 : 0;
-  
+  const currentAllowanceUSD = currentAllowance
+    ? Number(currentAllowance) / 1_000_000
+    : 0;
+
   // When Auto Pay toggle is clicked
   const handleAutoPayToggle = () => {
     if (isAutoPay) {
@@ -104,7 +112,7 @@ export function ContextSidebar({
       setShowApprovalDialog(true);
     }
   };
-  
+
   // Called when approval is successful
   const handleApprovalSuccess = () => {
     setIsAutoPay(true);
@@ -113,21 +121,21 @@ export function ContextSidebar({
     setPendingCapChange(null);
     // Refetch allowance to get updated value
     refetchAllowance();
-    
+
     // If approval was triggered from Auto Mode toggle, also enable Auto Mode
     if (pendingAutoMode) {
       setIsAutoMode(true);
       setPendingAutoMode(false);
     }
   };
-  
+
   // Called when approval is cancelled
   const handleApprovalCancel = () => {
     setShowApprovalDialog(false);
     setPendingCapChange(null);
     setPendingAutoMode(false);
   };
-  
+
   // Handle spending cap button click
   const handleSpendingCapClick = (newCap: number) => {
     if (newCap <= currentAllowanceUSD) {
@@ -139,20 +147,20 @@ export function ContextSidebar({
       setShowApprovalDialog(true);
     }
   };
-  
+
   // Auto Mode toggle - if Auto Pay is off, show approval dialog
   const handleAutoModeToggle = () => {
     if (isAutoMode) {
       // Turning OFF
       setIsAutoMode(false);
-    } else if (!isAutoPay) {
+    } else if (isAutoPay) {
+      // Auto Pay is ON, just toggle Auto Mode
+      setIsAutoMode(true);
+    } else {
       // Auto Pay is OFF, need to enable it first
       // Mark that we want to enable Auto Mode after approval succeeds
       setPendingAutoMode(true);
       setShowApprovalDialog(true);
-    } else {
-      // Auto Pay is ON, just toggle Auto Mode
-      setIsAutoMode(true);
     }
   };
   const categories = useMemo(
@@ -320,7 +328,7 @@ export function ContextSidebar({
                   <span className="font-medium">Full Agentic Mode</span>
                 </div>
               )}
-              
+
               {/* Auto Pay Toggle */}
               <div className="flex items-center justify-between py-1">
                 <Tooltip>
@@ -328,7 +336,8 @@ export function ContextSidebar({
                     <span className="cursor-help font-medium">Auto Pay</span>
                   </TooltipTrigger>
                   <TooltipContent align="start" className="max-w-[220px]">
-                    Pre-authorize payments up to a spending cap. No signing required for each query.
+                    Pre-authorize payments up to a spending cap. No signing
+                    required for each query.
                   </TooltipContent>
                 </Tooltip>
                 <button
@@ -349,29 +358,34 @@ export function ContextSidebar({
                   />
                 </button>
               </div>
-              
+
               {/* Spending Cap & Budget Display (when Auto Pay is enabled) */}
               {isAutoPay && (
                 <div className="flex flex-col gap-1.5 rounded-md bg-muted/50 p-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sidebar-foreground/60 text-[10px]">Spending Cap</span>
+                    <span className="text-[10px] text-sidebar-foreground/60">
+                      Spending Cap
+                    </span>
                     <div className="flex gap-1">
                       {SPENDING_CAP_OPTIONS.map((option) => {
-                        const needsApproval = option.value > currentAllowanceUSD;
+                        const needsApproval =
+                          option.value > currentAllowanceUSD;
                         const isSelected = spendingCap === option.value;
                         return (
                           <Tooltip key={option.value}>
                             <TooltipTrigger asChild>
                               <button
                                 className={cn(
-                                  "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+                                  "rounded px-1.5 py-0.5 font-medium text-[10px] transition-colors",
                                   isSelected
                                     ? "bg-primary text-primary-foreground"
                                     : needsApproval
                                       ? "bg-background/50 text-sidebar-foreground/40 hover:bg-muted"
                                       : "bg-background hover:bg-muted"
                                 )}
-                                onClick={() => handleSpendingCapClick(option.value)}
+                                onClick={() =>
+                                  handleSpendingCapClick(option.value)
+                                }
                                 type="button"
                               >
                                 {option.label}
@@ -388,7 +402,9 @@ export function ContextSidebar({
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sidebar-foreground/60 text-[10px]">Budget</span>
+                    <span className="text-[10px] text-sidebar-foreground/60">
+                      Budget
+                    </span>
                     <span className="font-mono text-[10px]">
                       ${formatPrice(spentAmount)} / ${formatPrice(spendingCap)}
                     </span>
@@ -404,26 +420,28 @@ export function ContextSidebar({
                             ? "bg-amber-500"
                             : "bg-emerald-500"
                       )}
-                      style={{ width: `${Math.min((spentAmount / spendingCap) * 100, 100)}%` }}
+                      style={{
+                        width: `${Math.min((spentAmount / spendingCap) * 100, 100)}%`,
+                      }}
                     />
                   </div>
                 </div>
               )}
-              
+
               {/* Auto Mode Toggle */}
               <div className="flex items-center justify-between py-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className={cn(
-                      "cursor-help",
-                      !isAutoPay && "opacity-50"
-                    )}>Auto Mode</span>
+                    <span
+                      className={cn("cursor-help", !isAutoPay && "opacity-50")}
+                    >
+                      Auto Mode
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent align="start" className="max-w-[220px]">
-                    {isAutoPay 
+                    {isAutoPay
                       ? "Let AI discover and use tools automatically, including paid tools"
-                      : "Enable Auto Pay first to use Auto Mode with paid tools"
-                    }
+                      : "Enable Auto Pay first to use Auto Mode with paid tools"}
                   </TooltipContent>
                 </Tooltip>
                 <button
@@ -445,14 +463,12 @@ export function ContextSidebar({
                 </button>
               </div>
               {isAutoMode && (
-                <div className="text-sidebar-foreground/50 text-[10px] leading-tight">
-                  {isAutoPay 
-                    ? "AI will discover and use tools automatically within your budget"
-                    : "AI will search marketplace for relevant tools (free tools only)"
-                  }
+                <div className="text-[10px] text-sidebar-foreground/50 leading-tight">
+                  AI will discover and use tools automatically within your
+                  budget
                 </div>
               )}
-              
+
               {/* Developer Mode Toggle */}
               <div className="flex items-center justify-between py-1">
                 <span>Developer Mode</span>
@@ -474,9 +490,9 @@ export function ContextSidebar({
                   />
                 </button>
               </div>
-              
+
               {/* Tool Count & Cost Summary */}
-              <div className="border-t border-sidebar-border pt-1.5">
+              <div className="border-sidebar-border border-t pt-1.5">
                 <div>
                   {activeTools.length}{" "}
                   {activeTools.length === 1 ? "tool" : "tools"} active
@@ -498,7 +514,7 @@ export function ContextSidebar({
           </SidebarFooter>
         </Sidebar>
       </div>
-      
+
       {/* Auto Pay Approval Dialog */}
       <AutoPayApprovalDialog
         initialCap={pendingCapChange ?? undefined}
