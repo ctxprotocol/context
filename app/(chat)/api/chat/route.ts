@@ -595,15 +595,13 @@ export async function POST(request: Request) {
           await new Promise((resolve) => setTimeout(resolve, 10));
 
           // STREAMING PLANNER:
-          // Use streamText so dev mode can see the code "as it's being written".
-          // NOTE: extractReasoningMiddleware is available but currently disabled as it
-          // requires specific model support for <think> tags. For now, use textStream
-          // which works reliably with all models including Kimi K2.
+          // Use streamText with fullStream to capture both reasoning and code.
+          // fullStream preserves reasoning parts that Kimi K2 Thinking outputs natively.
+          // NOTE: smoothStream is NOT used here as it's incompatible with fullStream.
           const planningResult = streamText({
             model: myProvider.languageModel(selectedChatModel),
             system: planningSystemInstructions,
             messages: baseModelMessages,
-            experimental_transform: smoothStream({ chunking: "word" }),
             experimental_telemetry: {
               isEnabled: isProductionEnvironment,
               functionId: "planning-stream-text",
@@ -611,15 +609,38 @@ export async function POST(request: Request) {
           });
 
           let planningText = "";
+          let reasoningText = "";
 
-          // Stream each chunk of planning code to the client for real-time display
-          for await (const delta of planningResult.textStream) {
-            planningText += delta;
-            // Stream the cumulative planning text so the UI can display it as it's written
-            dataStream.write({
-              type: "data-debugCode",
-              data: planningText,
-            });
+          // Stream each chunk to the client for real-time display
+          // Both reasoning-delta and text-delta use .text property
+          for await (const part of planningResult.fullStream) {
+            if (part.type === "reasoning-delta") {
+              const delta = (part as { text?: string }).text;
+              if (delta) {
+                reasoningText += delta;
+                dataStream.write({
+                  type: "data-reasoning",
+                  data: reasoningText,
+                });
+              }
+            } else if (part.type === "text-delta") {
+              const delta = (part as { text?: string }).text;
+              if (delta) {
+                // First text-delta after reasoning means reasoning is complete
+                if (reasoningText.length > 0 && planningText.length === 0) {
+                  dataStream.write({
+                    type: "data-reasoningComplete",
+                    data: true,
+                  });
+                }
+                // Accumulate and stream the planning code
+                planningText += delta;
+                dataStream.write({
+                  type: "data-debugCode",
+                  data: planningText,
+                });
+              }
+            }
           }
 
           planningText = planningText.trim();
