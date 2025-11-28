@@ -201,7 +201,12 @@ export async function submitTool(
       const { client, tools, transportUsed } = await connectAndListTools(parsed.data.endpoint);
       console.log(`[contribute] Connected via ${transportUsed} to:`, parsed.data.endpoint);
       
-      await client.close();
+      // Close client gracefully - ignore errors since we already have the tools
+      try {
+        await client.close();
+      } catch (closeError) {
+        console.warn("[contribute] Warning: Failed to close client cleanly:", closeError);
+      }
 
       if (!tools || tools.length === 0) {
         return {
