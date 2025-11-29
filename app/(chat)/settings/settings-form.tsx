@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Brain,
   CheckCircle2,
   Eye,
   EyeOff,
   Key,
   Loader2,
+  Moon,
   Sparkles,
   Trash2,
   Zap,
@@ -70,7 +72,7 @@ const PROVIDER_CONFIG: Record<
     helpUrl: string;
     helpText: string;
     color: string;
-    logo: string;
+    icon: React.ElementType;
   }
 > = {
   kimi: {
@@ -80,7 +82,7 @@ const PROVIDER_CONFIG: Record<
     helpUrl: "https://platform.moonshot.cn/console/api-keys",
     helpText: "Get your API key from Moonshot Console",
     color: "from-violet-500 to-purple-600",
-    logo: "🌙",
+    icon: Moon,
   },
   gemini: {
     name: "Google Gemini",
@@ -89,7 +91,7 @@ const PROVIDER_CONFIG: Record<
     helpUrl: "https://aistudio.google.com/apikey",
     helpText: "Get your API key from Google AI Studio",
     color: "from-blue-500 to-cyan-500",
-    logo: "✨",
+    icon: Sparkles,
   },
   anthropic: {
     name: "Anthropic Claude",
@@ -98,7 +100,7 @@ const PROVIDER_CONFIG: Record<
     helpUrl: "https://console.anthropic.com/settings/keys",
     helpText: "Get your API key from Anthropic Console",
     color: "from-orange-500 to-amber-500",
-    logo: "🧠",
+    icon: Brain,
   },
 };
 
@@ -323,9 +325,10 @@ export function SettingsForm() {
                 <span>Unlimited queries with your own API key</span>
               </div>
               <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-                <span className="text-lg">
-                  {PROVIDER_CONFIG[settings.byokProvider].logo}
-                </span>
+                {(() => {
+                  const ProviderIcon = PROVIDER_CONFIG[settings.byokProvider].icon;
+                  return <ProviderIcon className="size-5" />;
+                })()}
                 <span className="font-medium">
                   {PROVIDER_CONFIG[settings.byokProvider].name}
                 </span>
@@ -392,6 +395,7 @@ export function SettingsForm() {
               const isConfigured = settings.configuredProviders.includes(provider);
               const isActive = settings.byokProvider === provider;
               const isExpanded = expandedProvider === provider;
+              const ProviderIcon = config.icon;
 
               return (
                 <div
@@ -411,11 +415,11 @@ export function SettingsForm() {
                   >
                     <div
                       className={cn(
-                        "flex size-10 items-center justify-center rounded-lg bg-gradient-to-br text-white text-lg",
+                        "flex size-10 items-center justify-center rounded-lg bg-gradient-to-br text-white",
                         config.color
                       )}
                     >
-                      {config.logo}
+                      <ProviderIcon className="size-5" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -582,7 +586,7 @@ export function SettingsForm() {
       </Card>
 
       {/* Info Section */}
-      <div className="rounded-lg border border-dashed p-4 space-y-4">
+      <div className="rounded-lg border border-dashed p-4">
         <div>
           <h3 className="font-medium text-sm mb-2">About API Key Security</h3>
           <ul className="space-y-1 text-xs text-muted-foreground">
@@ -591,16 +595,6 @@ export function SettingsForm() {
             <li>• You can remove your keys at any time</li>
             <li>• We recommend using dedicated keys for this app</li>
           </ul>
-        </div>
-        <div className="border-t pt-4">
-          <h3 className="font-medium text-sm mb-2">Why no OpenAI?</h3>
-          <p className="text-xs text-muted-foreground">
-            We've chosen not to support OpenAI API keys due to concerns about
-            their API usage tracking practices and history of competitive
-            behavior towards successful applications built on their platform.
-            The providers we support (Moonshot, Google, Anthropic) offer
-            excellent alternatives with competitive pricing and capabilities.
-          </p>
         </div>
       </div>
     </div>
