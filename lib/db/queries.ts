@@ -1079,23 +1079,174 @@ export async function getDeveloperEarnings({
 }
 
 /**
- * Search AI tools by name or description
- * Note: Currently returns all active tools
- * TODO: Implement full-text search using PostgreSQL's ILIKE or tsvector
+ * Search AI tools using semantic vector search with pgvector
+ * Falls back to LIKE search if vector search fails or returns no results
+ *
+ * @param query - Search term to match against tool embeddings
+ * @param limit - Maximum number of results (default: 20)
+ * @returns Tools sorted by semantic similarity, with similarity scores
  */
-export async function searchAITools() {
-  try {
-    // For MVP, return all active tools
-    // TODO: Add query parameter and WHERE clause with ILIKE for name/description search
-    return await db
-      .select()
-      .from(aiTool)
-      .where(eq(aiTool.isActive, true))
-      .limit(20);
-  } catch (error) {
-    console.error("Failed to search AI tools:", error);
-    throw new ChatSDKError("bad_request:database", "Failed to search AI tools");
+export async function searchAITools({
+  query,
+  limit = 20,
+}: {
+  query: string;
+  limit?: number;
+}) {
+  if (!query || query.trim().length === 0) {
+    // No query - return all active tools
+    return {
+      tools: await getActiveAITools(),
+      searchType: null as "vector" | "fallback" | null,
+    };
   }
+
+  try {
+    // Try vector search first (semantic similarity)
+    const vectorResults = await searchAIToolsVector({ query, limit });
+    if (vectorResults.length > 0) {
+      return { tools: vectorResults, searchType: "vector" as const };
+    }
+
+    // Fallback to LIKE search if no vector results
+    console.log("[searchAITools] No vector results, falling back to LIKE search");
+    const fallbackResults = await searchAIToolsFallback({ query, limit });
+    return { tools: fallbackResults, searchType: "fallback" as const };
+  } catch (error) {
+    console.error("[searchAITools] Vector search failed, using fallback:", error);
+    const fallbackResults = await searchAIToolsFallback({ query, limit });
+    return { tools: fallbackResults, searchType: "fallback" as const };
+  }
+}
+
+/**
+ * Semantic vector search using pgvector
+ * Returns tools sorted by cosine similarity to the query
+ */
+async function searchAIToolsVector({
+  query,
+  limit,
+}: {
+  query: string;
+  limit: number;
+}) {
+  // Generate embedding for the search query
+  const queryEmbedding = await generateEmbedding(query);
+  const embeddingStr = formatEmbeddingForPg(queryEmbedding);
+
+  // Search by cosine similarity using pgvector
+  // The <=> operator computes cosine distance (1 - cosine_similarity)
+  const results = await db.execute(sql`
+    SELECT 
+      id,
+      name,
+      description,
+      price_per_query as "pricePerQuery",
+      tool_schema as "toolSchema",
+      category,
+      icon_url as "iconUrl",
+      is_verified as "isVerified",
+      is_active as "isActive",
+      total_queries as "totalQueries",
+      average_rating as "averageRating",
+      developer_id as "developerId",
+      developer_wallet as "developerWallet",
+      api_endpoint as "apiEndpoint",
+      created_at as "createdAt",
+      1 - (embedding <=> ${embeddingStr}::vector) as similarity
+    FROM "AITool"
+    WHERE is_active = true
+      AND embedding IS NOT NULL
+    ORDER BY embedding <=> ${embeddingStr}::vector
+    LIMIT ${limit}
+  `);
+
+  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<
+    Record<string, unknown>
+  >;
+
+  return rows.map((tool) => ({
+    id: tool.id as string,
+    name: tool.name as string,
+    description: tool.description as string,
+    pricePerQuery: tool.pricePerQuery as string,
+    toolSchema: tool.toolSchema as Record<string, unknown>,
+    category: tool.category as string | null,
+    iconUrl: tool.iconUrl as string | null,
+    isVerified: tool.isVerified as boolean,
+    isActive: tool.isActive as boolean,
+    totalQueries: tool.totalQueries as number,
+    averageRating: tool.averageRating as string | null,
+    developerId: tool.developerId as string,
+    developerWallet: tool.developerWallet as string,
+    apiEndpoint: tool.apiEndpoint as string,
+    createdAt: tool.createdAt as Date,
+    similarity: tool.similarity as number,
+  }));
+}
+
+/**
+ * Fallback LIKE search (used when vector search is unavailable)
+ */
+async function searchAIToolsFallback({
+  query,
+  limit,
+}: {
+  query: string;
+  limit: number;
+}) {
+  const searchTerm = `%${query.toLowerCase()}%`;
+
+  const results = await db.execute(sql`
+    SELECT 
+      id,
+      name,
+      description,
+      price_per_query as "pricePerQuery",
+      tool_schema as "toolSchema",
+      category,
+      icon_url as "iconUrl",
+      is_verified as "isVerified",
+      is_active as "isActive",
+      total_queries as "totalQueries",
+      average_rating as "averageRating",
+      developer_id as "developerId",
+      developer_wallet as "developerWallet",
+      api_endpoint as "apiEndpoint",
+      created_at as "createdAt"
+    FROM "AITool"
+    WHERE is_active = true
+      AND (
+        LOWER(name) LIKE ${searchTerm}
+        OR LOWER(description) LIKE ${searchTerm}
+        OR LOWER(category) LIKE ${searchTerm}
+      )
+    ORDER BY total_queries DESC
+    LIMIT ${limit}
+  `);
+
+  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<
+    Record<string, unknown>
+  >;
+
+  return rows.map((tool) => ({
+    id: tool.id as string,
+    name: tool.name as string,
+    description: tool.description as string,
+    pricePerQuery: tool.pricePerQuery as string,
+    toolSchema: tool.toolSchema as Record<string, unknown>,
+    category: tool.category as string | null,
+    iconUrl: tool.iconUrl as string | null,
+    isVerified: tool.isVerified as boolean,
+    isActive: tool.isActive as boolean,
+    totalQueries: tool.totalQueries as number,
+    averageRating: tool.averageRating as string | null,
+    developerId: tool.developerId as string,
+    developerWallet: tool.developerWallet as string,
+    apiEndpoint: tool.apiEndpoint as string,
+    createdAt: tool.createdAt as Date,
+    similarity: null,
+  }));
 }
 
 /**

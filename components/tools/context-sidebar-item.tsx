@@ -17,6 +17,7 @@ const PureContextSidebarItem = ({
   tool: AITool;
   isActive: boolean;
   onToggle: (toolId: string) => void;
+  similarity?: number | null;
 }) => {
   const formattedPrice = formatPrice(tool.pricePerQuery ?? 0);
 
@@ -25,12 +26,12 @@ const PureContextSidebarItem = ({
   return (
     <SidebarMenuItem>
       <div className="flex w-full items-center gap-1">
-      <SidebarMenuButton
+        <SidebarMenuButton
           className="group/item h-auto flex-1 justify-between py-2.5"
-        isActive={isActive}
-        onClick={() => onToggle(tool.id)}
-        type="button"
-      >
+          isActive={isActive}
+          onClick={() => onToggle(tool.id)}
+          type="button"
+        >
           <div className="flex min-w-0 flex-col items-start gap-1 text-left">
             <div className="flex w-full items-center gap-2">
               <span className="truncate font-medium text-sm">{tool.name}</span>
@@ -42,8 +43,8 @@ const PureContextSidebarItem = ({
               )}
             </div>
             <span className="font-normal text-muted-foreground text-xs">
-          ${formattedPrice}
-        </span>
+              ${formattedPrice}
+            </span>
           </div>
           <div
             className={cn(
@@ -60,7 +61,7 @@ const PureContextSidebarItem = ({
               )}
             />
           </div>
-      </SidebarMenuButton>
+        </SidebarMenuButton>
         <HoverCard closeDelay={100} openDelay={200}>
           <HoverCardTrigger asChild>
             <button

@@ -1,9 +1,15 @@
 "use client";
 
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
-import { ZapIcon } from "lucide-react";
+import { Loader2Icon, ZapIcon } from "lucide-react";
 import Link from "next/link";
-import { type CSSProperties, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useReadContract } from "wagmi";
 // No router needed here; navigation handled elsewhere if needed
 import {
@@ -22,12 +28,16 @@ import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
+import type { AITool } from "@/lib/db/schema";
 import { cn, formatPrice } from "@/lib/utils";
 import { CrossIcon, LoaderIcon } from "../icons";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { AutoPayApprovalDialog } from "./auto-pay-approval-dialog";
 import { ContextSidebarItem } from "./context-sidebar-item";
+
+const DEBOUNCE_MS = 300;
+const LOG_PREFIX = "[tool-search]";
 
 type ContextSidebarProps = {
   isOpen: boolean;
@@ -48,8 +58,128 @@ export function ContextSidebar({
   const { tools, loading, activeToolIds, activeTools, totalCost, toggleTool } =
     useSessionTools();
   const [searchQuery, setSearchQuery] = useState("");
+  const [vectorResults, setVectorResults] = useState<AITool[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  // Refs for debounce and abort
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const { activeWallet } = useWalletIdentity();
   const { client: smartWalletClient } = useSmartWallets();
+
+  // Vector search function
+  const performVectorSearch = async (query: string) => {
+    console.log(LOG_PREFIX, "performVectorSearch called with:", query);
+
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      console.log(LOG_PREFIX, "Aborting previous request");
+      abortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
+    setIsSearching(true);
+    setSearchError(null);
+
+    const url = `/api/tools/search?q=${encodeURIComponent(query)}&limit=20`;
+    console.log(LOG_PREFIX, "Fetching:", url);
+
+    try {
+      const startTime = performance.now();
+      const response = await fetch(url, { signal });
+      const duration = Math.round(performance.now() - startTime);
+
+      console.log(
+        LOG_PREFIX,
+        `Response status: ${response.status} (${duration}ms)`
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(LOG_PREFIX, "Response data:", {
+        toolCount: data.tools?.length ?? 0,
+        searchType: data.searchType,
+        query: data.query,
+        toolNames: data.tools?.map((t: AITool) => t.name) ?? [],
+      });
+
+      setVectorResults(data.tools || []);
+      setSearchError(null);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        console.log(LOG_PREFIX, "Request aborted (expected)");
+        return; // Don't update state for aborted requests
+      }
+
+      console.error(LOG_PREFIX, "Search failed:", error);
+      setSearchError(error instanceof Error ? error.message : "Search failed");
+      setVectorResults(null); // Fall back to client-side filtering
+    } finally {
+      // Only clear searching if this wasn't aborted
+      if (!signal.aborted) {
+        setIsSearching(false);
+        console.log(LOG_PREFIX, "Search complete, isSearching=false");
+      }
+    }
+  };
+
+  // Handle search input change with manual debounce
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    console.log(LOG_PREFIX, "Input changed:", query);
+    setSearchQuery(query);
+
+    // Clear any pending debounce
+    if (debounceTimerRef.current) {
+      console.log(LOG_PREFIX, "Clearing debounce timer");
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    // If empty, clear results immediately
+    if (!query.trim()) {
+      console.log(LOG_PREFIX, "Empty query, clearing results");
+      setVectorResults(null);
+      setIsSearching(false);
+      setSearchError(null);
+
+      // Abort any in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      return;
+    }
+
+    // Start debounce timer for vector search
+    console.log(LOG_PREFIX, `Starting debounce timer (${DEBOUNCE_MS}ms)`);
+    setIsSearching(true); // Show loading immediately
+
+    debounceTimerRef.current = setTimeout(() => {
+      console.log(LOG_PREFIX, "Debounce timer fired");
+      performVectorSearch(query);
+    }, DEBOUNCE_MS);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log(LOG_PREFIX, "Component unmounting, cleanup");
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   // Auto Pay and Auto Mode from global context
   const {
@@ -163,11 +293,14 @@ export function ContextSidebar({
       setShowApprovalDialog(true);
     }
   };
-  const categories = useMemo(
-    () => Array.from(new Set(tools.map((tool) => tool.category || "Other"))),
-    [tools]
-  );
-  const filteredTools = useMemo(
+
+  // Determine which tools to display
+  // If we have a search query and vector results, use those
+  // Otherwise, fall back to client-side filtering
+  const isSearchActive = searchQuery.trim().length > 0;
+
+  // Client-side filtering (fallback)
+  const clientFilteredTools = useMemo(
     () =>
       tools.filter(
         (tool) =>
@@ -177,19 +310,53 @@ export function ContextSidebar({
       ),
     [tools, searchQuery]
   );
+
+  // Use vector results if available, otherwise client-side filtered
+  const displayTools = isSearchActive
+    ? (vectorResults ?? clientFilteredTools)
+    : tools;
+
+  const categories = useMemo(
+    () => Array.from(new Set(tools.map((tool) => tool.category || "Other"))),
+    [tools]
+  );
+
   const toolsByCategory = useMemo(
     () =>
       categories.reduce(
         (acc, category) => {
-          acc[category] = filteredTools.filter(
+          acc[category] = displayTools.filter(
             (tool) => (tool.category || "Other") === category
           );
           return acc;
         },
         {} as Record<string, typeof tools>
       ),
-    [categories, filteredTools]
+    [categories, displayTools]
   );
+
+  // Log state for debugging
+  useEffect(() => {
+    if (isSearchActive) {
+      console.log(LOG_PREFIX, "Search state:", {
+        query: searchQuery,
+        isSearching,
+        hasVectorResults: vectorResults !== null,
+        vectorResultCount: vectorResults?.length ?? 0,
+        clientFilterCount: clientFilteredTools.length,
+        displayToolCount: displayTools.length,
+        error: searchError,
+      });
+    }
+  }, [
+    searchQuery,
+    isSearching,
+    vectorResults,
+    clientFilteredTools.length,
+    displayTools.length,
+    searchError,
+    isSearchActive,
+  ]);
 
   return (
     <div
@@ -243,12 +410,19 @@ export function ContextSidebar({
                     </Tooltip>
                   </div>
                 </div>
-                <SidebarInput
-                  className="h-8 focus-visible:ring-ring"
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search tools..."
-                  value={searchQuery}
-                />
+                <div className="relative">
+                  <SidebarInput
+                    className="h-8 focus-visible:ring-ring"
+                    onChange={handleSearchChange}
+                    placeholder="Search tools..."
+                    value={searchQuery}
+                  />
+                  {isSearching && (
+                    <div className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-2">
+                      <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                    </div>
+                  )}
+                </div>
               </div>
             </SidebarMenu>
           </SidebarHeader>
@@ -277,7 +451,65 @@ export function ContextSidebar({
                   </div>
                 </SidebarGroupContent>
               </SidebarGroup>
-            ) : filteredTools.length === 0 ? (
+            ) : isSearchActive ? (
+              // Search mode
+              <SidebarGroup>
+                <SidebarGroupLabel>
+                  {isSearching
+                    ? "Searching..."
+                    : displayTools.length > 0
+                      ? `${displayTools.length} result${displayTools.length === 1 ? "" : "s"}`
+                      : "Results"}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  {isSearching ? (
+                    // Loading skeletons during search
+                    <div className="flex flex-col">
+                      {[52, 40, 64, 48, 56].map((item) => {
+                        const skeletonStyles = {
+                          "--skeleton-width": `${item}%`,
+                        } as CSSProperties;
+                        return (
+                          <div
+                            className="flex h-8 animate-pulse items-center gap-2 rounded-md px-2"
+                            key={item}
+                          >
+                            <div
+                              className="h-4 max-w-[var(--skeleton-width)] flex-1 rounded-md bg-sidebar-accent-foreground/10"
+                              style={skeletonStyles}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : displayTools.length === 0 ? (
+                    // No results
+                    <div
+                      className={cn(
+                        "flex flex-row items-center justify-center gap-2 px-2 py-4 text-sm",
+                        "w-full",
+                        "text-sidebar-foreground/60"
+                      )}
+                    >
+                      No tools found.
+                    </div>
+                  ) : (
+                    // Search results list
+                    <SidebarMenu>
+                      {displayTools.map((tool) => (
+                        <ContextSidebarItem
+                          isActive={activeToolIds.includes(tool.id)}
+                          key={tool.id}
+                          onToggle={toggleTool}
+                          tool={tool}
+                        />
+                      ))}
+                    </SidebarMenu>
+                  )}
+                </SidebarGroupContent>
+              </SidebarGroup>
+            ) : displayTools.length === 0 ? (
+              // No tools at all
               <SidebarGroup>
                 <SidebarGroupContent>
                   <div
@@ -287,13 +519,12 @@ export function ContextSidebar({
                       "text-sidebar-foreground/60"
                     )}
                   >
-                    {searchQuery
-                      ? "No tools found."
-                      : "No tools available yet."}
+                    No tools available yet.
                   </div>
                 </SidebarGroupContent>
               </SidebarGroup>
             ) : (
+              // Default view - grouped by category
               categories.map((category) => {
                 const categoryTools = toolsByCategory[category];
                 if (categoryTools.length === 0) {
