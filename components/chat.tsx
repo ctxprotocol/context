@@ -27,6 +27,7 @@ import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { useDebugMode } from "@/hooks/use-debug-mode";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
 import { contextRouterAbi } from "@/lib/generated";
+import { getEstimatedModelCost } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -212,20 +213,34 @@ export function Chat({
     console.log("[chat-client] Processing Auto Mode payment (two-phase)", toolSelection);
 
     try {
-      // Calculate total amount
-      const totalAmount = toolSelection.selectedTools.reduce((sum, tool) => {
+      // Calculate tool fees
+      const toolFees = toolSelection.selectedTools.reduce((sum, tool) => {
         return sum + parseUnits(tool.price ?? "0", 6);
       }, 0n);
 
-      // Record spend for budget tracking
-      const totalCostUSD = Number(totalAmount) / 1_000_000;
-      recordSpend(totalCostUSD);
+      // Calculate model cost for logging (platform absorbs this cost via 10% fee)
+      const modelCostUSD = getEstimatedModelCost(currentModelIdRef.current);
+
+      // Record ONLY tool fees against budget (model cost is platform operational expense)
+      const toolFeesUSD = Number(toolFees) / 1_000_000;
+      recordSpend(toolFeesUSD);
+
+      console.log("[chat-client] Auto Mode payment breakdown", {
+        toolFees: toolFeesUSD,
+        modelCost: modelCostUSD,
+        note: "Model cost absorbed by platform via 10% fee",
+      });
 
       // Encode batch payment transaction
+      // Note: Model costs are tracked for budget purposes but NOT included in on-chain payments
+      // Reason: The ContextRouter does 90/10 split - model costs are a pass-through, not developer revenue
+      // The 10% platform fee from tool payments covers operational costs including model API fees
+      // TODO: Future contract upgrade could add separate model cost payment mechanism
       const toolIds = toolSelection.selectedTools.map(() => 0n); // Tool IDs not used in contract
       const developerWallets = toolSelection.selectedTools.map(
         (t) => t.developerWallet as `0x${string}`
       );
+      // Each developer gets exactly their tool price - no model cost included
       const amounts = toolSelection.selectedTools.map((t) =>
         parseUnits(t.price ?? "0", 6)
       );
