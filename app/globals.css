@@ -27,6 +27,10 @@
     var(--foreground) 75%,
     var(--muted-foreground) 100%
   );
+  /* GPU acceleration hints to prevent animation freeze during JS execution */
+  will-change: background-position;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 @utility ai-thinking-gradient {

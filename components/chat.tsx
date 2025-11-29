@@ -43,6 +43,13 @@ import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
 
 /**
+ * Throttle interval for streaming updates (ms)
+ * This prevents excessive re-renders during rapid streaming
+ * which can freeze CSS animations
+ */
+const STREAMING_THROTTLE_MS = 150;
+
+/**
  * Auto Mode Tool Selection data from server (two-phase model)
  * Sent after discovery phase when AI has selected tools to use
  * User must approve and pay before execution phase begins
@@ -99,6 +106,58 @@ export function Chat({
   const { isAutoMode, recordSpend } = useAutoPay();
   const autoModeRef = useRef(isAutoMode);
   const { client: smartWalletClient } = useSmartWallets();
+
+  // Throttled streaming updates to prevent animation freeze
+  // Buffer the latest values and commit at intervals
+  const streamingCodeRef = useRef<string | null>(null);
+  const streamingReasoningRef = useRef<string | null>(null);
+  const lastStreamingUpdateRef = useRef<number>(0);
+  const pendingStreamingUpdateRef = useRef<number | null>(null);
+
+  // Throttled setter for streaming code - reduces re-renders during rapid streaming
+  const throttledSetStreamingCode = useCallback((code: string | null) => {
+    streamingCodeRef.current = code;
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastStreamingUpdateRef.current;
+    
+    // If enough time has passed, update immediately
+    if (timeSinceLastUpdate >= STREAMING_THROTTLE_MS) {
+      lastStreamingUpdateRef.current = now;
+      setStreamingCode(code);
+    } else if (!pendingStreamingUpdateRef.current) {
+      // Schedule an update for when throttle period ends
+      pendingStreamingUpdateRef.current = window.setTimeout(() => {
+        pendingStreamingUpdateRef.current = null;
+        lastStreamingUpdateRef.current = Date.now();
+        setStreamingCode(streamingCodeRef.current);
+        if (streamingReasoningRef.current !== null) {
+          setStreamingReasoning(streamingReasoningRef.current);
+        }
+      }, STREAMING_THROTTLE_MS - timeSinceLastUpdate);
+    }
+  }, [setStreamingCode, setStreamingReasoning]);
+
+  // Throttled setter for streaming reasoning
+  const throttledSetStreamingReasoning = useCallback((reasoning: string | null) => {
+    streamingReasoningRef.current = reasoning;
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastStreamingUpdateRef.current;
+    
+    if (timeSinceLastUpdate >= STREAMING_THROTTLE_MS) {
+      lastStreamingUpdateRef.current = now;
+      setStreamingReasoning(reasoning);
+    }
+    // Otherwise it will be batched with the code update
+  }, [setStreamingReasoning]);
+
+  // Cleanup pending updates on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingStreamingUpdateRef.current) {
+        clearTimeout(pendingStreamingUpdateRef.current);
+      }
+    };
+  }, []);
 
   // Auto Mode tool selection state (two-phase model)
   const [pendingToolSelection, setPendingToolSelection] = useState<AutoModeToolSelection | null>(null);
@@ -270,62 +329,92 @@ export function Chat({
         setUsage(dataPart.data);
       }
       // Handle custom protocol messages
+      // Use a switch for cleaner, single-pass handling of each message type
       const part = dataPart as any;
-      if (part.type === "data-toolStatus" && typeof part.data === "object") {
-        const statusValue = part.data.status;
-        if (statusValue === "planning") {
-          setStage("planning");
-        } else if (statusValue === "executing") {
-          setStage("executing");
-        } else if (statusValue === "thinking") {
-          setStage("thinking");
-        } else if (statusValue === "confirming-payment") {
-          // Auto Mode JIT payment - includes tool name and price
-          const toolName = part.data.toolName as string | undefined;
-          setStage("confirming-payment", toolName ?? undefined);
+      const partType = part.type as string;
+      
+      switch (partType) {
+        // Tool status changes - consolidated handler for all stages
+        case "data-toolStatus": {
+          if (typeof part.data === "object") {
+            const statusValue = part.data.status;
+            const toolNameFromStatus = part.data.toolName as string | undefined;
+            // Single setStage call based on status
+            switch (statusValue) {
+              case "discovering-tools":
+              case "planning":
+              case "executing":
+              case "thinking":
+              case "awaiting-tool-approval":
+                setStage(statusValue);
+                break;
+              case "confirming-payment":
+                setStage("confirming-payment", toolNameFromStatus ?? undefined);
+                break;
+              default:
+                break;
+            }
+          }
+          break;
         }
-      }
-      // Stream planning code for real-time display
-      if (part.type === "data-debugCode" && typeof part.data === "string") {
-        setStreamingCode(part.data);
-      }
-      // Stream execution result for display
-      if (part.type === "data-debugResult" && typeof part.data === "string") {
-        setDebugResult(part.data);
-      }
-      // Stream execution progress (tool queries, results, errors)
-      if (part.type === "data-executionProgress" && typeof part.data === "object") {
-        const { type, toolName, message, timestamp } = part.data as {
-          type: "query" | "result" | "error";
-          toolName: string;
-          message: string;
-          timestamp: number;
-        };
-        addExecutionLog({ type, toolName, message, timestamp });
-      }
-      // Stream reasoning/thinking content from models that support it
-      if (part.type === "data-reasoning" && typeof part.data === "string") {
-        setStreamingReasoning(part.data);
-      }
-      // Signal that reasoning is complete and code generation is starting
-      if (part.type === "data-reasoningComplete" && part.data === true) {
-        setReasoningComplete(true);
-      }
-      // Auto Mode: Server has selected tools and is awaiting payment approval (two-phase model)
-      // This is the discovery phase result - tools have been selected but NOT executed yet
-      if (part.type === "data-autoModeToolSelection" && typeof part.data === "object") {
-        console.log("[chat-client] Auto Mode tool selection received", part.data);
-        setPendingToolSelection(part.data as AutoModeToolSelection);
-        // Stage will be set by data-toolStatus to "awaiting-tool-approval"
-      }
-      // Handle the new discovering-tools and awaiting-tool-approval stages
-      if (part.type === "data-toolStatus" && typeof part.data === "object") {
-        const statusValue = part.data.status;
-        if (statusValue === "discovering-tools") {
-          setStage("discovering-tools");
-        } else if (statusValue === "awaiting-tool-approval") {
-          setStage("awaiting-tool-approval");
+        
+        // Stream planning code for real-time display (throttled to prevent animation freeze)
+        case "data-debugCode": {
+          if (typeof part.data === "string") {
+            throttledSetStreamingCode(part.data);
+          }
+          break;
         }
+        
+        // Stream execution result for display
+        case "data-debugResult": {
+          if (typeof part.data === "string") {
+            setDebugResult(part.data);
+          }
+          break;
+        }
+        
+        // Stream execution progress (tool queries, results, errors)
+        case "data-executionProgress": {
+          if (typeof part.data === "object") {
+            const { type, toolName, message, timestamp } = part.data as {
+              type: "query" | "result" | "error";
+              toolName: string;
+              message: string;
+              timestamp: number;
+            };
+            addExecutionLog({ type, toolName, message, timestamp });
+          }
+          break;
+        }
+        
+        // Stream reasoning/thinking content from models that support it (throttled)
+        case "data-reasoning": {
+          if (typeof part.data === "string") {
+            throttledSetStreamingReasoning(part.data);
+          }
+          break;
+        }
+        
+        // Signal that reasoning is complete and code generation is starting
+        case "data-reasoningComplete": {
+          if (part.data === true) {
+            setReasoningComplete(true);
+          }
+          break;
+        }
+        
+        // Auto Mode: Server has selected tools and is awaiting payment approval
+        case "data-autoModeToolSelection": {
+          if (typeof part.data === "object") {
+            console.log("[chat-client] Auto Mode tool selection received", part.data);
+            setPendingToolSelection(part.data as AutoModeToolSelection);
+          }
+          break;
+        }
+        
+        default:
+          break;
       }
     },
     onFinish: () => {

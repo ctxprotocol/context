@@ -89,10 +89,12 @@ export function PaymentStatusProvider({ children }: { children: ReactNode }) {
     if (newStage === "executing") {
       setExecutionLogs([]);
     }
-    // Clear reasoning state when starting planning
-    if (newStage === "planning") {
+    // Clear reasoning and code state when starting discovery or planning
+    // This ensures a fresh state for each new AI thinking phase
+    if (newStage === "discovering-tools" || newStage === "planning") {
       setStreamingReasoningState(null);
       setIsReasoningComplete(false);
+      setStreamingCodeState(null);
     }
     // Reset transaction info when starting a new payment
     if (newStage === "confirming-payment") {
@@ -174,6 +176,21 @@ export function usePaymentStatus() {
 /**
  * Get human-readable status message for each payment stage
  * Follows design-system.json typography (text-sm, muted-foreground)
+ *
+ * AUTO MODE FLOW:
+ * 1. "discovering-tools" - AI analyzes query and searches marketplace for tools
+ * 2. "awaiting-tool-approval" - Tools selected, waiting for payment confirmation
+ * 3. "confirming-payment" - Processing blockchain payment
+ * 4. "planning" - AI planning how to use the selected tools (generates code)
+ * 5. "executing" - Running the generated code to call tools
+ * 6. "thinking" - AI analyzing results and formulating response
+ *
+ * MANUAL MODE FLOW:
+ * 1. "setting-cap" - User setting spending cap
+ * 2. "confirming-payment" - Processing blockchain payment
+ * 3. "planning" - AI planning how to use the selected tools
+ * 4. "executing" - Running the generated code
+ * 5. "thinking" - Formulating response
  */
 export function getPaymentStatusMessage(
   stage: PaymentStage,
@@ -187,20 +204,20 @@ export function getPaymentStatusMessage(
         ? `Confirming payment for ${toolName}...`
         : "Confirming payment...";
     case "planning":
-      return "Planning...";
+      return "Planning execution...";
     case "discovering-tools":
       return "Discovering tools...";
     case "awaiting-tool-approval":
       return toolName
         ? `Found: ${toolName}`
-        : "Reviewing available tools...";
+        : "Selecting tools...";
     case "querying-tool":
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
     case "executing":
       return "Executing...";
     case "thinking":
-      return "Thinking...";
+      return "Analyzing results...";
     default:
-      return "Thinking...";
+      return "Processing...";
   }
 }

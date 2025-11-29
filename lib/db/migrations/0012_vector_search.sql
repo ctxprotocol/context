@@ -14,3 +14,5 @@ ALTER TABLE "AITool" ADD COLUMN IF NOT EXISTS "search_text" text;
 CREATE INDEX IF NOT EXISTS "AITool_embedding_idx" 
 ON "AITool" USING hnsw ("embedding" vector_cosine_ops);
 
+
+

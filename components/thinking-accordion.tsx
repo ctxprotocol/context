@@ -460,7 +460,7 @@ function PureThinkingAccordion({
                   />
                 )}
 
-                {/* Show searching indicator when no reasoning */}
+                {/* Show searching indicator when no reasoning yet */}
                 {!hasReasoning && !extractedCode && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-cyan-500/70" />
@@ -502,7 +502,7 @@ function PureThinkingAccordion({
                   />
                 )}
 
-                {/* Phase 2: Show "generating code..." when waiting for code */}
+                {/* Phase 2: Show "generating code..." when waiting for first content to arrive */}
                 {!extractedCode && !hasReasoning && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
