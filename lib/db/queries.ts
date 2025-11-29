@@ -38,6 +38,8 @@ import {
   toolQuery,
   type User,
   user,
+  type UserSettings,
+  userSettings,
   vote,
 } from "./schema";
 import { generateHashedPassword } from "./utils";
@@ -1339,5 +1341,147 @@ export async function verifyAITool({
   } catch (error) {
     console.error("Failed to verify tool:", error);
     throw new ChatSDKError("bad_request:database", "Failed to verify tool");
+  }
+}
+
+// ============================================================================
+// USER SETTINGS QUERIES (BYOK / Tier System)
+// ============================================================================
+
+/**
+ * Get user settings by user ID
+ */
+export async function getUserSettings(
+  userId: string
+): Promise<UserSettings | null> {
+  try {
+    const [settings] = await db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId));
+    return settings ?? null;
+  } catch (_error) {
+    console.error("Failed to get user settings:", _error);
+    return null;
+  }
+}
+
+/**
+ * Upsert user settings (create or update)
+ */
+export async function upsertUserSettings(
+  userId: string,
+  data: Partial<Omit<UserSettings, "userId" | "createdAt">>
+) {
+  try {
+    return await db
+      .insert(userSettings)
+      .values({
+        userId,
+        ...data,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: userSettings.userId,
+        set: { ...data, updatedAt: new Date() },
+      })
+      .returning();
+  } catch (error) {
+    console.error("Failed to upsert user settings:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to update user settings"
+    );
+  }
+}
+
+/**
+ * Increment free queries used counter for a user.
+ * Automatically resets if it's a new day.
+ */
+export async function incrementFreeQueriesUsed(userId: string): Promise<number> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  try {
+    // Get current settings
+    const settings = await getUserSettings(userId);
+
+    // Check if we need to reset (new day)
+    if (!settings?.freeQueriesResetAt || settings.freeQueriesResetAt < todayStart) {
+      await upsertUserSettings(userId, {
+        freeQueriesUsedToday: 1,
+        freeQueriesResetAt: now,
+      });
+      return 1;
+    }
+
+    // Increment
+    const newCount = (settings.freeQueriesUsedToday ?? 0) + 1;
+    await upsertUserSettings(userId, { freeQueriesUsedToday: newCount });
+    return newCount;
+  } catch (error) {
+    console.error("Failed to increment free queries:", error);
+    // Don't throw - just log and return 0 to avoid breaking the flow
+    return 0;
+  }
+}
+
+/**
+ * Get the current free queries used today for a user.
+ * Accounts for daily reset.
+ */
+export async function getFreeQueriesUsedToday(userId: string): Promise<number> {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  try {
+    const settings = await getUserSettings(userId);
+
+    // Check if reset needed (new day)
+    if (!settings?.freeQueriesResetAt || settings.freeQueriesResetAt < todayStart) {
+      return 0;
+    }
+
+    return settings.freeQueriesUsedToday ?? 0;
+  } catch (error) {
+    console.error("Failed to get free queries count:", error);
+    return 0;
+  }
+}
+
+/**
+ * Add accumulated model cost for convenience tier billing
+ */
+export async function addAccumulatedModelCost(
+  userId: string,
+  cost: number
+): Promise<void> {
+  try {
+    const settings = await getUserSettings(userId);
+    const currentCost = Number(settings?.accumulatedModelCost ?? 0);
+    await upsertUserSettings(userId, {
+      accumulatedModelCost: String(currentCost + cost),
+    });
+  } catch (error) {
+    console.error("Failed to add accumulated model cost:", error);
+    // Don't throw - just log to avoid breaking the flow
+  }
+}
+
+/**
+ * Reset accumulated model cost (after payment collection)
+ */
+export async function resetAccumulatedModelCost(userId: string): Promise<void> {
+  try {
+    await upsertUserSettings(userId, {
+      accumulatedModelCost: "0",
+    });
+  } catch (error) {
+    console.error("Failed to reset accumulated model cost:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to reset accumulated model cost"
+    );
   }
 }

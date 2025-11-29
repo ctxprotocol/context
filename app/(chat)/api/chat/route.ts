@@ -23,7 +23,12 @@ import {
   executeSkillCode,
   REGISTERED_SKILL_MODULES,
 } from "@/lib/ai/code-executor";
-import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import {
+  canMakeQuery,
+  entitlementsByUserType,
+  FREE_TIER_DAILY_LIMIT,
+  type UserTier,
+} from "@/lib/ai/entitlements";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   autoModeDiscoveryPrompt,
@@ -32,17 +37,27 @@ import {
   regularPrompt,
   systemPrompt,
 } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import {
+  type BYOKConfig,
+  getProviderForUser,
+  myProvider,
+} from "@/lib/ai/providers";
+import { decryptApiKey } from "@/lib/crypto";
+import type { BYOKProvider } from "@/lib/db/schema";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
 import type { AllowedToolContext } from "@/lib/ai/skills/runtime";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
+  addAccumulatedModelCost,
   createStreamId,
   deleteChatById,
   getAIToolById,
   getChatById,
+  getFreeQueriesUsedToday,
   getMessageCountByUserId,
   getMessagesByChatId,
+  getUserSettings,
+  incrementFreeQueriesUsed,
   recordToolQuery,
   saveChat,
   saveMessages,
@@ -304,6 +319,7 @@ export async function POST(request: Request) {
 
     const userType: UserType = session.user.type;
 
+    // Anti-abuse limit check (high ceiling)
     const messageCount = await getMessageCountByUserId({
       id: session.user.id,
       differenceInHours: 24,
@@ -312,6 +328,64 @@ export async function POST(request: Request) {
     if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
       return new ChatSDKError("rate_limit:chat").toResponse();
     }
+
+    // === TIER SYSTEM: Determine user's tier and validate access ===
+    const userSettingsData = await getUserSettings(session.user.id);
+    const userTier: UserTier = (userSettingsData?.tier as UserTier) || "free";
+
+    // Free tier: Check daily limit
+    if (userTier === "free") {
+      const queriesUsedToday = await getFreeQueriesUsedToday(session.user.id);
+
+      if (!canMakeQuery(userTier, queriesUsedToday)) {
+        return new ChatSDKError(
+          "rate_limit:chat",
+          `Free tier limit reached (${FREE_TIER_DAILY_LIMIT}/day). Add your own API key (BYOK) or enable Convenience Tier to continue.`
+        ).toResponse();
+      }
+    }
+
+    // BYOK tier: Get user's API key and provider for dynamic provider
+    let byokConfig: BYOKConfig | undefined;
+    if (userTier === "byok" && userSettingsData?.byokProvider) {
+      const byokProvider = userSettingsData.byokProvider as BYOKProvider;
+
+      // Get the encrypted key for the selected provider
+      let encryptedKey: string | null = null;
+      switch (byokProvider) {
+        case "kimi":
+          encryptedKey = userSettingsData.kimiApiKeyEncrypted;
+          break;
+        case "gemini":
+          encryptedKey = userSettingsData.geminiApiKeyEncrypted;
+          break;
+        case "anthropic":
+          encryptedKey = userSettingsData.anthropicApiKeyEncrypted;
+          break;
+      }
+
+      if (encryptedKey) {
+        try {
+          const apiKey = decryptApiKey(encryptedKey);
+          byokConfig = { provider: byokProvider, apiKey };
+        } catch (decryptError) {
+          console.error("[chat-api] Failed to decrypt BYOK API key:", decryptError);
+          return new ChatSDKError(
+            "bad_request:chat",
+            "Your API key could not be decrypted. Please update your API key in settings."
+          ).toResponse();
+        }
+      } else {
+        console.warn("[chat-api] BYOK provider selected but no key found:", byokProvider);
+        return new ChatSDKError(
+          "bad_request:chat",
+          "No API key configured for your selected provider. Please add an API key in settings."
+        ).toResponse();
+      }
+    }
+
+    // Get the appropriate provider based on tier and BYOK config
+    const provider = byokConfig ? getProviderForUser(byokConfig) : myProvider;
 
     const paidTools = await Promise.all(
       toolInvocations.map(async (invocation) => {
@@ -487,7 +561,7 @@ export async function POST(request: Request) {
       const stream = createUIMessageStream({
         execute: ({ writer: dataStream }) => {
           const result = streamText({
-            model: myProvider.languageModel(selectedChatModel),
+            model: provider.languageModel(selectedChatModel),
             system: systemInstructions,
             messages: convertToModelMessages(uiMessages),
             stopWhen: stepCountIs(5),
@@ -500,7 +574,7 @@ export async function POST(request: Request) {
               try {
                 const providers = await getTokenlensCatalog();
                 const modelId =
-                  myProvider.languageModel(selectedChatModel).modelId;
+                  provider.languageModel(selectedChatModel).modelId;
                 if (!modelId) {
                   finalMergedUsage = usage;
                   dataStream.write({
@@ -561,6 +635,11 @@ export async function POST(request: Request) {
             })),
           });
 
+          // === TIER SYSTEM: Track usage ===
+          if (userTier === "free") {
+            await incrementFreeQueriesUsed(session.user.id);
+          }
+
           if (finalMergedUsage) {
             try {
               await updateChatLastContextById({
@@ -579,6 +658,7 @@ export async function POST(request: Request) {
               console.log("[cost-tracking] Model cost comparison:", {
                 chatId: id,
                 model: selectedChatModel,
+                userTier,
                 estimatedCost: `$${estimatedCost.toFixed(6)}`,
                 actualCost: `$${actualCost.toFixed(6)}`,
                 delta: `$${costDelta.toFixed(6)}`,
@@ -587,6 +667,15 @@ export async function POST(request: Request) {
                     ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
                     : "N/A",
               });
+
+              // Track actual cost for convenience tier
+              if (userTier === "convenience" && actualCost > 0) {
+                await addAccumulatedModelCost(session.user.id, actualCost);
+                console.log("[cost-tracking] Accumulated model cost for convenience tier:", {
+                  userId: session.user.id,
+                  costAdded: actualCost,
+                });
+              }
             } catch (err) {
               console.warn("Unable to persist last usage for chat", id, err);
             }
@@ -690,7 +779,7 @@ export async function POST(request: Request) {
           // fullStream preserves reasoning parts that Kimi K2 Thinking outputs natively.
           // NOTE: smoothStream is NOT used here as it's incompatible with fullStream.
           const planningResult = streamText({
-            model: myProvider.languageModel(selectedChatModel),
+            model: provider.languageModel(selectedChatModel),
             system: planningSystemInstructions,
             messages: baseModelMessages,
             experimental_telemetry: {
@@ -1349,7 +1438,7 @@ Anti-Hallucination Rules:
 ${devPrefix}`;
 
           const result = streamText({
-            model: myProvider.languageModel(selectedChatModel),
+            model: provider.languageModel(selectedChatModel),
             system: answerSystemInstructions,
             messages: finalMessages,
             stopWhen: stepCountIs(5),
@@ -1362,7 +1451,7 @@ ${devPrefix}`;
               try {
                 const providers = await getTokenlensCatalog();
                 const modelId =
-                  myProvider.languageModel(selectedChatModel).modelId;
+                  provider.languageModel(selectedChatModel).modelId;
                 if (!modelId) {
                   finalMergedUsage = usage;
                   dataStream.write({
@@ -1430,6 +1519,11 @@ ${devPrefix}`;
           })),
         });
 
+        // === TIER SYSTEM: Track usage ===
+        if (userTier === "free") {
+          await incrementFreeQueriesUsed(session.user.id);
+        }
+
         if (finalMergedUsage) {
           try {
             await updateChatLastContextById({
@@ -1448,6 +1542,7 @@ ${devPrefix}`;
             console.log("[cost-tracking] Model cost comparison (paid tools):", {
               chatId: id,
               model: selectedChatModel,
+              userTier,
               estimatedCost: `$${estimatedCost.toFixed(6)}`,
               actualCost: `$${actualCost.toFixed(6)}`,
               delta: `$${costDelta.toFixed(6)}`,
@@ -1456,6 +1551,15 @@ ${devPrefix}`;
                   ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
                   : "N/A",
             });
+
+            // Track actual cost for convenience tier
+            if (userTier === "convenience" && actualCost > 0) {
+              await addAccumulatedModelCost(session.user.id, actualCost);
+              console.log("[cost-tracking] Accumulated model cost for convenience tier:", {
+                userId: session.user.id,
+                costAdded: actualCost,
+              });
+            }
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);
           }

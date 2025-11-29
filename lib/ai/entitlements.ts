@@ -1,24 +1,36 @@
 import type { UserType } from "@/app/(auth)/auth";
 import type { ChatModel } from "./models";
 
+/**
+ * User tier for the BYOK system:
+ * - free: Limited daily queries using platform's API key
+ * - byok: Unlimited queries using user's own API key
+ * - convenience: Pay-as-you-go model cost pass-through
+ */
+export type UserTier = "free" | "byok" | "convenience";
+
 type Entitlements = {
   maxMessagesPerDay: number;
   availableChatModelIds: ChatModel["id"][];
 };
 
+/**
+ * Base entitlements by user type (anti-abuse limits).
+ * These are high ceilings - actual limiting is via tier system.
+ */
 export const entitlementsByUserType: Record<UserType, Entitlements> = {
   /*
    * For users without an account
-   * High ceiling for anti-abuse only - actual limiting is via micropayments
+   * Very limited - should sign up to get more
    */
   guest: {
-    maxMessagesPerDay: 10_000,
-    availableChatModelIds: ["chat-model", "chat-model-reasoning"],
+    maxMessagesPerDay: 5,
+    availableChatModelIds: ["chat-model"],
   },
 
   /*
    * For users with an account
-   * High ceiling for anti-abuse only - actual limiting is via micropayments
+   * High ceiling for anti-abuse only - actual limiting is via tier system
    */
   regular: {
     maxMessagesPerDay: 10_000,
@@ -29,3 +41,33 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
    * TODO: For users with an account and a paid membership
    */
 };
+
+/**
+ * Free tier daily limit for regular users.
+ * Users can upgrade to BYOK or Convenience tier for unlimited queries.
+ */
+export const FREE_TIER_DAILY_LIMIT = 20;
+
+/**
+ * Check if a user has exceeded their free tier limit.
+ * Returns the remaining queries or -1 if unlimited (BYOK/convenience tier).
+ */
+export function getRemainingFreeQueries(
+  tier: UserTier,
+  usedToday: number
+): number {
+  if (tier === "byok" || tier === "convenience") {
+    return -1; // Unlimited
+  }
+  return Math.max(0, FREE_TIER_DAILY_LIMIT - usedToday);
+}
+
+/**
+ * Check if a user can make a query based on their tier and usage.
+ */
+export function canMakeQuery(tier: UserTier, usedToday: number): boolean {
+  if (tier === "byok" || tier === "convenience") {
+    return true; // Unlimited for BYOK and convenience tiers
+  }
+  return usedToday < FREE_TIER_DAILY_LIMIT;
+}

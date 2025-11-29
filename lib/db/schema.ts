@@ -26,6 +26,52 @@ export const user = pgTable("User", {
 
 export type User = InferSelectModel<typeof user>;
 
+// Supported BYOK providers (explicitly NO OpenAI)
+export type BYOKProvider = "kimi" | "gemini" | "anthropic";
+
+// User Settings for BYOK and tier management
+export const userSettings = pgTable("UserSettings", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => user.id),
+
+  // BYOK Settings - Multiple provider support
+  // Note: We explicitly do NOT support OpenAI due to their API usage tracking practices
+  kimiApiKeyEncrypted: text("kimi_api_key_encrypted"), // Moonshot/Kimi API key
+  geminiApiKeyEncrypted: text("gemini_api_key_encrypted"), // Google Gemini API key
+  anthropicApiKeyEncrypted: text("anthropic_api_key_encrypted"), // Anthropic Claude API key
+
+  // Which provider to use for BYOK (null = use platform default)
+  byokProvider: varchar("byok_provider", { length: 20 }), // "kimi" | "gemini" | "anthropic"
+
+  useBYOK: boolean("use_byok").notNull().default(false),
+
+  // Tier Settings: "free" | "byok" | "convenience"
+  tier: varchar("tier", { length: 20 }).notNull().default("free"),
+
+  // Convenience Tier - Model Cost Pass-through
+  enableModelCostPassthrough: boolean("enable_model_cost_passthrough")
+    .notNull()
+    .default(false),
+
+  // Accumulated model costs (for convenience tier billing)
+  accumulatedModelCost: numeric("accumulated_model_cost", {
+    precision: 18,
+    scale: 6,
+  })
+    .notNull()
+    .default("0"),
+
+  // Free tier tracking (daily reset)
+  freeQueriesUsedToday: integer("free_queries_used_today").notNull().default(0),
+  freeQueriesResetAt: timestamp("free_queries_reset_at"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type UserSettings = InferSelectModel<typeof userSettings>;
+
 export const chat = pgTable("Chat", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),

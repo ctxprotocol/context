@@ -194,6 +194,11 @@ export function SidebarUserNav() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
+              <Link className="w-full cursor-pointer" href="/settings">
+                Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link className="w-full cursor-pointer" href="/contribute">
                 Contribute a tool
               </Link>
