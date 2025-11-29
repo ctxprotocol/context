@@ -1,3 +1,5 @@
+import type { BYOKProvider } from "../db/schema";
+
 export const DEFAULT_CHAT_MODEL: string = "chat-model";
 
 export type ChatModel = {
@@ -17,11 +19,59 @@ export type ChatModel = {
   supportsBYOK: boolean;
 };
 
+/**
+ * Provider-specific model display names and descriptions
+ */
+export const PROVIDER_MODEL_INFO: Record<
+  BYOKProvider,
+  {
+    chat: { name: string; description: string };
+    reasoning: { name: string; description: string };
+  }
+> = {
+  kimi: {
+    chat: {
+      name: "Kimi K2",
+      description: "Advanced multimodal model with long context understanding",
+    },
+    reasoning: {
+      name: "Kimi K2 Thinking",
+      description:
+        "Uses advanced chain-of-thought reasoning with extended thinking process",
+    },
+  },
+  gemini: {
+    chat: {
+      name: "Gemini 2.0 Flash",
+      description: "Fast multimodal model with 2M context window",
+    },
+    reasoning: {
+      name: "Gemini 2.0 Thinking",
+      description:
+        "Experimental thinking model with enhanced reasoning capabilities",
+    },
+  },
+  anthropic: {
+    chat: {
+      name: "Claude Sonnet 4",
+      description: "High-performance model optimized for complex tasks",
+    },
+    reasoning: {
+      name: "Claude Sonnet 4",
+      description:
+        "Premium quality reasoning with extended thinking capabilities",
+    },
+  },
+};
+
+/**
+ * Base chat models (platform default - Kimi)
+ */
 export const chatModels: ChatModel[] = [
   {
     id: "chat-model",
-    name: "Kimi K2",
-    description: "Advanced multimodal model with long context understanding",
+    name: PROVIDER_MODEL_INFO.kimi.chat.name,
+    description: PROVIDER_MODEL_INFO.kimi.chat.description,
     // Average ~2000 input + ~500 output tokens per query
     // Kimi K2 pricing: ~$0.001/1K input, ~$0.002/1K output = ~$0.003 avg
     estimatedCostPerQuery: 0.003,
@@ -29,15 +79,42 @@ export const chatModels: ChatModel[] = [
   },
   {
     id: "chat-model-reasoning",
-    name: "Kimi K2 Thinking",
-    description:
-      "Uses advanced chain-of-thought reasoning with extended thinking process",
+    name: PROVIDER_MODEL_INFO.kimi.reasoning.name,
+    description: PROVIDER_MODEL_INFO.kimi.reasoning.description,
     // Reasoning models use more tokens due to thinking process
     // ~3000 input + ~2000 output + ~1000 reasoning = ~$0.008 avg
     estimatedCostPerQuery: 0.008,
     supportsBYOK: true,
   },
 ];
+
+/**
+ * Get chat models with provider-specific names
+ * @param provider - The BYOK provider (or null for platform default)
+ */
+export function getChatModelsForProvider(
+  provider: BYOKProvider | null
+): ChatModel[] {
+  const activeProvider = provider || "kimi";
+  const providerInfo = PROVIDER_MODEL_INFO[activeProvider];
+
+  return [
+    {
+      id: "chat-model",
+      name: providerInfo.chat.name,
+      description: providerInfo.chat.description,
+      estimatedCostPerQuery: 0.003,
+      supportsBYOK: true,
+    },
+    {
+      id: "chat-model-reasoning",
+      name: providerInfo.reasoning.name,
+      description: providerInfo.reasoning.description,
+      estimatedCostPerQuery: 0.008,
+      supportsBYOK: true,
+    },
+  ];
+}
 
 /**
  * Get estimated model cost for a given model ID.

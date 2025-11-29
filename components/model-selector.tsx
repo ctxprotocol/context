@@ -10,8 +10,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useUserSettings } from "@/hooks/use-user-settings";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
-import { chatModels } from "@/lib/ai/models";
+import { getChatModelsForProvider } from "@/lib/ai/models";
+import type { BYOKProvider } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 import { CheckCircleFillIcon, ChevronDownIcon } from "./icons";
 
@@ -27,10 +29,19 @@ export function ModelSelector({
   const [optimisticModelId, setOptimisticModelId] =
     useOptimistic(selectedModelId);
 
+  const { settings } = useUserSettings();
   const userType = session.user.type;
   const { availableChatModelIds } = entitlementsByUserType[userType];
 
-  const availableChatModels = chatModels.filter((chatModel) =>
+  // Get models with provider-specific names based on BYOK settings
+  const byokProvider: BYOKProvider | null =
+    settings.tier === "byok" && settings.byokProvider
+      ? (settings.byokProvider as BYOKProvider)
+      : null;
+
+  const allModelsForProvider = getChatModelsForProvider(byokProvider);
+
+  const availableChatModels = allModelsForProvider.filter((chatModel) =>
     availableChatModelIds.includes(chatModel.id)
   );
 
