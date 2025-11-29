@@ -37,7 +37,13 @@ import { useSessionTools } from "@/hooks/use-session-tools";
 import { useToolSelection } from "@/hooks/use-tool-selection";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
-import { chatModels, getEstimatedModelCost } from "@/lib/ai/models";
+import { useUserSettings } from "@/hooks/use-user-settings";
+import {
+  chatModels,
+  getChatModelsForProvider,
+  getEstimatedModelCost,
+} from "@/lib/ai/models";
+import type { BYOKProvider } from "@/lib/db/schema";
 import { myProvider } from "@/lib/ai/providers";
 import type { AITool } from "@/lib/db/schema";
 import {
@@ -1374,12 +1380,21 @@ function PureModelSelectorCompact({
   isReadonly: boolean;
 }) {
   const [optimisticModelId, setOptimisticModelId] = useState(selectedModelId);
+  const { settings } = useUserSettings();
 
   useEffect(() => {
     setOptimisticModelId(selectedModelId);
   }, [selectedModelId]);
 
-  const selectedModel = chatModels.find(
+  // Get models based on BYOK provider
+  const byokProvider: BYOKProvider | null =
+    settings.tier === "byok" && settings.byokProvider
+      ? (settings.byokProvider as BYOKProvider)
+      : null;
+
+  const availableModels = getChatModelsForProvider(byokProvider);
+
+  const selectedModel = availableModels.find(
     (model) => model.id === optimisticModelId
   );
 
@@ -1389,7 +1404,7 @@ function PureModelSelectorCompact({
         if (isReadonly) {
           return;
         }
-        const model = chatModels.find((m) => m.name === modelName);
+        const model = availableModels.find((m) => m.name === modelName);
         if (model) {
           setOptimisticModelId(model.id);
           onModelChange?.(model.id);
@@ -1411,7 +1426,7 @@ function PureModelSelectorCompact({
       </Trigger>
       <PromptInputModelSelectContent className="min-w-[260px] p-0">
         <div className="flex flex-col gap-px">
-          {chatModels.map((model) => (
+          {availableModels.map((model) => (
             <SelectItem key={model.id} value={model.name}>
               <div className="truncate font-medium text-xs">{model.name}</div>
               <div className="mt-px truncate text-[10px] text-muted-foreground leading-tight">

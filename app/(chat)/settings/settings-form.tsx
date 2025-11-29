@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { mutate } from "swr";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -145,7 +146,10 @@ export function SettingsForm() {
   const refreshSettings = async () => {
     const response = await fetch("/api/settings");
     if (response.ok) {
-      setSettings(await response.json());
+      const data = await response.json();
+      setSettings(data);
+      // Also invalidate the SWR cache so model selector updates immediately
+      mutate("/api/settings", data, { revalidate: false });
     }
   };
 

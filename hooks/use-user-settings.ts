@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import useSWR from "swr";
 import type { UserTier } from "@/lib/ai/entitlements";
 
 type BYOKProvider = "kimi" | "gemini" | "anthropic" | null;
@@ -23,34 +24,87 @@ const DEFAULT_SETTINGS: UserSettings = {
   freeQueriesDailyLimit: 20,
 };
 
-export function useUserSettings() {
-  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+const SETTINGS_CACHE_KEY = "context-user-settings";
 
-  useEffect(() => {
-    async function fetchSettings() {
-      try {
-        const response = await fetch("/api/settings");
-        if (response.ok) {
-          const data = await response.json();
-          setSettings({
-            tier: data.tier || "free",
-            useBYOK: data.useBYOK || false,
-            byokProvider: data.byokProvider || null,
-            configuredProviders: data.configuredProviders || [],
-            freeQueriesUsedToday: data.freeQueriesUsedToday || 0,
-            freeQueriesDailyLimit: data.freeQueriesDailyLimit || 20,
-          });
-        }
-      } catch (_error) {
-        // Use defaults on error
-      } finally {
-        setLoading(false);
-      }
+// Try to get cached settings from sessionStorage
+function getCachedSettings(): UserSettings | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
     }
-    fetchSettings();
-  }, []);
-
-  return { settings, loading };
+  } catch {
+    // Ignore errors
+  }
+  return null;
 }
 
+// Cache settings to sessionStorage
+function cacheSettings(settings: UserSettings) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings));
+  } catch {
+    // Ignore errors
+  }
+}
+
+const fetcher = async (url: string): Promise<UserSettings> => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Failed to fetch settings");
+  }
+  const data = await response.json();
+  const settings: UserSettings = {
+    tier: data.tier || "free",
+    useBYOK: data.useBYOK || false,
+    byokProvider: data.byokProvider || null,
+    configuredProviders: data.configuredProviders || [],
+    freeQueriesUsedToday: data.freeQueriesUsedToday || 0,
+    freeQueriesDailyLimit: data.freeQueriesDailyLimit || 20,
+  };
+  // Cache for instant hydration on next page load
+  cacheSettings(settings);
+  return settings;
+};
+
+export function useUserSettings() {
+  // Start with cached settings if available for instant hydration
+  const [initialSettings] = useState<UserSettings>(() => {
+    const cached = getCachedSettings();
+    return cached || DEFAULT_SETTINGS;
+  });
+
+  const { data, error, isLoading, mutate } = useSWR<UserSettings>(
+    "/api/settings",
+    fetcher,
+    {
+      fallbackData: initialSettings,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 5000, // 5 seconds
+    }
+  );
+
+  const refresh = useCallback(() => {
+    mutate();
+  }, [mutate]);
+
+  return {
+    settings: data || DEFAULT_SETTINGS,
+    loading: isLoading,
+    error,
+    refresh,
+  };
+}
+
+// Clear cached settings (call on logout)
+export function clearUserSettingsCache() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(SETTINGS_CACHE_KEY);
+  } catch {
+    // Ignore
+  }
+}

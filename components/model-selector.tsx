@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUserSettings } from "@/hooks/use-user-settings";
@@ -16,6 +17,13 @@ import { getChatModelsForProvider } from "@/lib/ai/models";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
 import { CheckCircleFillIcon, ChevronDownIcon } from "./icons";
+
+// Provider display info
+const PROVIDER_INFO: Record<BYOKProvider, { label: string; badge: string }> = {
+  kimi: { label: "Moonshot", badge: "BYOK" },
+  gemini: { label: "Google", badge: "BYOK" },
+  anthropic: { label: "Anthropic", badge: "BYOK" },
+};
 
 export function ModelSelector({
   session,
@@ -29,7 +37,7 @@ export function ModelSelector({
   const [optimisticModelId, setOptimisticModelId] =
     useOptimistic(selectedModelId);
 
-  const { settings } = useUserSettings();
+  const { settings, loading } = useUserSettings();
   const userType = session.user.type;
   const { availableChatModelIds } = entitlementsByUserType[userType];
 
@@ -53,6 +61,9 @@ export function ModelSelector({
     [optimisticModelId, availableChatModels]
   );
 
+  // Show provider badge for BYOK users
+  const providerInfo = byokProvider ? PROVIDER_INFO[byokProvider] : null;
+
   return (
     <DropdownMenu onOpenChange={setOpen} open={open}>
       <DropdownMenuTrigger
@@ -67,7 +78,9 @@ export function ModelSelector({
           data-testid="model-selector"
           variant="outline"
         >
-          {selectedChatModel?.name}
+          <span className={cn(loading && "opacity-50")}>
+            {selectedChatModel?.name}
+          </span>
           <ChevronDownIcon />
         </Button>
       </DropdownMenuTrigger>
@@ -75,6 +88,21 @@ export function ModelSelector({
         align="start"
         className="min-w-[280px] max-w-[90vw] sm:min-w-[300px]"
       >
+        {/* Show BYOK provider info at top if active */}
+        {providerInfo && (
+          <>
+            <div className="px-2 py-1.5">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">
+                  {providerInfo.badge}
+                </span>
+                <span>Using {providerInfo.label} API key</span>
+              </div>
+            </div>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
         {availableChatModels.map((chatModel) => {
           const { id } = chatModel;
 
