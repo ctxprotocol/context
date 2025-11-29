@@ -1119,9 +1119,14 @@ export async function searchAITools({
   }
 }
 
+// Minimum similarity threshold for vector search results
+// Results below this threshold are filtered out (0.3 = 30% similarity)
+const SIMILARITY_THRESHOLD = 0.3;
+
 /**
  * Semantic vector search using pgvector
  * Returns tools sorted by cosine similarity to the query
+ * Only includes results above the similarity threshold
  */
 async function searchAIToolsVector({
   query,
@@ -1136,6 +1141,7 @@ async function searchAIToolsVector({
 
   // Search by cosine similarity using pgvector
   // The <=> operator computes cosine distance (1 - cosine_similarity)
+  // We filter by similarity threshold to avoid returning irrelevant results
   const results = await db.execute(sql`
     SELECT 
       id,
@@ -1157,6 +1163,7 @@ async function searchAIToolsVector({
     FROM "AITool"
     WHERE is_active = true
       AND embedding IS NOT NULL
+      AND 1 - (embedding <=> ${embeddingStr}::vector) >= ${SIMILARITY_THRESHOLD}
     ORDER BY embedding <=> ${embeddingStr}::vector
     LIMIT ${limit}
   `);
@@ -1164,6 +1171,17 @@ async function searchAIToolsVector({
   const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<
     Record<string, unknown>
   >;
+
+  // Log similarity scores for debugging
+  if (rows.length > 0) {
+    console.log(
+      "[searchAIToolsVector] Results with similarity:",
+      rows.map((r) => ({
+        name: r.name,
+        similarity: Number(r.similarity).toFixed(3),
+      }))
+    );
+  }
 
   return rows.map((tool) => ({
     id: tool.id as string,
