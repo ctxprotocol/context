@@ -471,7 +471,14 @@ export function ContextSidebar({
 
               {/* Developer Mode Toggle */}
               <div className="flex items-center justify-between py-1">
-                <span>Developer Mode</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help">Developer Mode</span>
+                  </TooltipTrigger>
+                  <TooltipContent align="start" className="max-w-[220px]">
+                    Show detailed tool execution logs and debug information.
+                  </TooltipContent>
+                </Tooltip>
                 <button
                   aria-checked={isDebugMode}
                   className={cn(
