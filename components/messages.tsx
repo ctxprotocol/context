@@ -155,8 +155,18 @@ function PureMessages({
               message.parts.length > 0 &&
               message.parts.every((part) => part.type.startsWith("data-"));
 
-            // Never render pure data-only assistant messages or empty "ghost" messages.
-            if (isGhost || hasOnlyDataParts) {
+            // FIX: Hide Auto Mode continuation messages
+            // These are system messages sent to trigger execution after payment.
+            // They should not be visible in the chat UI.
+            const isAutoModeContinuation =
+              message.role === "user" &&
+              message.parts?.length === 1 &&
+              message.parts[0].type === "text" &&
+              message.parts[0].text === "[Continue with execution]";
+
+            // Never render pure data-only assistant messages, empty "ghost" messages,
+            // or Auto Mode continuation messages.
+            if (isGhost || hasOnlyDataParts || isAutoModeContinuation) {
               return null;
             }
 
