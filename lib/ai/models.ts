@@ -42,24 +42,24 @@ export const PROVIDER_MODEL_INFO: Record<
   },
   gemini: {
     chat: {
-      name: "Gemini 2.0 Flash",
-      description: "Fast multimodal model with 2M context window",
+      name: "Gemini 3 Pro Thinking",
+      description: "Fast responses with low thinking level for everyday tasks",
     },
     reasoning: {
-      name: "Gemini 2.0 Thinking",
+      name: "Gemini 3 Pro Thinking+",
       description:
-        "Experimental thinking model with enhanced reasoning capabilities",
+        "Deep reasoning with high thinking level for complex tasks",
     },
   },
   anthropic: {
     chat: {
-      name: "Claude Sonnet 4",
-      description: "High-performance model optimized for complex tasks",
+      name: "Claude Sonnet 4.5",
+      description: "Fast, intelligent model optimized for everyday tasks",
     },
     reasoning: {
-      name: "Claude Sonnet 4",
+      name: "Claude Opus 4.5",
       description:
-        "Premium quality reasoning with extended thinking capabilities",
+        "Most capable Claude model with superior reasoning abilities",
     },
   },
 };

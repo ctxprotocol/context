@@ -65,16 +65,16 @@ const PROVIDER_MODELS = {
     artifact: "kimi-k2-turbo-preview",
   },
   gemini: {
-    chat: "gemini-2.0-flash",
-    reasoning: "gemini-2.0-flash-thinking-exp",
-    title: "gemini-2.0-flash",
-    artifact: "gemini-2.0-flash",
+    chat: "gemini-3-pro-preview",
+    reasoning: "gemini-3-pro-preview",
+    title: "gemini-2.5-flash",
+    artifact: "gemini-2.5-flash",
   },
   anthropic: {
-    chat: "claude-sonnet-4-20250514",
-    reasoning: "claude-sonnet-4-20250514",
-    title: "claude-sonnet-4-20250514",
-    artifact: "claude-sonnet-4-20250514",
+    chat: "claude-sonnet-4-5-20250929",
+    reasoning: "claude-opus-4-5-20250929",
+    title: "claude-sonnet-4-5-20250929",
+    artifact: "claude-sonnet-4-5-20250929",
   },
 } as const;
 
