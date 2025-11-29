@@ -1,11 +1,14 @@
 "use client";
 
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
+import { encodeFunctionData, parseUnits, type Hex } from "viem";
+import { base } from "viem/chains";
 import { ChatHeader } from "@/components/chat-header";
 import {
   AlertDialog,
@@ -23,6 +26,7 @@ import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { useDebugMode } from "@/hooks/use-debug-mode";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
+import { contextRouterAbi } from "@/lib/generated";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -37,6 +41,26 @@ import { toast } from "sonner";
 import { useContextSidebar } from "@/hooks/use-context-sidebar";
 import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
+
+/**
+ * Auto Mode Tool Selection data from server (two-phase model)
+ * Sent after discovery phase when AI has selected tools to use
+ * User must approve and pay before execution phase begins
+ */
+type AutoModeToolSelection = {
+  selectedTools: Array<{
+    toolId: string;
+    name: string;
+    description: string;
+    price: string;
+    developerWallet: string;
+    mcpTools?: Array<{ name: string; description?: string }>;
+    reason?: string;
+  }>;
+  totalCost: string;
+  selectionReasoning?: string;
+  originalQuery?: string;
+};
 
 export function Chat({
   id,
@@ -72,8 +96,13 @@ export function Chat({
   } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
   const debugModeRef = useRef(isDebugMode);
-  const { isAutoMode } = useAutoPay();
+  const { isAutoMode, recordSpend } = useAutoPay();
   const autoModeRef = useRef(isAutoMode);
+  const { client: smartWalletClient } = useSmartWallets();
+
+  // Auto Mode tool selection state (two-phase model)
+  const [pendingToolSelection, setPendingToolSelection] = useState<AutoModeToolSelection | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     debugModeRef.current = isDebugMode;
@@ -101,6 +130,97 @@ export function Chat({
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
+
+  // Router address for payment contract
+  const routerAddress = process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
+
+  /**
+   * Process payment for Auto Mode selected tools (two-phase model)
+   * After payment succeeds, returns the payment info needed for execution phase
+   */
+  const processToolSelectionPayment = useCallback(async (
+    toolSelection: AutoModeToolSelection
+  ): Promise<{
+    transactionHash: string;
+    selectedTools: Array<{ toolId: string; name: string; price: string; mcpToolName?: string }>;
+    originalQuery?: string;
+  } | null> => {
+    if (isProcessingPayment || !smartWalletClient) {
+      return null;
+    }
+
+    setIsProcessingPayment(true);
+    console.log("[chat-client] Processing Auto Mode payment (two-phase)", toolSelection);
+
+    try {
+      // Calculate total amount
+      const totalAmount = toolSelection.selectedTools.reduce((sum, tool) => {
+        return sum + parseUnits(tool.price ?? "0", 6);
+      }, 0n);
+
+      // Record spend for budget tracking
+      const totalCostUSD = Number(totalAmount) / 1_000_000;
+      recordSpend(totalCostUSD);
+
+      // Encode batch payment transaction
+      const toolIds = toolSelection.selectedTools.map(() => 0n); // Tool IDs not used in contract
+      const developerWallets = toolSelection.selectedTools.map(
+        (t) => t.developerWallet as `0x${string}`
+      );
+      const amounts = toolSelection.selectedTools.map((t) =>
+        parseUnits(t.price ?? "0", 6)
+      );
+
+      const txData = encodeFunctionData({
+        abi: contextRouterAbi,
+        functionName: "executeBatchPaidQuery",
+        args: [toolIds, developerWallets, amounts],
+      });
+
+      console.log("[chat-client] Sending batch payment transaction");
+
+      // Send via smart wallet with auto-signing (no popup in Auto Mode)
+      const txHash = await smartWalletClient.sendTransaction(
+        {
+          chain: base,
+          to: routerAddress,
+          data: txData,
+          value: BigInt(0),
+        },
+        {
+          uiOptions: {
+            showWalletUIs: false, // Auto-pay, no confirmation needed
+          },
+        }
+      );
+
+      if (!txHash) {
+        throw new Error("No transaction hash returned");
+      }
+
+      const hash = txHash as `0x${string}`;
+      console.log("[chat-client] Auto Mode payment confirmed", { hash });
+      toast.success("Payment confirmed! Executing tools...");
+
+      // Return payment info for execution phase
+      return {
+        transactionHash: hash,
+        selectedTools: toolSelection.selectedTools.map((t) => ({
+          toolId: t.toolId,
+          name: t.name,
+          price: t.price,
+          mcpToolName: t.mcpTools?.[0]?.name, // Primary method to call
+        })),
+        originalQuery: toolSelection.originalQuery,
+      };
+    } catch (error) {
+      console.error("[chat-client] Auto Mode payment failed", error);
+      toast.error("Payment failed. Please try again.");
+      return null;
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }, [isProcessingPayment, smartWalletClient, routerAddress, recordSpend]);
 
   const {
     messages,
@@ -159,6 +279,10 @@ export function Chat({
           setStage("executing");
         } else if (statusValue === "thinking") {
           setStage("thinking");
+        } else if (statusValue === "confirming-payment") {
+          // Auto Mode JIT payment - includes tool name and price
+          const toolName = part.data.toolName as string | undefined;
+          setStage("confirming-payment", toolName ?? undefined);
         }
       }
       // Stream planning code for real-time display
@@ -186,6 +310,22 @@ export function Chat({
       // Signal that reasoning is complete and code generation is starting
       if (part.type === "data-reasoningComplete" && part.data === true) {
         setReasoningComplete(true);
+      }
+      // Auto Mode: Server has selected tools and is awaiting payment approval (two-phase model)
+      // This is the discovery phase result - tools have been selected but NOT executed yet
+      if (part.type === "data-autoModeToolSelection" && typeof part.data === "object") {
+        console.log("[chat-client] Auto Mode tool selection received", part.data);
+        setPendingToolSelection(part.data as AutoModeToolSelection);
+        // Stage will be set by data-toolStatus to "awaiting-tool-approval"
+      }
+      // Handle the new discovering-tools and awaiting-tool-approval stages
+      if (part.type === "data-toolStatus" && typeof part.data === "object") {
+        const statusValue = part.data.status;
+        if (statusValue === "discovering-tools") {
+          setStage("discovering-tools");
+        } else if (statusValue === "awaiting-tool-approval") {
+          setStage("awaiting-tool-approval");
+        }
       }
     },
     onFinish: () => {
@@ -215,6 +355,61 @@ export function Chat({
       }
     },
   });
+
+  /**
+   * Process Auto Mode payment and trigger execution phase (two-phase model)
+   * 
+   * Flow:
+   * 1. Discovery phase completes, pendingToolSelection is set
+   * 2. This effect detects it when status is not streaming
+   * 3. Process payment via smart wallet
+   * 4. Send NEW message to server with autoModePayment to trigger execution
+   * 5. Server verifies payment and executes tools
+   * 6. Response streams back with tool results
+   */
+  useEffect(() => {
+    if (pendingToolSelection && !isProcessingPayment && status !== "streaming") {
+      const handlePaymentAndExecution = async () => {
+        // Show "Confirming payment..." 
+        setStage("confirming-payment");
+        
+        const paymentResult = await processToolSelectionPayment(pendingToolSelection);
+        
+        if (paymentResult) {
+          console.log("[chat-client] Payment confirmed, triggering execution phase");
+          
+          // Clear pending selection
+          setPendingToolSelection(null);
+          
+          // Send a continuation message to trigger execution phase
+          // The server will verify payment and execute tools
+          sendMessage(
+            {
+              role: "user" as const,
+              parts: [{ type: "text", text: "[Continue with execution]" }],
+            },
+            {
+              body: {
+                autoModePayment: {
+                  transactionHash: paymentResult.transactionHash,
+                  selectedTools: paymentResult.selectedTools,
+                  originalQuery: paymentResult.originalQuery,
+                },
+              },
+            }
+          );
+          
+          // Stage will be updated by the new stream
+          setStage("executing");
+        } else {
+          // Payment failed - reset stage
+          setPendingToolSelection(null);
+          setStage("idle");
+        }
+      };
+      handlePaymentAndExecution();
+    }
+  }, [pendingToolSelection, isProcessingPayment, status, processToolSelectionPayment, sendMessage, setStage]);
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");

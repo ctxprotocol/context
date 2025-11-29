@@ -10,17 +10,32 @@ export type AllowedToolContext = {
   executionCount: number;
 };
 
+/**
+ * Tool usage tracking for Auto Mode
+ * Records tools used during execution for batch payment at end
+ */
+export type AutoModeToolUsage = {
+  tool: AITool;
+  callCount: number;
+};
+
 export type SkillRuntime = {
   session: Session;
   dataStream?: UIMessageStreamWriter<ChatMessage>;
   requestId?: string;
   chatId?: string;
   allowedTools?: Map<string, AllowedToolContext>;
+  
   // Auto Mode: AI can discover and use tools dynamically
-  // When true, callMcpSkill will allow any active tool
   isAutoMode?: boolean;
-  // Track tools used in Auto Mode for billing
-  autoModeToolsUsed?: Map<string, { tool: AITool; callCount: number }>;
+  
+  // Auto Mode Discovery Phase: Only search marketplace, don't execute paid tools
+  // When true, callMcpSkill will reject paid tool calls
+  isDiscoveryPhase?: boolean;
+  
+  // Track tools USED during Auto Mode execution (tool ID -> usage info)
+  // Populated as callMcpSkill is called, used for batch payment at end
+  autoModeToolsUsed?: Map<string, AutoModeToolUsage>;
 };
 
 let currentRuntime: SkillRuntime | null = null;

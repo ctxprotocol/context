@@ -14,6 +14,8 @@ export type PaymentStage =
   | "confirming-payment"
   | "querying-tool"
   | "planning"
+  | "discovering-tools" // Auto Mode: AI is searching and selecting tools
+  | "awaiting-tool-approval" // Auto Mode: Waiting for user to approve selected tools
   | "executing"
   | "thinking";
 
@@ -186,6 +188,12 @@ export function getPaymentStatusMessage(
         : "Confirming payment...";
     case "planning":
       return "Planning...";
+    case "discovering-tools":
+      return "Discovering tools...";
+    case "awaiting-tool-approval":
+      return toolName
+        ? `Found: ${toolName}`
+        : "Reviewing available tools...";
     case "querying-tool":
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
     case "executing":

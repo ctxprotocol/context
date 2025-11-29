@@ -81,6 +81,8 @@ function isActivePhase(stage: PaymentStage): boolean {
     stage === "setting-cap" ||
     stage === "confirming-payment" ||
     stage === "planning" ||
+    stage === "discovering-tools" ||
+    stage === "awaiting-tool-approval" ||
     stage === "executing" ||
     stage === "thinking" ||
     stage === "querying-tool"
@@ -445,6 +447,42 @@ function PureThinkingAccordion({
 
             {stage === "confirming-payment" && (
               <TransactionStatusPreview transactionInfo={transactionInfo} />
+            )}
+
+            {/* Discovering tools stage - Auto Mode searching marketplace */}
+            {stage === "discovering-tools" && (
+              <>
+                {/* Show reasoning while searching */}
+                {hasReasoning && (
+                  <FadedReasoningPreview
+                    isStreaming={isStreamingReasoning}
+                    reasoning={streamingReasoning ?? ""}
+                  />
+                )}
+
+                {/* Show searching indicator when no reasoning */}
+                {!hasReasoning && !extractedCode && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                    <div className="size-1.5 animate-pulse rounded-full bg-cyan-500/70" />
+                    <span className="font-mono">searching marketplace...</span>
+                  </div>
+                )}
+
+                {/* Show code as it streams */}
+                {extractedCode && (
+                  <FadedCodePreview code={extractedCode} isStreaming={true} />
+                )}
+              </>
+            )}
+
+            {/* Awaiting tool approval stage - tools selected, waiting for payment */}
+            {stage === "awaiting-tool-approval" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-green-500/70" />
+                <span className="font-mono">
+                  {toolName ? `found: ${toolName}` : "reviewing tools..."}
+                </span>
+              </div>
             )}
 
             {/* Planning stage with reasoning support:

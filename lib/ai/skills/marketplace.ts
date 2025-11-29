@@ -15,6 +15,11 @@ import { aiTool } from "@/lib/db/schema";
  * This is a FREE, always-available skill that doesn't require payment.
  */
 
+type McpToolInfo = {
+  name: string;
+  description?: string;
+};
+
 type MarketplaceSearchResult = {
   id: string;
   name: string;
@@ -23,6 +28,9 @@ type MarketplaceSearchResult = {
   kind: "mcp" | "skill";
   category: string | null;
   isVerified: boolean;
+  // For MCP tools: the available methods/tools on the MCP server
+  // The AI needs this to know what toolName to pass to callMcpSkill
+  mcpTools?: McpToolInfo[];
 };
 
 // Create a separate connection for marketplace queries
@@ -36,6 +44,26 @@ function getToolKind(schema: Record<string, unknown> | null): "mcp" | "skill" {
   }
   // Default to skill for native tools
   return "skill";
+}
+
+/**
+ * Extract MCP tools from the tool schema
+ * Returns the available methods/tools on the MCP server
+ */
+function getMcpTools(schema: Record<string, unknown> | null): McpToolInfo[] | undefined {
+  if (!schema || schema.kind !== "mcp") {
+    return undefined;
+  }
+  
+  const tools = schema.tools as Array<{ name: string; description?: string }> | undefined;
+  if (!tools || !Array.isArray(tools)) {
+    return undefined;
+  }
+  
+  return tools.map((t) => ({
+    name: t.name,
+    description: t.description,
+  }));
 }
 
 /**
@@ -104,15 +132,19 @@ async function searchMarketplaceVector(
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
   const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
   
-  return rows.map((tool) => ({
-    id: tool.id as string,
-    name: tool.name as string,
-    description: tool.description as string,
-    price: (tool.pricePerQuery as string) ?? "0",
-    kind: getToolKind(tool.toolSchema as Record<string, unknown> | null),
-    category: tool.category as string | null,
-    isVerified: tool.isVerified as boolean,
-  }));
+  return rows.map((tool) => {
+    const schema = tool.toolSchema as Record<string, unknown> | null;
+    return {
+      id: tool.id as string,
+      name: tool.name as string,
+      description: tool.description as string,
+      price: (tool.pricePerQuery as string) ?? "0",
+      kind: getToolKind(schema),
+      category: tool.category as string | null,
+      isVerified: tool.isVerified as boolean,
+      mcpTools: getMcpTools(schema),
+    };
+  });
 }
 
 /**
@@ -146,15 +178,19 @@ async function searchMarketplaceFallback(
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
   const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
   
-  return rows.map((tool) => ({
-    id: tool.id as string,
-    name: tool.name as string,
-    description: tool.description as string,
-    price: (tool.pricePerQuery as string) ?? "0",
-    kind: getToolKind(tool.toolSchema as Record<string, unknown> | null),
-    category: tool.category as string | null,
-    isVerified: tool.isVerified as boolean,
-  }));
+  return rows.map((tool) => {
+    const schema = tool.toolSchema as Record<string, unknown> | null;
+    return {
+      id: tool.id as string,
+      name: tool.name as string,
+      description: tool.description as string,
+      price: (tool.pricePerQuery as string) ?? "0",
+      kind: getToolKind(schema),
+      category: tool.category as string | null,
+      isVerified: tool.isVerified as boolean,
+      mcpTools: getMcpTools(schema),
+    };
+  });
 }
 
 /**
@@ -182,15 +218,19 @@ export async function getFeaturedTools(
       .orderBy(sql`${aiTool.totalQueries} DESC`)
       .limit(limit);
 
-    return results.map((tool) => ({
-      id: tool.id,
-      name: tool.name,
-      description: tool.description,
-      price: tool.pricePerQuery ?? "0",
-      kind: getToolKind(tool.toolSchema as Record<string, unknown> | null),
-      category: tool.category,
-      isVerified: tool.isVerified,
-    }));
+    return results.map((tool) => {
+      const schema = tool.toolSchema as Record<string, unknown> | null;
+      return {
+        id: tool.id,
+        name: tool.name,
+        description: tool.description,
+        price: tool.pricePerQuery ?? "0",
+        kind: getToolKind(schema),
+        category: tool.category,
+        isVerified: tool.isVerified,
+        mcpTools: getMcpTools(schema),
+      };
+    });
   } catch (error) {
     console.error("Failed to get featured tools:", error);
     throw new Error("Failed to get featured tools. Please try again.");
@@ -223,15 +263,19 @@ export async function getToolsByCategory(
       .orderBy(sql`${aiTool.totalQueries} DESC`)
       .limit(limit);
 
-    return results.map((tool) => ({
-      id: tool.id,
-      name: tool.name,
-      description: tool.description,
-      price: tool.pricePerQuery ?? "0",
-      kind: getToolKind(tool.toolSchema as Record<string, unknown> | null),
-      category: tool.category,
-      isVerified: tool.isVerified,
-    }));
+    return results.map((tool) => {
+      const schema = tool.toolSchema as Record<string, unknown> | null;
+      return {
+        id: tool.id,
+        name: tool.name,
+        description: tool.description,
+        price: tool.pricePerQuery ?? "0",
+        kind: getToolKind(schema),
+        category: tool.category,
+        isVerified: tool.isVerified,
+        mcpTools: getMcpTools(schema),
+      };
+    });
   } catch (error) {
     console.error("Failed to get tools by category:", error);
     throw new Error("Failed to get tools by category. Please try again.");

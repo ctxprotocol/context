@@ -18,8 +18,117 @@ export type EnabledToolSummary = {
   }[];
 };
 
+/**
+ * DISCOVERY PROMPT (Auto Mode Phase 1)
+ *
+ * This prompt is used when Auto Mode is enabled to search the marketplace
+ * and intelligently select the best tools for the user's query.
+ *
+ * Key principle: Separation of concerns - this step ONLY discovers and selects tools.
+ * Execution happens in a separate step after payment is confirmed.
+ */
+const discoveryPrompt = `
+You are Context's tool discovery assistant. Your job is to search the marketplace and select the best tools for the user's question.
+
+**CRITICAL: You MUST respond with a code block that will be executed. Do NOT respond with plain text or JSON.**
+
+## Required Response Format
+
+Respond with ONLY a code block like this:
+
+\`\`\`ts
+import { searchMarketplace } from "@/lib/ai/skills/marketplace";
+
+export async function main() {
+  // 1. Search for relevant tools
+  const tools = await searchMarketplace("your search query here", 5);
+  
+  // 2. If no tools found, return early
+  if (tools.length === 0) {
+    return { selectedTools: [], error: "No matching tools found" };
+  }
+  
+  // 3. Analyze the results and select the best tool(s)
+  // tools contains: [{ id, name, description, price, kind, isVerified, mcpTools }]
+  
+  // 4. Return your selection with the exact format below
+  return {
+    selectedTools: [
+      {
+        id: tools[0].id,
+        name: tools[0].name,
+        description: tools[0].description,
+        price: tools[0].price,
+        mcpTools: tools[0].mcpTools,
+        reason: "Why this tool fits the user's query"
+      }
+    ],
+    selectionReasoning: "Brief explanation of the selection"
+  };
+}
+\`\`\`
+
+**CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations like \`: any\`, \`: string\`, \`<Type>\`, or type casts. The code runs in a JavaScript VM.**
+
+## Selection Guidelines
+
+When analyzing search results:
+1. **Relevance**: Does the tool's description match the user's need?
+2. **Methods**: Does it have appropriate mcpTools for the task?
+3. **Verification**: Prefer isVerified=true tools
+4. **Price**: If equally capable, prefer cheaper tools
+
+## Example: User asks "What are Optimism gas fees?"
+
+\`\`\`ts
+import { searchMarketplace } from "@/lib/ai/skills/marketplace";
+
+export async function main() {
+  const tools = await searchMarketplace("gas prices optimism L2", 5);
+  
+  if (tools.length === 0) {
+    return { selectedTools: [], error: "No gas price tools found" };
+  }
+  
+  // Find the best match for Optimism gas data
+  const gasTools = tools.filter(function(t) {
+    return t.description.toLowerCase().includes("gas") ||
+           t.name.toLowerCase().includes("gas");
+  });
+  
+  const selected = gasTools.length > 0 ? gasTools[0] : tools[0];
+  
+  return {
+    selectedTools: [{
+      id: selected.id,
+      name: selected.name,
+      description: selected.description,
+      price: selected.price,
+      mcpTools: selected.mcpTools,
+      reason: "Best match for Optimism gas price data"
+    }],
+    selectionReasoning: "Selected based on gas price capability and L2 support"
+  };
+}
+\`\`\`
+
+## Rules
+- **ALWAYS** respond with a \`\`\`ts code block (for syntax highlighting) containing executable JavaScript
+- **ALWAYS** import searchMarketplace at the top
+- **ALWAYS** export async function main()
+- **NEVER** call callMcpSkill - only search and select
+- **NEVER** respond with plain JSON - it must be executable code
+- **NEVER** use TypeScript syntax (no type annotations, no generics)
+`;
+
+/**
+ * EXECUTION PROMPT (Phase 2 - After Payment)
+ *
+ * This prompt is used after tools have been selected and payment confirmed.
+ * The AI focuses purely on using the pre-selected tools to answer the question.
+ */
 const codingAgentPrompt = `
-You are Context's code-execution orchestrator. Context is a decentralized marketplace where developers provide "context" (data/skills) to LLMs. Your job is to dynamically discover and use this data to answer user requests.
+You are Context's code-execution orchestrator. Context is a decentralized marketplace where developers provide "context" (data/skills) to LLMs. Your job is to use the authorized tools to answer user requests.
 
 Key Philosophy:
 - You are an "Explorer", not an "Encyclopedia". Do not rely on your internal training data for specific values (chain IDs, prices, IDs).
@@ -71,36 +180,6 @@ const result2 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 2
 const result3 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 3 } });
 \`\`\`
 
-## Tool Discovery (Auto Mode)
-When Auto Mode is enabled, you can search the marketplace and use discovered tools:
-\`\`\`ts
-// Import BOTH modules at the top - no dynamic imports!
-import { searchMarketplace } from "@/lib/ai/skills/marketplace";
-import { callMcpSkill } from "@/lib/ai/skills/mcp";
-
-export async function main() {
-  const tools = await searchMarketplace("weather forecast");
-  // Returns: [{ id, name, description, price, kind, category, isVerified }]
-  
-  if (tools.length === 0) {
-    return { error: "No tools found" };
-  }
-  
-  const tool = tools[0];
-  // Use the tool directly - payment is automatic in Auto Mode
-  const result = await callMcpSkill({
-    toolId: tool.id,
-    toolName: "get_weather", // Check the tool's skills
-    args: { city: "London" }
-  });
-  
-  return result;
-}
-\`\`\`
-- Searching is FREE
-- In Auto Mode: Import both modules at the TOP, search, then use tools. Payment is automatic.
-- NOT in Auto Mode: Do NOT search for tools. The user manually selects tools from the sidebar.
-
 Rules:
 - Never import or execute modules outside the approved list.
 - Never alias imports (e.g., no \`as foo\`).
@@ -146,27 +225,48 @@ About the origin of user's request:
 - country: ${requestHints.country}
 `;
 
+/**
+ * Auto Mode Discovery Phase prompt
+ * Used when Auto Mode needs to search and select tools before execution
+ */
+export const autoModeDiscoveryPrompt = ({
+  selectedChatModel,
+  requestHints,
+}: {
+  selectedChatModel: string;
+  requestHints: RequestHints;
+}) => {
+  const requestPrompt = getRequestPromptFromHints(requestHints);
+  const basePrompt = `${regularPrompt}\n\n${discoveryPrompt}\n\n${requestPrompt}`;
+
+  if (selectedChatModel === "chat-model-reasoning") {
+    return `${basePrompt}\n\n${reasoningPrompt}`;
+  }
+
+  return basePrompt;
+};
+
 export const systemPrompt = ({
   selectedChatModel,
   requestHints,
   enabledTools = [],
   isDebugMode = false,
-  isAutoMode = false,
+  isAutoModeExecution = false, // True when executing after payment confirmed
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
   enabledTools?: EnabledToolSummary[];
   isDebugMode?: boolean;
-  isAutoMode?: boolean;
+  isAutoModeExecution?: boolean;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
   // Only include the coding agent prompt when:
   // 1. Developer Mode is ON, OR
   // 2. There are enabled tools to use, OR
-  // 3. Auto Mode is ON (AI can discover tools dynamically)
+  // 3. Auto Mode execution phase (tools already selected and paid for)
   const hasTools = enabledTools.length > 0;
-  const shouldUseCodingAgent = isDebugMode || hasTools || isAutoMode;
+  const shouldUseCodingAgent = isDebugMode || hasTools || isAutoModeExecution;
 
   if (!shouldUseCodingAgent) {
     // Normal chat mode - no code generation, just helpful responses
@@ -178,21 +278,17 @@ export const systemPrompt = ({
     return basePrompt;
   }
 
-  // Developer Mode, tools enabled, or Auto Mode - include coding agent
+  // Developer Mode, tools enabled, or Auto Mode execution - include coding agent
   let toolsPrompt: string;
 
-  if (isAutoMode) {
-    // Auto Mode: AI can discover and use tools dynamically
-    const manualToolsSection =
-      enabledTools.length > 0
-        ? `\n\nManually selected tools (already authorized):\n${enabledTools
-            .map((tool, index) => formatEnabledTool(tool, index))
-            .join("\n")}`
-        : "";
+  if (isAutoModeExecution) {
+    // Auto Mode Execution Phase: Tools have been selected and paid for
+    // The AI should focus purely on using these tools to answer the question
+    toolsPrompt = `**AUTO MODE - EXECUTION PHASE**
+The following tools have been selected and authorized for this query:
+${enabledTools.map((tool, index) => formatEnabledTool(tool, index)).join("\n")}
 
-    toolsPrompt = `**AUTO MODE ENABLED** - You can search the marketplace to discover relevant tools.
-Use searchMarketplace() to find tools, then use them directly. Payment is handled automatically.
-${manualToolsSection}`;
+Focus on using these tools to answer the user's question. Do NOT search for additional tools.`;
   } else if (enabledTools.length === 0) {
     toolsPrompt =
       "No paid marketplace skills are authorized for this turn. Do not attempt to import them.";

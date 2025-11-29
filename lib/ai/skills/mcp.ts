@@ -339,6 +339,11 @@ function getResultPreview(content: unknown): string {
  * This is the execution function for MCP Tools. Users pay once per "Tool" per turn,
  * but the agent can call this skill function up to 100 times within that turn.
  *
+ * Auto Mode (Trust Model):
+ * - Tools execute IMMEDIATELY (no payment pause)
+ * - Usage is TRACKED in autoModeToolsUsed
+ * - Payment happens at END via batch transaction
+ *
  * @param toolId - The database ID of the MCP Tool (marketplace listing)
  * @param toolName - The name of the specific tool to call on the MCP server
  * @param args - Arguments to pass to the tool
@@ -363,12 +368,29 @@ export async function callMcpSkill({
 
   // Check payment authorization for paid tools
   const isFree = isFreeTool(tool);
+  
   if (!isFree) {
     // Check if tool is pre-authorized (manual selection with payment)
     const isPreAuthorized = runtime.allowedTools?.has(toolId);
     
-    // In Auto Mode, tools can be used dynamically (payment via Auto Pay)
+    // Auto Mode phases:
+    // - Discovery phase: DON'T execute paid tools, only search
+    // - Execution phase: Execute paid tools with verified payment
     const isAutoModeEnabled = runtime.isAutoMode === true;
+    const isDiscoveryPhase = runtime.isDiscoveryPhase === true;
+    
+    // During discovery phase, reject paid tool execution
+    // The AI should only search the marketplace, not execute tools
+    if (isDiscoveryPhase) {
+      console.log("[mcp-skill] Discovery phase: rejecting paid tool execution", {
+        toolId,
+        toolName: tool.name,
+        price: tool.pricePerQuery,
+      });
+      throw new Error(
+        `Tool "${tool.name}" requires payment ($${tool.pricePerQuery}/query). This is the discovery phase - tool will be executed after payment confirmation.`
+      );
+    }
     
     if (!isPreAuthorized && !isAutoModeEnabled) {
       throw new Error(
@@ -392,29 +414,29 @@ export async function callMcpSkill({
 
       toolContext.executionCount++;
     } else if (isAutoModeEnabled) {
-      // Auto Mode: track tool usage for billing
+      // Auto Mode Execution Phase: Tool is authorized via verified payment
+      // Track execution for logging purposes
       if (!runtime.autoModeToolsUsed) {
         runtime.autoModeToolsUsed = new Map();
       }
       
+      // Track this tool usage
       const existing = runtime.autoModeToolsUsed.get(toolId);
       if (existing) {
-        if (existing.callCount >= MAX_CALLS_PER_TURN) {
-          throw new Error(
-            `Tool ${tool.name} has reached its limit of ${MAX_CALLS_PER_TURN} calls per turn.`
-          );
-        }
         existing.callCount++;
+        console.log("[mcp-skill] Auto Mode Execution: tool call tracked (repeated)", { 
+          toolId, 
+          toolName: tool.name,
+          callCount: existing.callCount,
+        });
       } else {
         runtime.autoModeToolsUsed.set(toolId, { tool, callCount: 1 });
+        console.log("[mcp-skill] Auto Mode Execution: tool call tracked (new)", { 
+          toolId, 
+          toolName: tool.name,
+          price: tool.pricePerQuery,
+        });
       }
-      
-      console.log("[mcp-skill] Auto Mode: using tool", { 
-        toolId, 
-        toolName: tool.name, 
-        price: tool.pricePerQuery,
-        totalToolsUsed: runtime.autoModeToolsUsed.size 
-      });
     }
   }
 

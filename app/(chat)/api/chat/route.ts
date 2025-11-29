@@ -26,6 +26,7 @@ import {
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
+  autoModeDiscoveryPrompt,
   type EnabledToolSummary,
   type RequestHints,
   regularPrompt,
@@ -49,12 +50,19 @@ import {
 } from "@/lib/db/queries";
 import type { AITool, DBMessage } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
-import { verifyPayment } from "@/lib/tools/payment-verifier";
+import {
+  verifyBatchPayment,
+  verifyPayment,
+} from "@/lib/tools/payment-verifier";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
-import { type PostRequestBody, postRequestBodySchema } from "./schema";
+import {
+  type AutoModePayment,
+  type PostRequestBody,
+  postRequestBodySchema,
+} from "./schema";
 
 export const maxDuration = 60;
 
@@ -71,6 +79,7 @@ const BUILTIN_MODULES: AllowedModule[] = [
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
 const REGISTERED_MODULE_SET = new Set<string>(REGISTERED_SKILL_MODULES);
 const MCP_TOOL_MODULE = "@/lib/ai/skills/mcp" as const;
+const MARKETPLACE_MODULE = "@/lib/ai/skills/marketplace" as const;
 
 const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
@@ -78,17 +87,27 @@ const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
 type ExecutionStatus = "not_executed" | "success" | "failed";
 
 function hasNonEmptyData(data: unknown): boolean {
-  if (data === null || data === undefined) return false;
-  if (typeof data === "string") return data.trim().length > 0;
-  if (typeof data === "number" || typeof data === "boolean") return true;
+  if (data === null || data === undefined) {
+    return false;
+  }
+  if (typeof data === "string") {
+    return data.trim().length > 0;
+  }
+  if (typeof data === "number" || typeof data === "boolean") {
+    return true;
+  }
   if (Array.isArray(data)) {
     return data.some(hasNonEmptyData);
   }
   if (typeof data === "object") {
     const keys = Object.keys(data);
-    if (keys.length === 0) return false;
+    if (keys.length === 0) {
+      return false;
+    }
     // Special case for error object: if the object has exactly one key `error`, treat it as "no data"
-    if (keys.length === 1 && keys[0] === "error") return false;
+    if (keys.length === 1 && keys[0] === "error") {
+      return false;
+    }
     return Object.values(data as Record<string, unknown>).some(hasNonEmptyData);
   }
   return false;
@@ -251,6 +270,7 @@ export async function POST(request: Request) {
       toolInvocations = [],
       isDebugMode = false,
       isAutoMode = false,
+      autoModePayment,
     }: {
       id: string;
       message: ChatMessage;
@@ -259,7 +279,14 @@ export async function POST(request: Request) {
       toolInvocations?: { toolId: string; transactionHash: string }[];
       isDebugMode?: boolean;
       isAutoMode?: boolean;
+      autoModePayment?: AutoModePayment;
     } = requestBody;
+
+    // Auto Mode: Determine which phase we're in
+    // - Discovery phase: isAutoMode=true, autoModePayment=undefined
+    // - Execution phase: isAutoMode=true, autoModePayment has payment proof
+    const isAutoModeDiscovery = isAutoMode && !autoModePayment;
+    const isAutoModeExecution = isAutoMode && !!autoModePayment;
 
     if (process.env.NODE_ENV === "development") {
       console.log("[chat-api] request debug flags", {
@@ -455,7 +482,6 @@ export async function POST(request: Request) {
         selectedChatModel,
         requestHints,
         isDebugMode, // Pass debug mode to control if coding agent prompt is included
-        isAutoMode, // Pass auto mode for dynamic tool discovery
       });
 
       const stream = createUIMessageStream({
@@ -583,19 +609,77 @@ export async function POST(request: Request) {
             chatId: id,
             toolInvocationsCount: toolInvocations.length,
             enabledToolIds: enabledToolSummaries.map((t) => t.toolId),
-          });
-          const planningSystemInstructions = systemPrompt({
-            selectedChatModel,
-            requestHints,
-            enabledTools: enabledToolSummaries,
-            isDebugMode, // Pass debug mode for consistency
-            isAutoMode, // Pass auto mode for dynamic tool discovery
+            isAutoModeDiscovery,
+            isAutoModeExecution,
           });
 
-          // Signal planning status so UI shows "Planning..."
+          // Choose the appropriate prompt based on the phase
+          let planningSystemInstructions: string;
+
+          if (isAutoModeDiscovery) {
+            // Discovery phase: Use focused discovery prompt for tool selection
+            planningSystemInstructions = autoModeDiscoveryPrompt({
+              selectedChatModel,
+              requestHints,
+            });
+          } else if (isAutoModeExecution && autoModePayment) {
+            // Execution phase: Build tool summaries from paid-for tools
+            const executionToolSummaries: EnabledToolSummary[] =
+              await Promise.all(
+                autoModePayment.selectedTools.map(async (selected) => {
+                  const dbTool = await getAIToolById({ id: selected.toolId });
+                  const toolSchema = dbTool?.toolSchema as Record<
+                    string,
+                    unknown
+                  > | null;
+                  const mcpTools = toolSchema?.tools as
+                    | Array<{
+                        name: string;
+                        description?: string;
+                        inputSchema?: unknown;
+                        outputSchema?: unknown;
+                      }>
+                    | undefined;
+
+                  return {
+                    toolId: selected.toolId,
+                    name: selected.name,
+                    description: dbTool?.description ?? "",
+                    price: selected.price,
+                    kind: "mcp" as const,
+                    mcpTools: mcpTools?.map((t) => ({
+                      name: t.name,
+                      description: t.description,
+                      inputSchema: t.inputSchema,
+                      outputSchema: t.outputSchema,
+                    })),
+                  };
+                })
+              );
+
+            planningSystemInstructions = systemPrompt({
+              selectedChatModel,
+              requestHints,
+              enabledTools: executionToolSummaries,
+              isDebugMode,
+              isAutoModeExecution: true, // Focused execution prompt
+            });
+          } else {
+            // Regular mode: Use standard prompt with manually selected tools
+            planningSystemInstructions = systemPrompt({
+              selectedChatModel,
+              requestHints,
+              enabledTools: enabledToolSummaries,
+              isDebugMode,
+            });
+          }
+
+          // Signal appropriate status based on phase
           dataStream.write({
             type: "data-toolStatus",
-            data: { status: "planning" },
+            data: {
+              status: isAutoModeDiscovery ? "discovering-tools" : "planning",
+            },
           });
 
           // Force a tiny delay to ensure the chunk is flushed
@@ -735,7 +819,323 @@ export async function POST(request: Request) {
                   "[chat-api] no authorized skills found after filtering; falling back to direct answer",
                   { chatId: id }
                 );
+              } else if (
+                isAutoModeDiscovery &&
+                allowedModules.has(MARKETPLACE_MODULE)
+              ) {
+                // ===========================================================
+                // AUTO MODE DISCOVERY PHASE: Search and select tools
+                // ===========================================================
+                // This phase only searches the marketplace and selects tools.
+                // It does NOT execute paid tools. Execution happens after payment.
+
+                console.log(
+                  "[chat-api] Auto Mode Discovery: executing search",
+                  {
+                    chatId: id,
+                  }
+                );
+
+                // Execute the discovery code (only marketplace search, no paid tools)
+                const discoveryExecution = await executeSkillCode({
+                  code: codeBlock,
+                  allowedModules: Array.from(allowedModules),
+                  runtime: {
+                    session,
+                    dataStream,
+                    requestId: id,
+                    chatId: id,
+                    isAutoMode: true,
+                    isDiscoveryPhase: true, // Flag to prevent paid tool execution
+                  },
+                });
+
+                if (discoveryExecution.ok) {
+                  // Parse the discovery result to extract selected tools
+                  const discoveryResult = discoveryExecution.data as {
+                    selectedTools?: Array<{
+                      id: string;
+                      name: string;
+                      description?: string;
+                      price: string;
+                      mcpTools?: Array<{ name: string; description?: string }>;
+                      reason?: string;
+                    }>;
+                    selectionReasoning?: string;
+                    candidates?: unknown[];
+                    error?: string;
+                  };
+
+                  // Stream the discovery result for debugging
+                  dataStream.write({
+                    type: "data-debugResult",
+                    data: formatExecutionData(discoveryResult),
+                  });
+
+                  // Check if tools were selected
+                  const selectedTools = discoveryResult?.selectedTools ?? [];
+
+                  if (selectedTools.length === 0) {
+                    // No tools selected - either no matches or free tools only
+                    console.log(
+                      "[chat-api] Auto Mode Discovery: no paid tools selected",
+                      {
+                        chatId: id,
+                        reason:
+                          discoveryResult?.error ||
+                          discoveryResult?.selectionReasoning,
+                      }
+                    );
+
+                    dataStream.write({
+                      type: "data-toolStatus",
+                      data: { status: "thinking" },
+                    });
+
+                    mediatorText = discoveryResult?.error
+                      ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
+                      : `Tool discovery completed. No paid tools required for this query.
+Selection reasoning: ${discoveryResult?.selectionReasoning || "N/A"}`;
+                  } else {
+                    // Calculate total cost
+                    const totalCost = selectedTools.reduce((sum, tool) => {
+                      return sum + Number(tool.price ?? 0);
+                    }, 0);
+
+                    console.log(
+                      "[chat-api] Auto Mode Discovery: tools selected",
+                      {
+                        chatId: id,
+                        toolCount: selectedTools.length,
+                        totalCost,
+                        tools: selectedTools.map((t) => ({
+                          id: t.id,
+                          name: t.name,
+                          price: t.price,
+                        })),
+                      }
+                    );
+
+                    // Fetch full tool details for each selected tool
+                    const toolDetails = await Promise.all(
+                      selectedTools.map(async (selected) => {
+                        const tool = await getAIToolById({ id: selected.id });
+                        return {
+                          toolId: selected.id,
+                          name: selected.name,
+                          description:
+                            selected.description || tool?.description || "",
+                          price: selected.price,
+                          developerWallet: tool?.developerWallet || "",
+                          mcpTools: selected.mcpTools,
+                          reason: selected.reason,
+                        };
+                      })
+                    );
+
+                    // Send tool selection to client for approval
+                    // This is the PAY-BEFORE-DELIVERY model
+                    dataStream.write({
+                      type: "data-autoModeToolSelection",
+                      data: {
+                        selectedTools: toolDetails,
+                        totalCost: totalCost.toFixed(6),
+                        selectionReasoning: discoveryResult?.selectionReasoning,
+                        originalQuery: message.parts
+                          .filter(
+                            (p): p is { type: "text"; text: string } =>
+                              p.type === "text"
+                          )
+                          .map((p) => p.text)
+                          .join(" "),
+                      },
+                    });
+
+                    // Signal awaiting payment - stream will end here
+                    // Client must pay and send a new request with autoModePayment
+                    dataStream.write({
+                      type: "data-toolStatus",
+                      data: { status: "awaiting-tool-approval" },
+                    });
+
+                    // Don't continue to response generation - wait for payment
+                    console.log(
+                      "[chat-api] Auto Mode Discovery: awaiting payment",
+                      {
+                        chatId: id,
+                        totalCost,
+                      }
+                    );
+
+                    // Return early - don't generate response until payment confirmed
+                    return;
+                  }
+                } else {
+                  console.error("[chat-api] Auto Mode Discovery failed", {
+                    chatId: id,
+                    error: discoveryExecution.error,
+                  });
+
+                  dataStream.write({
+                    type: "data-toolStatus",
+                    data: { status: "thinking" },
+                  });
+
+                  mediatorText = `Tool discovery failed: ${discoveryExecution.error}
+HAS_DATA: false
+STATUS: failed
+Logs:
+${discoveryExecution.logs.join("\n")}`;
+                }
+              } else if (isAutoModeExecution && autoModePayment) {
+                // ===========================================================
+                // AUTO MODE EXECUTION PHASE: After payment confirmed
+                // ===========================================================
+                // Payment has been received - verify and execute tools
+
+                console.log(
+                  "[chat-api] Auto Mode Execution: verifying payment",
+                  {
+                    chatId: id,
+                    txHash: autoModePayment.transactionHash,
+                    toolCount: autoModePayment.selectedTools.length,
+                  }
+                );
+
+                // Verify payment on-chain
+                const expectedTools = autoModePayment.selectedTools.map(
+                  (t) => ({
+                    toolId: t.toolId,
+                    developerAddress: "", // Will be fetched below
+                  })
+                );
+
+                // Fetch developer wallets for verification
+                for (const tool of expectedTools) {
+                  const dbTool = await getAIToolById({ id: tool.toolId });
+                  if (dbTool) {
+                    tool.developerAddress = dbTool.developerWallet;
+                  }
+                }
+
+                const verification = await verifyBatchPayment(
+                  autoModePayment.transactionHash as `0x${string}`,
+                  expectedTools
+                );
+
+                if (!verification.isValid) {
+                  console.error(
+                    "[chat-api] Auto Mode Execution: payment verification failed",
+                    {
+                      chatId: id,
+                      error: verification.error,
+                    }
+                  );
+                  throw new ChatSDKError(
+                    "bad_request:chat",
+                    verification.error || "Payment verification failed."
+                  );
+                }
+
+                console.log(
+                  "[chat-api] Auto Mode Execution: payment verified, executing",
+                  {
+                    chatId: id,
+                  }
+                );
+
+                // Build the allowed tools map from selected tools
+                const autoModeAllowedTools = new Map<
+                  string,
+                  AllowedToolContext
+                >();
+                for (const selectedTool of autoModePayment.selectedTools) {
+                  const dbTool = await getAIToolById({
+                    id: selectedTool.toolId,
+                  });
+                  if (dbTool) {
+                    autoModeAllowedTools.set(selectedTool.toolId, {
+                      tool: dbTool,
+                      transactionHash: autoModePayment.transactionHash,
+                      kind: "mcp",
+                      executionCount: 0,
+                    });
+                  }
+                }
+
+                // Execute with the paid tools now authorized
+                const execution = await executeSkillCode({
+                  code: codeBlock,
+                  allowedModules: Array.from(allowedModules),
+                  runtime: {
+                    session,
+                    dataStream,
+                    requestId: id,
+                    chatId: id,
+                    isAutoMode: true,
+                    allowedTools: autoModeAllowedTools,
+                  },
+                });
+
+                if (execution.ok) {
+                  executionStatus = "success";
+                  executionHasData = hasNonEmptyData(execution.data);
+                  executionPayload = formatExecutionData(execution.data);
+                } else {
+                  executionStatus = "failed";
+                  executionHasData = false;
+                  executionPayload = formatExecutionData({
+                    error: execution.error,
+                    logs: execution.logs,
+                  });
+                }
+
+                dataStream.write({
+                  type: "data-debugResult",
+                  data: executionPayload,
+                });
+
+                // Record tool queries with payment
+                for (const selectedTool of autoModePayment.selectedTools) {
+                  const dbTool = await getAIToolById({
+                    id: selectedTool.toolId,
+                  });
+                  if (dbTool) {
+                    await recordToolQuery({
+                      toolId: selectedTool.toolId,
+                      userId: session.user.id,
+                      chatId: id,
+                      amountPaid: selectedTool.price,
+                      transactionHash: autoModePayment.transactionHash,
+                      queryOutput: execution.ok
+                        ? (execution.data as Record<string, unknown>)
+                        : undefined,
+                      status: execution.ok ? "completed" : "failed",
+                    });
+                  }
+                }
+
+                dataStream.write({
+                  type: "data-toolStatus",
+                  data: { status: "thinking" },
+                });
+
+                mediatorText = execution.ok
+                  ? `Tool execution succeeded (payment verified).
+HAS_DATA: ${executionHasData}
+STATUS: ${executionStatus}
+Modules used: ${Array.from(allowedModules).join(", ")}
+Result JSON:
+${formatExecutionData(execution.data)}`
+                  : `Tool execution failed: ${execution.error}
+HAS_DATA: false
+STATUS: failed
+Logs:
+${execution.logs.join("\n")}`;
               } else {
+                // ===========================================================
+                // NON-AUTO MODE: Original payment verification flow
+                // ===========================================================
                 const verifiedSkillContexts: PaidToolContext[] = [];
                 for (const context of paidModulesUsed) {
                   const verification = await verifyPayment(

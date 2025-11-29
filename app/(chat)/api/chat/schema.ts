@@ -19,6 +19,25 @@ const toolInvocationSchema = z.object({
   transactionHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
 });
 
+// Auto Mode: Selected tool from discovery phase
+const autoModeSelectedToolSchema = z.object({
+  toolId: z.string().uuid(),
+  name: z.string(),
+  price: z.string(),
+  // The specific MCP tool/method to call
+  mcpToolName: z.string().optional(),
+});
+
+// Auto Mode: Payment confirmation for execution phase
+const autoModePaymentSchema = z.object({
+  // Transaction hash proving payment
+  transactionHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  // Tools that were selected in discovery phase and paid for
+  selectedTools: z.array(autoModeSelectedToolSchema).min(1).max(10),
+  // Original user query (from discovery phase)
+  originalQuery: z.string().optional(),
+});
+
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
   message: z.object({
@@ -36,6 +55,11 @@ export const postRequestBodySchema = z.object({
   // Auto Mode: AI can discover and use tools automatically
   // When combined with Auto Pay, enables Full Agentic Mode
   isAutoMode: z.boolean().optional(),
+  // Auto Mode Execution Phase: Payment confirmation with selected tools
+  // When present, this is the execution phase after discovery + payment
+  autoModePayment: autoModePaymentSchema.optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;
+export type AutoModePayment = z.infer<typeof autoModePaymentSchema>;
+export type AutoModeSelectedTool = z.infer<typeof autoModeSelectedToolSchema>;
