@@ -1,40 +1,34 @@
-# Hyperliquid Orderbook MCP Server
+# Hyperliquid Ultimate MCP Server v2.0
 
-This MCP server provides tools for analyzing Hyperliquid perpetual markets, orderbook depth, and price impact. It's designed to help answer questions like:
+The world's most comprehensive Hyperliquid MCP server. Enables AI agents to analyze orderbook depth, simulate price impact, track funding rates, monitor staking flows, and answer complex questions like:
 
-> "Can the market absorb a $20M sell order for HYPE without significant slippage?"
+> "The HyperLiquid team sent 609,108 HYPE ($20.9M) to Flowdesk. Can the market absorb this sell pressure? By how much would the price drop?"
 
-## Use Case
+## 🚀 Features
 
-When the HyperLiquid team unstaked 2.6M $HYPE ($89.2M) and sent 609,108 HYPE ($20.9M) to Flowdesk, this server can analyze:
+### Orderbook & Liquidity Analysis
+- **get_orderbook** - L2 orderbook with cumulative depth, liquidity scores, and volume context
+- **calculate_price_impact** - Simulate order execution with TWAP duration estimates
+- **analyze_large_order** - Comprehensive analysis for large orders (team unlocks, whale sells)
 
-1. **Current orderbook depth** - How much bid liquidity exists at each price level?
-2. **Price impact simulation** - If 609K HYPE were sold, what would be the average fill price and slippage?
-3. **Market absorption capacity** - Can the visible orderbook absorb this flow, or would it exhaust liquidity?
+### Market Data
+- **get_market_info** - Price, volume, OI, funding, max leverage, impact prices
+- **list_markets** - All available perpetual markets
+- **get_candles** - Historical OHLCV data for any interval
 
-## Tools
+### Funding & Sentiment
+- **get_funding_analysis** - Current and predicted funding rates across Binance, Bybit, Hyperliquid
+- **get_open_interest_analysis** - OI analysis with liquidation risk assessment
 
-### `get_orderbook`
-Get the L2 orderbook with bid/ask levels, cumulative depth, and liquidity metrics.
+### Staking & Flows
+- **get_staking_summary** - Staking mechanics, lockup periods, APY info
+- **get_user_delegations** - Query any wallet's staking delegations
 
-### `calculate_price_impact`
-**The key tool** - Simulate selling/buying a specific amount and get:
-- Average fill price
-- Price impact percentage
-- Slippage in basis points
-- Whether visible book can absorb the order
-- Human-readable absorption assessment
+### Trade Analysis
+- **get_recent_trades** - Recent trades with whale detection
+- **get_markets_at_oi_cap** - Markets at open interest capacity
 
-### `list_markets`
-List all available perpetual markets on Hyperliquid.
-
-### `get_market_info`
-Get detailed market info: mark price, funding rate, open interest, 24h volume.
-
-### `get_recent_trades`
-Analyze recent trades for volume and buy/sell patterns.
-
-## Setup
+## 📦 Setup
 
 ```bash
 cd examples/hyperliquid-contributor
@@ -42,66 +36,103 @@ pnpm install
 pnpm run dev
 ```
 
-The server runs on `http://localhost:4002` by default.
+Server runs on `http://localhost:4002`.
 
-## Endpoints
+## 🔌 Endpoints
 
-- **SSE**: `http://localhost:4002/sse` - MCP connection endpoint
-- **Health**: `http://localhost:4002/health` - Health check with available tools
+- **SSE**: `http://localhost:4002/sse` - MCP connection
+- **Health**: `http://localhost:4002/health` - Status check
 
-## Example: Analyzing HYPE Sell Pressure
+## 💡 Example Questions This MCP Can Answer
 
-With Context, you can ask:
+### Market Absorption Analysis
+> "Can the market absorb 609,000 HYPE being sold?"
 
-> "The HyperLiquid team is sending 609,108 HYPE ($20.9M) to Flowdesk. Using the Hyperliquid orderbook data, can the market effectively absorb this sell flow? If not, by how much would the price rerate lower?"
+Uses `analyze_large_order` to provide:
+- % of daily volume the order represents
+- Visible orderbook absorption capacity
+- TWAP duration recommendation
+- Reflexivity risk assessment
+- Price impact estimates
 
-The agent will:
-1. Call `get_orderbook` for HYPE to see current liquidity
-2. Call `calculate_price_impact` with `side: "sell"` and `size: 609108`
-3. Call `get_market_info` for additional context (volume, open interest)
-4. Synthesize the data to answer your question
+### Funding Arbitrage
+> "Is there a funding arbitrage opportunity between Hyperliquid and Binance for ETH?"
 
-## Technical Details
+Uses `get_funding_analysis` to compare rates across venues.
 
-- **No API key required** - Hyperliquid's public API is used
-- **Real-time data** - Each call fetches live orderbook state
-- **Price impact calculation** - Walks through orderbook levels to simulate execution
+### Staking Flow Analysis
+> "The team unstaked 2.6M HYPE. When will it hit the market?"
 
-## Output Schema
+Uses `get_staking_summary` to explain the 7-day unstaking queue.
 
-All tools return structured JSON with `outputSchema` defined for reliable AI parsing. Example price impact response:
+### Liquidation Risk
+> "Is HYPE at risk of liquidation cascades?"
+
+Uses `get_open_interest_analysis` to assess OI/volume ratio and funding bias.
+
+## 🎯 Key Improvements over v1.0
+
+1. **Volume Context** - Every orderbook analysis includes comparison to 24h volume
+2. **TWAP Estimation** - Recommends execution duration for minimal impact
+3. **Hidden Liquidity Notes** - Explains that visible book ≠ total liquidity
+4. **Funding Predictions** - Multi-venue funding rate comparison
+5. **Staking Mechanics** - Full documentation of lockup/unstaking periods
+6. **Comprehensive Analysis** - `analyze_large_order` combines 6+ data sources
+
+## 📊 Output Schema
+
+All tools return `structuredContent` for reliable AI parsing. Example:
 
 ```json
 {
   "coin": "HYPE",
-  "side": "sell",
-  "orderSize": 609108,
-  "orderNotional": 20912808,
-  "midPrice": 34.35,
-  "averageFillPrice": 34.12,
-  "worstFillPrice": 33.85,
-  "priceImpactPercent": -0.67,
-  "slippageBps": 67,
-  "filledSize": 609108,
-  "filledPercent": 100,
-  "remainingSize": 0,
-  "levelsConsumed": 24,
-  "canAbsorb": true,
-  "absorption": "absorbed with moderate impact"
+  "orderSummary": {
+    "size": 609108,
+    "notional": 20357607,
+    "asPercentOfDailyVolume": 6.1
+  },
+  "marketImpact": {
+    "immediateImpact": "severe - would exhaust visible liquidity",
+    "visibleBookAbsorption": 1.1,
+    "priceDropEstimate": "3-8% with market order, 1-3% with TWAP"
+  },
+  "executionRecommendation": {
+    "recommendedStrategy": "TWAP recommended",
+    "twapDuration": "4-8 hours",
+    "otcRecommendation": "Optional - TWAP sufficient"
+  },
+  "reflexivityRisk": {
+    "riskLevel": "moderate",
+    "worstCaseImpact": "Add 5-8% to base estimate"
+  },
+  "conclusion": "This sell order is 6.1% of daily volume..."
 }
 ```
 
-## Contributing to Context
+## 🌐 Deploying to Production
 
-To add this MCP server to the Context marketplace:
+Deploy to Railway, Fly.io, or Render:
 
-1. Deploy your server publicly (Railway, Fly.io, AWS, etc.)
-2. Go to [Context Contribute](https://context.xyz/contribute)
-3. Select "MCP Tool"
-4. Enter your SSE endpoint URL
-5. Skills are auto-discovered via `listTools()`
+```bash
+# Railway
+railway up
+
+# Fly.io
+fly launch
+fly deploy
+```
+
+Then register on Context: `https://context.xyz/contribute`
+
+## 📚 API Reference
+
+Based on [Hyperliquid API Documentation](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api).
+
+- L2 Book: 20 levels per side
+- Funding: Hourly rate
+- Candles: 1m to 1M intervals
+- Delegations: Requires wallet address
 
 ## License
 
 MIT
-
