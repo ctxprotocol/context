@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { Loader2, Pencil, RefreshCw } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,13 +17,10 @@ import {
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   editTool,
@@ -64,7 +61,6 @@ export function ToolCard({ tool }: { tool: Tool }) {
     startRefresh(async () => {
       const result = await refreshMCPSkills(tool.id);
       setRefreshMessage(result.message ?? null);
-      // Auto-clear success message after 3s
       if (result.status === "success") {
         setTimeout(() => setRefreshMessage(null), 3000);
       }
@@ -156,69 +152,90 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 Edit
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
+            <SheetContent 
+              side="right" 
+              className="flex w-full flex-col overflow-y-auto border-l-0 bg-sidebar p-0 text-sidebar-foreground sm:max-w-md"
+            >
               <form action={editAction} className="flex flex-1 flex-col">
-                <SheetHeader>
-                  <SheetTitle>Edit Tool</SheetTitle>
-                  <SheetDescription>
-                    Update your tool's name, description, category, or price. Changes
-                    will be reflected in the marketplace immediately.
-                  </SheetDescription>
-                </SheetHeader>
+                {/* Header */}
+                <div className="flex flex-col gap-1.5 border-b border-sidebar-border px-4 py-3">
+                  <h2 className="font-semibold text-lg text-sidebar-foreground">
+                    Edit Tool
+                  </h2>
+                  <p className="text-sidebar-foreground/60 text-xs">
+                    Update your tool's details. Changes are reflected immediately.
+                  </p>
+                </div>
 
                 <input type="hidden" name="toolId" value={tool.id} />
 
-                <div className="mt-6 flex-1 space-y-6">
+                {/* Form Fields */}
+                <div className="flex-1 space-y-4 px-4 py-4">
                   {/* Name */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-name">Name</Label>
+                  <div className="space-y-1.5">
+                    <Label 
+                      htmlFor="edit-name" 
+                      className="text-sidebar-foreground/60 text-xs font-medium"
+                    >
+                      Name
+                    </Label>
                     <Input
                       id="edit-name"
                       name="name"
                       defaultValue={tool.name}
                       aria-invalid={editState.fieldErrors?.name ? true : undefined}
                       className={cn(
-                        editState.fieldErrors?.name &&
-                          "border-destructive focus-visible:ring-destructive"
+                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring",
+                        editState.fieldErrors?.name && "border-destructive"
                       )}
                     />
                     {editState.fieldErrors?.name && (
-                      <p className="text-destructive text-sm">
+                      <p className="text-destructive text-xs">
                         {editState.fieldErrors.name}
                       </p>
                     )}
                   </div>
 
                   {/* Description */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-description">Description</Label>
+                  <div className="space-y-1.5">
+                    <Label 
+                      htmlFor="edit-description"
+                      className="text-sidebar-foreground/60 text-xs font-medium"
+                    >
+                      Description
+                    </Label>
                     <Textarea
                       id="edit-description"
                       name="description"
                       defaultValue={tool.description}
-                      rows={6}
+                      rows={5}
                       aria-invalid={editState.fieldErrors?.description ? true : undefined}
                       className={cn(
-                        editState.fieldErrors?.description &&
-                          "border-destructive focus-visible:ring-destructive"
+                        "border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring resize-none",
+                        editState.fieldErrors?.description && "border-destructive"
                       )}
                     />
                     {editState.fieldErrors?.description && (
-                      <p className="text-destructive text-sm">
+                      <p className="text-destructive text-xs">
                         {editState.fieldErrors.description}
                       </p>
                     )}
-                    <p className="text-muted-foreground text-xs">
-                      This is shown in the marketplace and used for semantic search.
-                      Updating it will regenerate the search embedding.
+                    <p className="text-sidebar-foreground/50 text-[10px] leading-tight">
+                      Shown in the marketplace and used for semantic search. 
+                      Updating regenerates the search embedding.
                     </p>
                   </div>
 
                   {/* Category */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-category">Category</Label>
+                  <div className="space-y-1.5">
+                    <Label 
+                      htmlFor="edit-category"
+                      className="text-sidebar-foreground/60 text-xs font-medium"
+                    >
+                      Category
+                    </Label>
                     <Select name="category" defaultValue={tool.category ?? ""}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground focus:ring-sidebar-ring">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -234,8 +251,13 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   </div>
 
                   {/* Price */}
-                  <div className="space-y-2">
-                    <Label htmlFor="edit-price">Price per query (USDC)</Label>
+                  <div className="space-y-1.5">
+                    <Label 
+                      htmlFor="edit-price"
+                      className="text-sidebar-foreground/60 text-xs font-medium"
+                    >
+                      Price per query (USDC)
+                    </Label>
                     <Input
                       id="edit-price"
                       name="pricePerQuery"
@@ -246,35 +268,43 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       defaultValue={tool.pricePerQuery}
                       aria-invalid={editState.fieldErrors?.pricePerQuery ? true : undefined}
                       className={cn(
-                        editState.fieldErrors?.pricePerQuery &&
-                          "border-destructive focus-visible:ring-destructive"
+                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring font-mono",
+                        editState.fieldErrors?.pricePerQuery && "border-destructive"
                       )}
                     />
                     {editState.fieldErrors?.pricePerQuery && (
-                      <p className="text-destructive text-sm">
+                      <p className="text-destructive text-xs">
                         {editState.fieldErrors.pricePerQuery}
                       </p>
                     )}
                   </div>
+
+                  {/* Error message */}
+                  {editState.status === "error" && editState.message && (
+                    <div className="rounded-md bg-destructive/10 px-3 py-2">
+                      <p className="text-destructive text-xs">{editState.message}</p>
+                    </div>
+                  )}
                 </div>
 
-                {/* Error message */}
-                {editState.status === "error" && editState.message && (
-                  <p className="mt-4 text-destructive text-sm">{editState.message}</p>
-                )}
-
-                <SheetFooter className="mt-8 pt-6 border-t">
-                  <Button type="submit" disabled={isEditing} className="w-full sm:w-auto">
+                {/* Footer */}
+                <div className="border-t border-sidebar-border px-4 py-3">
+                  <Button 
+                    type="submit" 
+                    disabled={isEditing} 
+                    className="w-full"
+                    size="sm"
+                  >
                     {isEditing ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                         Saving...
                       </>
                     ) : (
                       "Save Changes"
                     )}
                   </Button>
-                </SheetFooter>
+                </div>
               </form>
             </SheetContent>
           </Sheet>
@@ -294,30 +324,43 @@ export function ToolCard({ tool }: { tool: Tool }) {
             </Button>
           )}
 
-          {/* Toggle Active/Inactive */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto gap-1.5"
-            disabled={isToggling}
-            onClick={handleToggle}
-            type="button"
-          >
-            {tool.isActive ? (
-              <>
-                <ToggleRight className="h-4 w-4" />
-                Deactivate
-              </>
-            ) : (
-              <>
-                <ToggleLeft className="h-4 w-4" />
-                Activate
-              </>
-            )}
-          </Button>
+          {/* Toggle Active/Inactive - Sidebar-style switch */}
+          <div className="ml-auto flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help text-muted-foreground text-xs">
+                  {tool.isActive ? "Active" : "Inactive"}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {tool.isActive 
+                  ? "Tool is visible in the marketplace" 
+                  : "Tool is hidden from the marketplace"}
+              </TooltipContent>
+            </Tooltip>
+            <button
+              aria-checked={tool.isActive}
+              className={cn(
+                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                tool.isActive ? "bg-emerald-500" : "bg-input"
+              )}
+              disabled={isToggling}
+              onClick={handleToggle}
+              role="switch"
+              type="button"
+            >
+              <span
+                className={cn(
+                  "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform",
+                  tool.isActive ? "translate-x-4" : "translate-x-0"
+                )}
+              />
+            </button>
+          </div>
         </div>
       </div>
     </Card>
   );
 }
-
