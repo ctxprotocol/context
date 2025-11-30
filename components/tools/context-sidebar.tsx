@@ -414,7 +414,9 @@ export function ContextSidebar({
           <SidebarContent>
             {loading ? (
               <SidebarGroup>
-                <SidebarGroupLabel>Tools</SidebarGroupLabel>
+                <SidebarGroupLabel className="text-sidebar-foreground/50">
+                  Tools
+                </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <div className="flex flex-col">
                     {[44, 32, 28, 64, 52].map((item) => {
@@ -439,7 +441,7 @@ export function ContextSidebar({
             ) : isSearchActive ? (
               // Search mode
               <SidebarGroup>
-                <SidebarGroupLabel>
+                <SidebarGroupLabel className="text-sidebar-foreground/50">
                   {isSearching
                     ? "Searching..."
                     : displayTools.length > 0
@@ -517,7 +519,9 @@ export function ContextSidebar({
                 }
                 return (
                   <SidebarGroup key={category}>
-                    <SidebarGroupLabel>{category}</SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-sidebar-foreground/50">
+                      {category}
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {categoryTools.map((tool) => (
@@ -536,7 +540,7 @@ export function ContextSidebar({
             )}
           </SidebarContent>
           <SidebarFooter className="border-t">
-            <div className="flex flex-col gap-1.5 px-2 py-2 text-sidebar-foreground/70 text-xs">
+            <div className="flex flex-col gap-1.5 px-2 py-2 text-sidebar-foreground/50 text-xs">
               {/* Full Agentic Mode Indicator */}
               {isFullAgenticMode && (
                 <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-600 dark:text-amber-400">

@@ -1,13 +1,13 @@
 import "dotenv/config";
-import express, { type Request, type Response } from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
-  ListToolsRequestSchema,
+  type CallToolRequest,
   CallToolRequestSchema,
   type CallToolResult,
-  type CallToolRequest,
+  ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import express, { type Request, type Response } from "express";
 
 const HYPERLIQUID_API_URL = "https://api.hyperliquid.xyz/info";
 
@@ -301,7 +301,10 @@ const TOOLS = [
       properties: {
         coin: { type: "string", description: "The coin symbol" },
         markPrice: { type: "number", description: "Current mark price in USD" },
-        midPrice: { type: "number", description: "Current mid price from orderbook" },
+        midPrice: {
+          type: "number",
+          description: "Current mid price from orderbook",
+        },
         indexPrice: { type: "number", description: "Index price from oracles" },
         openInterest: {
           type: "number",
@@ -357,8 +360,7 @@ const TOOLS = [
       properties: {
         coin: {
           type: "string",
-          description:
-            'The coin/asset symbol (e.g., "HYPE", "BTC", "ETH")',
+          description: 'The coin/asset symbol (e.g., "HYPE", "BTC", "ETH")',
         },
       },
       required: ["coin"],
@@ -388,8 +390,14 @@ const TOOLS = [
           type: "object",
           description: "Summary statistics of recent trades",
           properties: {
-            totalVolume: { type: "number", description: "Total volume in base" },
-            totalNotional: { type: "number", description: "Total volume in USD" },
+            totalVolume: {
+              type: "number",
+              description: "Total volume in base",
+            },
+            totalNotional: {
+              type: "number",
+              description: "Total volume in USD",
+            },
             avgTradeSize: { type: "number", description: "Average trade size" },
             buyVolume: { type: "number", description: "Buy-side volume" },
             sellVolume: { type: "number", description: "Sell-side volume" },
@@ -484,9 +492,7 @@ server.setRequestHandler(
           const impact = calculatePriceImpact(parsed, side, size);
 
           return {
-            content: [
-              { type: "text", text: JSON.stringify(impact, null, 2) },
-            ],
+            content: [{ type: "text", text: JSON.stringify(impact, null, 2) }],
             structuredContent: impact,
           };
         }
@@ -751,7 +757,7 @@ function parseOrderbook(data: L2BookResponse, coin: string): ParsedOrderbook {
   const bestBid = bids.at(0)?.price ?? 0;
   const bestAsk = asks.at(0)?.price ?? 0;
   const midPrice = (bestBid + bestAsk) / 2;
-  const spread = midPrice > 0 ? ((bestAsk - bestBid) / midPrice) * 10000 : 0; // bps
+  const spread = midPrice > 0 ? ((bestAsk - bestBid) / midPrice) * 10_000 : 0; // bps
 
   return {
     coin,
@@ -833,7 +839,16 @@ function calculatePriceImpact(
 function parseMarkets(
   meta: MetaResponse,
   mids: AllMidsResponse
-): { markets: Array<{ symbol: string; name: string; markPrice: number; szDecimals: number }>; count: number; fetchedAt: string } {
+): {
+  markets: Array<{
+    symbol: string;
+    name: string;
+    markPrice: number;
+    szDecimals: number;
+  }>;
+  count: number;
+  fetchedAt: string;
+} {
   const markets = meta.universe.map((asset) => ({
     symbol: asset.name,
     name: asset.name,
@@ -1008,4 +1023,3 @@ app.listen(port, () => {
     console.log(`  - ${tool.name}: ${tool.description.slice(0, 80)}...`);
   }
 });
-
