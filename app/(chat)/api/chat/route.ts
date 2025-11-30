@@ -2,6 +2,7 @@ import { geolocation } from "@vercel/functions";
 import {
   convertToModelMessages,
   createUIMessageStream,
+  generateText,
   JsonToSseTransformStream,
   smoothStream,
   stepCountIs,
@@ -33,6 +34,8 @@ import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   autoModeDiscoveryPrompt,
   type EnabledToolSummary,
+  formatToolCallHistory,
+  reflectionPrompt,
   type RequestHints,
   regularPrompt,
   systemPrompt,
@@ -45,7 +48,7 @@ import {
 import { decryptApiKey } from "@/lib/crypto";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
-import type { AllowedToolContext } from "@/lib/ai/skills/runtime";
+import type { AllowedToolContext, ToolCallRecord } from "@/lib/ai/skills/runtime";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
   addAccumulatedModelCost,
@@ -126,6 +129,70 @@ function hasNonEmptyData(data: unknown): boolean {
     return Object.values(data as Record<string, unknown>).some(hasNonEmptyData);
   }
   return false;
+}
+
+/**
+ * Detect suspicious execution results that might benefit from reflection
+ * 
+ * A result is "suspicious" when:
+ * 1. Execution succeeded (code ran without errors)
+ * 2. Tool calls returned real data (toolCallHistory has results)
+ * 3. But the final result has null/undefined values where data should exist
+ * 
+ * This pattern suggests the AI's data processing logic had a bug,
+ * not that the tools failed.
+ */
+type SuspiciousResultCheck = {
+  isSuspicious: boolean;
+  reason?: string;
+  nullPaths: string[];
+};
+
+function detectSuspiciousResults(
+  executionData: unknown,
+  toolCallHistory?: Array<{ toolName: string; result: unknown }>
+): SuspiciousResultCheck {
+  const nullPaths: string[] = [];
+  
+  // Only check if we have tool call history with actual data
+  const hasToolData = toolCallHistory && toolCallHistory.length > 0 &&
+    toolCallHistory.some(call => hasNonEmptyData(call.result));
+  
+  if (!hasToolData) {
+    return { isSuspicious: false, nullPaths: [] };
+  }
+  
+  // Recursively find null values in the execution result
+  function findNullPaths(obj: unknown, path: string): void {
+    if (obj === null || obj === undefined) {
+      nullPaths.push(path);
+      return;
+    }
+    
+    if (typeof obj === "object" && !Array.isArray(obj)) {
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        // Skip metadata fields that are commonly null
+        if (["timestamp", "fetchedAt", "updatedAt", "createdAt"].includes(key)) {
+          continue;
+        }
+        findNullPaths(value, path ? `${path}.${key}` : key);
+      }
+    }
+  }
+  
+  findNullPaths(executionData, "");
+  
+  // Suspicious if there are null values in the final result
+  // but the raw tool data had values
+  if (nullPaths.length > 0) {
+    return {
+      isSuspicious: true,
+      reason: `Execution returned null values at: ${nullPaths.join(", ")} - but tool calls returned data. This suggests a data processing bug.`,
+      nullPaths,
+    };
+  }
+  
+  return { isSuspicious: false, nullPaths: [] };
 }
 
 type PaidToolContext = {
@@ -1152,19 +1219,148 @@ ${discoveryExecution.logs.join("\n")}`;
                   }
                 }
 
-                // Execute with the paid tools now authorized
-                const execution = await executeSkillCode({
-                  code: codeBlock,
-                  allowedModules: Array.from(allowedModules),
-                  runtime: {
+                // =============================================================
+                // AGENTIC REFLECTION LOOP
+                // =============================================================
+                // Execute code, check for suspicious results, reflect & retry
+                const MAX_REFLECTION_RETRIES = 2;
+                let currentCode = codeBlock;
+                let toolCallHistory: ToolCallRecord[] = [];
+                let finalExecution: typeof execution | null = null;
+
+                for (
+                  let attempt = 0;
+                  attempt <= MAX_REFLECTION_RETRIES;
+                  attempt++
+                ) {
+                  const isRetry = attempt > 0;
+
+                  if (isRetry) {
+                    console.log("[chat-api] Agentic Reflection: retry attempt", {
+                      chatId: id,
+                      attempt,
+                      reason: "suspicious results detected",
+                    });
+
+                    dataStream.write({
+                      type: "data-toolStatus",
+                      data: { status: "reflecting" },
+                    });
+                  }
+
+                  // Create runtime with fresh toolCallHistory for this attempt
+                  const executionRuntime = {
                     session,
                     dataStream,
                     requestId: id,
                     chatId: id,
                     isAutoMode: true,
                     allowedTools: autoModeAllowedTools,
-                  },
-                });
+                    toolCallHistory: isRetry ? toolCallHistory : [], // Reuse history on retry (no new calls needed)
+                  };
+
+                  // Execute with the paid tools now authorized
+                  const execution = await executeSkillCode({
+                    code: currentCode,
+                    allowedModules: Array.from(allowedModules),
+                    runtime: executionRuntime,
+                  });
+
+                  // Capture tool call history from this execution
+                  if (executionRuntime.toolCallHistory.length > 0) {
+                    toolCallHistory = executionRuntime.toolCallHistory;
+                  }
+
+                  finalExecution = execution;
+
+                  // Check if we should reflect and retry
+                  if (
+                    execution.ok &&
+                    attempt < MAX_REFLECTION_RETRIES &&
+                    toolCallHistory.length > 0
+                  ) {
+                    const suspiciousCheck = detectSuspiciousResults(
+                      execution.data,
+                      toolCallHistory
+                    );
+
+                    if (suspiciousCheck.isSuspicious) {
+                      console.log(
+                        "[chat-api] Agentic Reflection: suspicious results detected",
+                        {
+                          chatId: id,
+                          attempt,
+                          reason: suspiciousCheck.reason,
+                          nullPaths: suspiciousCheck.nullPaths,
+                        }
+                      );
+
+                      // Build reflection prompt with raw tool outputs
+                      const reflectionSystemPrompt = `${reflectionPrompt}
+
+## Your Original Code
+\`\`\`ts
+${currentCode}
+\`\`\`
+
+## Your Result (with suspicious nulls)
+\`\`\`json
+${formatExecutionData(execution.data)}
+\`\`\`
+
+## Null Values Found At
+${suspiciousCheck.nullPaths.map((p) => `- \`${p}\``).join("\n")}
+
+## Raw Tool Outputs (what the APIs actually returned)
+${formatToolCallHistory(toolCallHistory)}
+
+Now write ONLY the corrected code block. Fix the bug that caused the null values.`;
+
+                      // Ask AI to reflect and fix
+                      const reflectionResult = await generateText({
+                        model: provider.languageModel(selectedChatModel),
+                        system: reflectionSystemPrompt,
+                        messages: [
+                          {
+                            role: "user",
+                            content:
+                              "Fix the code to correctly process the tool outputs. Output only the corrected TypeScript code block.",
+                          },
+                        ],
+                      });
+
+                      const fixedCode = extractCodeBlock(reflectionResult.text);
+
+                      if (fixedCode && fixedCode !== currentCode) {
+                        console.log(
+                          "[chat-api] Agentic Reflection: AI provided fixed code",
+                          {
+                            chatId: id,
+                            attempt,
+                            codePreview: fixedCode.slice(0, 200),
+                          }
+                        );
+                        currentCode = fixedCode;
+                        // Continue to next iteration with fixed code
+                        continue;
+                      }
+
+                      console.log(
+                        "[chat-api] Agentic Reflection: no fix generated, using original result",
+                        {
+                          chatId: id,
+                          attempt,
+                        }
+                      );
+                    }
+                  }
+
+                  // No suspicious results or max retries reached - exit loop
+                  break;
+                }
+
+                // Use the final execution result
+                const execution = finalExecution!;
 
                 if (execution.ok) {
                   executionStatus = "success";

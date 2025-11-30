@@ -486,6 +486,19 @@ export async function callMcpSkill({
       const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
       console.log("[mcp-skill] Unwrapped content:", JSON.stringify(unwrappedContent).slice(0, 500));
 
+      // Record to tool call history for agentic reflection
+      // This allows the AI to see raw outputs if execution produces suspicious results
+      if (!runtime.toolCallHistory) {
+        runtime.toolCallHistory = [];
+      }
+      runtime.toolCallHistory.push({
+        toolId,
+        toolName,
+        args,
+        result: unwrappedContent,
+        timestamp: Date.now(),
+      });
+
       // Emit result progress - show a preview of what was returned
       const resultPreview = getResultPreview(unwrappedContent);
       emitProgress("result", `${toolName} returned: ${resultPreview}`);

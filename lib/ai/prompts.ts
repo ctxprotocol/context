@@ -496,3 +496,91 @@ export const titlePrompt = `\n
     - ensure it is not more than 80 characters long
     - the title should be a summary of the user's message
     - do not use quotes or colons`;
+
+/**
+ * REFLECTION PROMPT (Agentic Retry Loop)
+ * 
+ * Used when execution produces suspicious results (nulls where data should exist).
+ * Shows the AI the raw tool outputs and asks it to diagnose and fix the issue.
+ * This enables Cursor-like agentic behavior where the AI can reason through failures.
+ */
+export const reflectionPrompt = `
+You are debugging a failed data extraction. Your previous code executed successfully but returned null/empty values where real data should exist.
+
+## What Happened
+Your code ran without errors, but the final result contains null or empty values in fields where the raw tool data clearly shows values exist. This usually means:
+1. **Filtering logic was too strict** - You filtered for values that don't exist in the data
+2. **Wrong field access** - You accessed a property path that doesn't match the actual structure  
+3. **Incorrect assumptions** - You assumed data would be in a certain format but it wasn't
+
+## Your Task
+1. **Examine the raw tool outputs** - These show EXACTLY what the APIs returned
+2. **Compare to your code** - Find where your filtering/processing logic went wrong
+3. **Write corrected code** - Fix the specific bug, don't rewrite everything
+
+## Common Mistakes to Check
+- Filtering by enum/category values that don't exist (e.g., \`confidence <= 30\` when data only has [70,80,90,95,99])
+- Assuming arrays have certain indices or objects have certain keys
+- Case-sensitive string comparisons when data uses different casing
+- Numeric comparisons on string values or vice versa
+
+## Rules
+- ONLY output a corrected TypeScript code block - no explanation needed
+- Keep the same structure as your original code, just fix the bug
+- Use the ACTUAL values you see in the raw tool outputs, not assumed values
+- If you need to find "minimum" or "maximum", iterate through actual data instead of filtering by threshold
+- Preserve all the original tool calls - don't make new API requests
+
+## Example Fix
+BAD (assumes value exists):
+\`\`\`ts
+const lowConfidence = data.find(x => x.confidence <= 30); // Returns undefined!
+\`\`\`
+
+GOOD (uses actual data):
+\`\`\`ts
+// Find the minimum confidence from whatever values actually exist
+const sorted = [...data].sort((a, b) => a.confidence - b.confidence);
+const lowestConfidence = sorted[0]; // Works with any values
+\`\`\`
+`;
+
+/**
+ * Format tool call history for the reflection prompt
+ * Shows the AI exactly what each tool returned
+ */
+export function formatToolCallHistory(
+  history: Array<{
+    toolId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }>
+): string {
+  if (!history || history.length === 0) {
+    return "No tool calls recorded.";
+  }
+
+  return history
+    .map((call, i) => {
+      const argsStr = JSON.stringify(call.args, null, 2);
+      const resultStr = JSON.stringify(call.result, null, 2);
+      // Truncate very long results but keep enough context
+      const truncatedResult =
+        resultStr.length > 2000
+          ? `${resultStr.slice(0, 2000)}... (truncated, ${resultStr.length} chars total)`
+          : resultStr;
+
+      return `### Tool Call ${i + 1}: ${call.toolName}
+**Arguments:**
+\`\`\`json
+${argsStr}
+\`\`\`
+
+**Raw Result:**
+\`\`\`json
+${truncatedResult}
+\`\`\``;
+    })
+    .join("\n\n");
+}

@@ -43,17 +43,18 @@ const TOOLS = [
         },
         estimates: {
           type: "array",
-          description: "Gas price estimates at different confidence levels",
+          description: "Gas price estimates at different confidence levels. Array always contains 5 estimates sorted by confidence (highest first). To find cheapest gas, use the LAST item (lowest confidence = lowest price).",
           items: {
             type: "object",
             properties: {
               confidence: {
                 type: "number",
-                description: "Confidence level (1-99)",
+                description: "Confidence level that transaction will be included. API returns exactly these values: 99, 95, 90, 80, 70. Higher confidence = higher price but more certainty. Lower confidence (70) = cheapest option.",
+                enum: [99, 95, 90, 80, 70],
               },
               maxFeePerGas: {
                 type: "number",
-                description: "Max fee per gas in Gwei",
+                description: "Max fee per gas in Gwei. Can be very small decimals (e.g., 0.00001) or larger values (e.g., 50) depending on chain.",
               },
               maxPriorityFeePerGas: {
                 type: "number",

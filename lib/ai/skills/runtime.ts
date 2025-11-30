@@ -19,6 +19,18 @@ export type AutoModeToolUsage = {
   callCount: number;
 };
 
+/**
+ * Record of a single tool call during execution
+ * Used for reflection/retry when execution produces suspicious results
+ */
+export type ToolCallRecord = {
+  toolId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result: unknown;
+  timestamp: number;
+};
+
 export type SkillRuntime = {
   session: Session;
   dataStream?: UIMessageStreamWriter<ChatMessage>;
@@ -36,6 +48,10 @@ export type SkillRuntime = {
   // Track tools USED during Auto Mode execution (tool ID -> usage info)
   // Populated as callMcpSkill is called, used for batch payment at end
   autoModeToolsUsed?: Map<string, AutoModeToolUsage>;
+  
+  // Agentic Reflection: Capture raw tool outputs for diagnosis
+  // When execution produces suspicious results, we can show these to the AI
+  toolCallHistory?: ToolCallRecord[];
 };
 
 let currentRuntime: SkillRuntime | null = null;
