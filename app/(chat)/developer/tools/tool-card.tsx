@@ -2,6 +2,7 @@
 
 import { Loader2, Pencil, RefreshCw } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
+import { CrossIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
@@ -155,16 +157,35 @@ export function ToolCard({ tool }: { tool: Tool }) {
             <SheetContent 
               side="right" 
               className="flex w-full flex-col overflow-y-auto border-l-0 bg-sidebar p-0 text-sidebar-foreground sm:max-w-md"
+              hideCloseButton
             >
               <form action={editAction} className="flex flex-1 flex-col">
                 {/* Header */}
-                <div className="flex flex-col gap-1.5 border-b border-sidebar-border px-4 py-3">
-                  <h2 className="font-semibold text-lg text-sidebar-foreground">
-                    Edit Tool
-                  </h2>
-                  <p className="text-sidebar-foreground/60 text-xs">
-                    Update your tool's details. Changes are reflected immediately.
-                  </p>
+                <div className="flex items-start justify-between border-b border-sidebar-border px-4 py-3">
+                  <div className="flex flex-col gap-1.5">
+                    <h2 className="font-semibold text-lg text-sidebar-foreground">
+                      Edit Tool
+                    </h2>
+                    <p className="text-sidebar-foreground/60 text-xs">
+                      Update your tool's details. Changes are reflected immediately.
+                    </p>
+                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SheetClose asChild>
+                        <Button
+                          className="h-8 p-1 md:h-fit md:p-2"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <CrossIcon />
+                        </Button>
+                      </SheetClose>
+                    </TooltipTrigger>
+                    <TooltipContent align="end" className="hidden md:block">
+                      Close
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 <input type="hidden" name="toolId" value={tool.id} />
@@ -185,7 +206,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       defaultValue={tool.name}
                       aria-invalid={editState.fieldErrors?.name ? true : undefined}
                       className={cn(
-                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring",
+                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
                         editState.fieldErrors?.name && "border-destructive"
                       )}
                     />
@@ -211,7 +232,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       rows={5}
                       aria-invalid={editState.fieldErrors?.description ? true : undefined}
                       className={cn(
-                        "border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring resize-none",
+                        "border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring resize-none",
                         editState.fieldErrors?.description && "border-destructive"
                       )}
                     />
@@ -235,7 +256,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       Category
                     </Label>
                     <Select name="category" defaultValue={tool.category ?? ""}>
-                      <SelectTrigger className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground focus:ring-sidebar-ring">
+                      <SelectTrigger className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground focus:ring-ring">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -268,7 +289,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       defaultValue={tool.pricePerQuery}
                       aria-invalid={editState.fieldErrors?.pricePerQuery ? true : undefined}
                       className={cn(
-                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-sidebar-ring font-mono",
+                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring font-mono",
                         editState.fieldErrors?.pricePerQuery && "border-destructive"
                       )}
                     />
