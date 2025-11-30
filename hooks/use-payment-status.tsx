@@ -17,6 +17,8 @@ export type PaymentStage =
   | "discovering-tools" // Auto Mode: AI is searching and selecting tools
   | "awaiting-tool-approval" // Auto Mode: Waiting for user to approve selected tools
   | "executing"
+  | "fixing" // Auto Mode: AI is fixing a crashed execution
+  | "reflecting" // Auto Mode: AI is reflecting on suspicious results
   | "thinking";
 
 export type ExecutionLogEntry = {
@@ -183,6 +185,8 @@ export function usePaymentStatus() {
  * 3. "confirming-payment" - Processing blockchain payment
  * 4. "planning" - AI planning how to use the selected tools (generates code)
  * 5. "executing" - Running the generated code to call tools
+ * 5a. "fixing" - If code crashes, AI attempts to fix the error (self-healing)
+ * 5b. "reflecting" - If results are suspicious, AI reflects and retries
  * 6. "thinking" - AI analyzing results and formulating response
  *
  * MANUAL MODE FLOW:
@@ -215,6 +219,10 @@ export function getPaymentStatusMessage(
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
     case "executing":
       return "Executing...";
+    case "fixing":
+      return "Fixing runtime error...";
+    case "reflecting":
+      return "Reflecting on results...";
     case "thinking":
       return "Analyzing results...";
     default:

@@ -34,6 +34,7 @@ import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   autoModeDiscoveryPrompt,
   type EnabledToolSummary,
+  errorCorrectionPrompt,
   formatToolCallHistory,
   reflectionPrompt,
   type RequestHints,
@@ -1227,12 +1228,14 @@ ${discoveryExecution.logs.join("\n")}`;
                 let currentCode = codeBlock;
                 let toolCallHistory: ToolCallRecord[] = [];
                 let finalExecution: typeof execution | null = null;
+                let finalAttemptCount = 0;
 
                 for (
                   let attempt = 0;
                   attempt <= MAX_REFLECTION_RETRIES;
                   attempt++
                 ) {
+                  finalAttemptCount = attempt;
                   const isRetry = attempt > 0;
 
                   if (isRetry) {
@@ -1273,7 +1276,67 @@ ${discoveryExecution.logs.join("\n")}`;
 
                   finalExecution = execution;
 
-                  // Check if we should reflect and retry
+                  // =============================================================
+                  // SELF-HEALING: Handle Runtime Errors (code crashed)
+                  // =============================================================
+                  if (!execution.ok && attempt < MAX_REFLECTION_RETRIES) {
+                    console.log(
+                      "[chat-api] Agentic Self-Heal: execution crashed, attempting fix",
+                      {
+                        chatId: id,
+                        attempt,
+                        error: execution.error,
+                      }
+                    );
+
+                    dataStream.write({
+                      type: "data-toolStatus",
+                      data: { status: "fixing" },
+                    });
+
+                    // Generate a fix for the runtime error
+                    const errorFixResult = await generateText({
+                      model: provider.languageModel(selectedChatModel),
+                      system: errorCorrectionPrompt(
+                        currentCode,
+                        execution.error,
+                        execution.logs,
+                        toolCallHistory.length > 0 ? toolCallHistory : undefined
+                      ),
+                      messages: [
+                        {
+                          role: "user",
+                          content:
+                            "The previous code crashed. Fix the error and output the corrected code block.",
+                        },
+                      ],
+                    });
+
+                    const fixedCode = extractCodeBlock(errorFixResult.text);
+
+                    if (fixedCode && fixedCode !== currentCode) {
+                      console.log(
+                        "[chat-api] Agentic Self-Heal: AI provided fix for crash",
+                        {
+                          chatId: id,
+                          attempt,
+                          errorFixed: execution.error.slice(0, 100),
+                        }
+                      );
+                      currentCode = fixedCode;
+                      continue; // Retry with fixed code
+                    }
+
+                    console.log(
+                      "[chat-api] Agentic Self-Heal: could not generate fix, giving up",
+                      { chatId: id }
+                    );
+                    // Fall through to break - can't fix this error
+                  }
+
+                  // =============================================================
+                  // REFLECTION: Handle Suspicious Results (code ran but bad data)
+                  // =============================================================
                   if (
                     execution.ok &&
                     attempt < MAX_REFLECTION_RETRIES &&
@@ -1405,18 +1468,31 @@ Now write ONLY the corrected code block. Fix the bug that caused the null values
                   data: { status: "thinking" },
                 });
 
+                // Build retry info for transparency
+                const retryInfo =
+                  finalAttemptCount > 0
+                    ? `\nRETRIES: ${finalAttemptCount} (self-healed from ${finalAttemptCount === 1 ? "an error" : "errors"})`
+                    : "";
+
+                // For failed executions, show last few logs (most relevant)
+                const truncatedFailureLogs =
+                  execution.logs.length > 5
+                    ? `...(${execution.logs.length - 5} earlier logs)\n${execution.logs.slice(-5).join("\n")}`
+                    : execution.logs.join("\n");
+
                 mediatorText = execution.ok
-                  ? `Tool execution succeeded (payment verified).
+                  ? `Tool execution succeeded (payment verified).${retryInfo}
 HAS_DATA: ${executionHasData}
 STATUS: ${executionStatus}
 Modules used: ${Array.from(allowedModules).join(", ")}
 Result JSON:
 ${formatExecutionData(execution.data)}`
-                  : `Tool execution failed: ${execution.error}
+                  : `Tool execution failed after ${finalAttemptCount > 0 ? `${finalAttemptCount + 1} attempts (${finalAttemptCount} auto-fix retries)` : "1 attempt"}.
+ERROR: ${execution.error}
 HAS_DATA: false
 STATUS: failed
-Logs:
-${execution.logs.join("\n")}`;
+RECENT_LOGS:
+${truncatedFailureLogs || "(no logs)"}`;
               } else {
                 // ===========================================================
                 // NON-AUTO MODE: Original payment verification flow

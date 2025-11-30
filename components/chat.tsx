@@ -361,6 +361,8 @@ export function Chat({
               case "executing":
               case "thinking":
               case "awaiting-tool-approval":
+              case "fixing":
+              case "reflecting":
                 setStage(statusValue);
                 break;
               case "confirming-payment":

@@ -230,7 +230,7 @@ When no tools are needed:
 - If you do not have access to active tools, **DO NOT write code that imports tool skills**. You cannot execute these functions offline. You MAY still write generic code (e.g. Python, React snippets) if the user explicitly asks for it.
 
 When a tool is required:
-- Respond with one TypeScript code block and nothing else.
+- Respond with one \`\`\`ts code block (containing plain JavaScript) and nothing else.
 - The code must:
   • Use **static** named imports at the top of the file from the approved modules listed below.
   • **CRITICAL: Do NOT use dynamic imports like \`await import(...)\`. Only use static imports at the top.**
@@ -525,7 +525,8 @@ Your code ran without errors, but the final result contains null or empty values
 - Numeric comparisons on string values or vice versa
 
 ## Rules
-- ONLY output a corrected TypeScript code block - no explanation needed
+- ONLY output a corrected code block - no explanation needed
+- **CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations like \`: any\`, \`: string\`, \`<Type>\`, or type casts. The code runs in a JavaScript VM.**
 - Keep the same structure as your original code, just fix the bug
 - Use the ACTUAL values you see in the raw tool outputs, not assumed values
 - If you need to find "minimum" or "maximum", iterate through actual data instead of filtering by threshold
@@ -533,17 +534,90 @@ Your code ran without errors, but the final result contains null or empty values
 
 ## Example Fix
 BAD (assumes value exists):
-\`\`\`ts
-const lowConfidence = data.find(x => x.confidence <= 30); // Returns undefined!
+\`\`\`js
+var lowConfidence = data.find(x => x.confidence <= 30); // Returns undefined!
 \`\`\`
 
 GOOD (uses actual data):
-\`\`\`ts
+\`\`\`js
 // Find the minimum confidence from whatever values actually exist
-const sorted = [...data].sort((a, b) => a.confidence - b.confidence);
-const lowestConfidence = sorted[0]; // Works with any values
+var sorted = [...data].sort((a, b) => a.confidence - b.confidence);
+var lowestConfidence = sorted[0]; // Works with any values
 \`\`\`
 `;
+
+/**
+ * ERROR CORRECTION PROMPT (Self-Healing for Crashed Executions)
+ *
+ * Used when code execution throws a runtime error.
+ * This allows the agent to fix its own bugs like a developer reading a stack trace.
+ * NOTE: Code runs in a JavaScript VM - prompts must enforce plain JS (no TypeScript syntax).
+ *
+ * Key scenarios:
+ * - TypeError: Cannot read property 'x' of undefined
+ * - SyntaxError in generated code
+ * - API returned unexpected format causing crash
+ * - Tool threw an error (400, 500, timeout)
+ */
+export function errorCorrectionPrompt(
+  code: string,
+  error: string,
+  logs: string[],
+  toolCallHistory?: Array<{
+    toolId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }>
+): string {
+  const toolHistorySection =
+    toolCallHistory && toolCallHistory.length > 0
+      ? `
+## Tool Calls That Succeeded Before Crash
+${formatToolCallHistory(toolCallHistory)}
+`
+      : "";
+
+  // Sanitize logs to prevent context-window overflow
+  // Keep last 2000 chars which usually contains the stack trace
+  const LOG_TRUNCATE_LIMIT = 2000;
+  const combinedLogs = logs.join("\n") || "(no logs)";
+  const sanitizedLogs =
+    combinedLogs.length > LOG_TRUNCATE_LIMIT
+      ? `...(older logs truncated)\n${combinedLogs.slice(-LOG_TRUNCATE_LIMIT)}`
+      : combinedLogs;
+
+  return `
+You are an expert JavaScript debugger fixing a crashed script.
+
+## The Broken Code
+\`\`\`js
+${code}
+\`\`\`
+
+## The Error Message
+\`\`\`
+${error}
+\`\`\`
+
+## Console Logs (Context)
+\`\`\`
+${sanitizedLogs}
+\`\`\`
+${toolHistorySection}
+## Common Fixes
+1. **Property access on undefined**: Use optional chaining (\`data?.items\`) or nullish coalescing (\`data ?? []\`)
+2. **Wrong property path**: Check the tool output structure - APIs often return \`result.data\` vs \`result\` directly
+3. **Array methods on non-arrays**: Verify the data is actually an array before calling \`.map()\`, \`.filter()\`, etc.
+4. **Type mismatches**: Numbers returned as strings, nested objects instead of flat
+5. **Missing error handling**: Wrap risky operations in try/catch
+
+## Output Format
+Return ONLY the corrected JavaScript code block. Do not explain your fix.
+**CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations like \`: any\`, \`: string\`, \`<Type>\`, or type casts. The code runs in a JavaScript VM.**
+Fix the specific error, don't rewrite the entire approach.
+`;
+}
 
 /**
  * Format tool call history for the reflection prompt
