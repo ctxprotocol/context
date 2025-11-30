@@ -489,6 +489,10 @@ export function Chat({
           
           // Send a continuation message to trigger execution phase
           // The server will verify payment and execute tools
+          // Set "planning" stage before sending - this matches what the server will send
+          // The server flow is: planning → executing → thinking
+          setStage("planning");
+          
           sendMessage(
             {
               role: "user" as const,
@@ -504,9 +508,6 @@ export function Chat({
               },
             }
           );
-          
-          // Stage will be updated by the new stream
-          setStage("executing");
         } else {
           // Payment failed - reset stage
           setPendingToolSelection(null);

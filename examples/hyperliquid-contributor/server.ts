@@ -901,8 +901,12 @@ async function handleGetFundingAnalysis(
     for (const pred of coinPredictions[1]) {
       const [venue, data] = pred as [
         string,
-        { fundingRate: string; nextFundingTime: number },
+        { fundingRate: string; nextFundingTime: number } | null,
       ];
+      // Skip venues with null data
+      if (!data) {
+        continue;
+      }
       predictions.push({
         venue,
         rate: Number(data.fundingRate),
@@ -1022,9 +1026,10 @@ async function handleGetOpenInterestAnalysis(
     return errorResult("coin parameter is required");
   }
 
+  // fetchPerpsAtOiCap can fail with 422 on some API versions - handle gracefully
   const [metaAndCtx, marketsAtCap] = await Promise.all([
     fetchMetaAndAssetCtxs(),
-    fetchPerpsAtOiCap(),
+    fetchPerpsAtOiCap().catch(() => [] as string[]),
   ]);
 
   const meta = metaAndCtx[0];

@@ -100,7 +100,9 @@ const REGISTERED_MODULE_SET = new Set<string>(REGISTERED_SKILL_MODULES);
 const MCP_TOOL_MODULE = "@/lib/ai/skills/mcp" as const;
 const MARKETPLACE_MODULE = "@/lib/ai/skills/marketplace" as const;
 
-const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
+// Match code blocks with any language tag (ts, typescript, js, javascript, or none)
+// This regex properly strips language tags so the code executor doesn't interpret them as code
+const CODE_BLOCK_REGEX = /```(?:\w+)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
 
 type ExecutionStatus = "not_executed" | "success" | "failed";

@@ -57,6 +57,11 @@ type CachedClient = {
 };
 const clientCache = new Map<string, CachedClient>();
 
+// Pending connection promises to prevent race conditions
+// When multiple parallel calls try to connect to the same endpoint simultaneously,
+// the first call creates the connection and all others wait for the same promise
+const pendingConnections = new Map<string, Promise<Client>>();
+
 /**
  * MCP Tool Result type (from MCP spec 2025-06-18)
  */
@@ -203,6 +208,10 @@ function createMcpTransport(endpoint: string): SSEClientTransport | StreamableHT
  * while still ensuring connections don't become stale across requests.
  * 
  * Auto-detects transport type (SSE vs HTTP Streaming) based on endpoint URL.
+ * 
+ * IMPORTANT: Uses a pending connection pattern to prevent race conditions.
+ * When multiple parallel calls try to connect to the same endpoint simultaneously,
+ * only the first call actually creates the connection - all others wait for it.
  */
 async function getMcpClient(endpoint: string): Promise<Client> {
   const now = Date.now();
@@ -212,6 +221,14 @@ async function getMcpClient(endpoint: string): Promise<Client> {
   if (cached && (now - cached.createdAt) < CONNECTION_CACHE_TTL_MS) {
     console.log("[mcp-skill] Reusing cached MCP connection to:", endpoint);
     return cached.client;
+  }
+
+  // Check if there's already a connection in progress for this endpoint
+  // This prevents multiple parallel calls from creating duplicate connections
+  const pending = pendingConnections.get(endpoint);
+  if (pending) {
+    console.log("[mcp-skill] Waiting for in-progress connection to:", endpoint);
+    return pending;
   }
 
   // Clean up stale connection if exists
@@ -225,6 +242,25 @@ async function getMcpClient(endpoint: string): Promise<Client> {
     clientCache.delete(endpoint);
   }
 
+  // Create the connection promise and store it immediately
+  // This ensures any concurrent calls will wait for this same promise
+  const connectionPromise = createMcpConnection(endpoint, now);
+  pendingConnections.set(endpoint, connectionPromise);
+
+  try {
+    const client = await connectionPromise;
+    return client;
+  } finally {
+    // Clean up the pending promise regardless of success/failure
+    pendingConnections.delete(endpoint);
+  }
+}
+
+/**
+ * Internal function to actually create the MCP connection
+ * Separated from getMcpClient to enable the pending connection pattern
+ */
+async function createMcpConnection(endpoint: string, timestamp: number): Promise<Client> {
   console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
   const transportType = detectTransportType(endpoint);
 
@@ -244,7 +280,7 @@ async function getMcpClient(endpoint: string): Promise<Client> {
     console.log("[mcp-skill] Successfully connected via", transportType, "to:", endpoint);
 
     // Cache the connection with timestamp
-    clientCache.set(endpoint, { client, createdAt: now });
+    clientCache.set(endpoint, { client, createdAt: timestamp });
 
     return client;
   } catch (error) {
@@ -259,7 +295,7 @@ async function getMcpClient(endpoint: string): Promise<Client> {
         );
         await client.connect(sseTransport);
         console.log("[mcp-skill] Successfully connected via SSE fallback to:", endpoint);
-        clientCache.set(endpoint, { client, createdAt: now });
+        clientCache.set(endpoint, { client, createdAt: timestamp });
         return client;
       } catch (fallbackError) {
         console.error("[mcp-skill] SSE fallback also failed:", fallbackError);

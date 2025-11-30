@@ -7,7 +7,8 @@ import { type SkillRuntime, setSkillRuntime } from "@/lib/ai/skills/runtime";
 import * as suggestionSkills from "@/lib/ai/skills/suggestions";
 import * as weatherSkills from "@/lib/ai/skills/weather";
 
-const CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
+// Match code blocks with any language tag (ts, typescript, js, javascript, or none)
+const CODE_BLOCK_REGEX = /```(?:\w+)?\s*([\s\S]*?)```/i;
 const NAMED_IMPORT_REGEX = /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
 
 // 1. Built-in modules
