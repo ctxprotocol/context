@@ -85,8 +85,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
   }, [editState.status, isSheetOpen]);
 
   return (
-    <Card className="p-4">
-      <div className="flex flex-col gap-3">
+    <Card className="p-6">
+      <div className="flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 border-t pt-3">
+        <div className="flex items-center gap-2 border-t pt-4">
           {/* Edit Sheet */}
           <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
             <SheetTrigger asChild>
@@ -156,8 +156,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 Edit
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-              <form action={editAction}>
+            <SheetContent side="right" className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
+              <form action={editAction} className="flex flex-1 flex-col">
                 <SheetHeader>
                   <SheetTitle>Edit Tool</SheetTitle>
                   <SheetDescription>
@@ -168,7 +168,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
                 <input type="hidden" name="toolId" value={tool.id} />
 
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 flex-1 space-y-6">
                   {/* Name */}
                   <div className="space-y-2">
                     <Label htmlFor="edit-name">Name</Label>
@@ -263,8 +263,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   <p className="mt-4 text-destructive text-sm">{editState.message}</p>
                 )}
 
-                <SheetFooter className="mt-6">
-                  <Button type="submit" disabled={isEditing}>
+                <SheetFooter className="mt-8 pt-6 border-t">
+                  <Button type="submit" disabled={isEditing} className="w-full sm:w-auto">
                     {isEditing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

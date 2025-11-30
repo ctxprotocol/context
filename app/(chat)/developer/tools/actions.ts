@@ -202,14 +202,10 @@ export async function refreshMCPSkills(toolId: string): Promise<RefreshToolState
     // Connect to MCP server and list tools
     const { client, tools } = await connectAndListTools(schema.endpoint);
 
-    // Close client gracefully
-    try {
-      await client.close();
-    } catch (closeErr) {
-      if (!(closeErr instanceof Error && closeErr.name === "AbortError")) {
-        console.warn("[refreshMCPSkills] Error closing client:", closeErr);
-      }
-    }
+    // Close client gracefully - SSE connections throw AbortError on close, which is expected
+    client.close().catch(() => {
+      // Silently ignore - AbortError is expected when closing SSE connections
+    });
 
     if (!tools || tools.length === 0) {
       return {

@@ -23,9 +23,9 @@ export default async function DeveloperToolsPage() {
   const tools = await getAIToolsByDeveloper({ developerId: session.user.id });
 
   return (
-    <div className="mx-auto flex h-dvh max-w-4xl flex-col gap-6 overflow-y-auto p-4">
+    <div className="mx-auto flex h-dvh max-w-4xl flex-col gap-8 overflow-y-auto p-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-bold text-3xl">My Tools</h1>
+        <h1 className="font-semibold text-2xl tracking-tight">My Tools</h1>
         <Link href="/contribute">
           <Button type="button">Create New Tool</Button>
         </Link>
@@ -34,15 +34,18 @@ export default async function DeveloperToolsPage() {
       <EarningsPanel />
 
       <div className="flex flex-col gap-4">
-        <h2 className="font-semibold text-xl">Your Tools</h2>
+        <h2 className="font-semibold text-lg">Your Tools</h2>
 
         {tools.length === 0 ? (
-          <Card className="p-6 text-center">
-            <p className="text-muted-foreground">
-              You haven't created any tools yet.
+          <Card className="flex flex-col items-center justify-center p-8 text-center">
+            <p className="mb-2 font-semibold text-foreground text-lg">
+              No tools yet
+            </p>
+            <p className="mb-6 max-w-sm text-muted-foreground text-sm">
+              Create your first tool to start earning from the marketplace.
             </p>
             <Link href="/contribute">
-              <Button className="mt-4" variant="outline" type="button">
+              <Button variant="outline" type="button">
                 Create Your First Tool
               </Button>
             </Link>
