@@ -201,7 +201,15 @@ export async function submitTool(
       const { client, tools, transportUsed } = await connectAndListTools(parsed.data.endpoint);
       console.log(`[contribute] Connected via ${transportUsed} to:`, parsed.data.endpoint);
       
-      await client.close();
+      // Close client - ignore AbortError which is expected for SSE transport
+      try {
+        await client.close();
+      } catch (closeErr) {
+        // AbortError is expected when closing SSE connections
+        if (!(closeErr instanceof Error && closeErr.name === "AbortError")) {
+          console.warn("[contribute] Error closing MCP client:", closeErr);
+        }
+      }
 
       if (!tools || tools.length === 0) {
         return {

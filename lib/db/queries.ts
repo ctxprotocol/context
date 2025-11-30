@@ -706,6 +706,10 @@ export async function createAITool({
     // Create the tool with embedding if available
     let newTool;
     if (embeddingStr) {
+      // Ensure undefined values are converted to null for raw SQL
+      const categoryVal = category ?? null;
+      const iconUrlVal = iconUrl ?? null;
+      
       const result = await db.execute(sql`
         INSERT INTO "AITool" (
           name, description, developer_id, developer_wallet, 
@@ -714,11 +718,13 @@ export async function createAITool({
         ) VALUES (
           ${name}, ${description}, ${developerId}, ${developerWallet},
           ${pricePerQuery}, ${JSON.stringify(toolSchema)}::jsonb, ${apiEndpoint}, 
-          ${category}, ${iconUrl}, true, ${searchText}, ${embeddingStr}::vector
+          ${categoryVal}, ${iconUrlVal}, true, ${searchText}, ${embeddingStr}::vector
         )
         RETURNING *
       `);
-      newTool = result.rows[0];
+      // Handle both array and object-with-rows formats from db.execute()
+      const rows = Array.isArray(result) ? result : (result.rows ?? []);
+      newTool = rows[0];
     } else {
       // Fallback: create without embedding
       const result = await db
