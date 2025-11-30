@@ -51,6 +51,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const [isRefreshing, startRefresh] = useTransition();
   const [isToggling, startToggle] = useTransition();
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [closeTooltipOpen, setCloseTooltipOpen] = useState(false);
 
   const [editState, editAction, isEditing] = useActionState(editTool, initialEditState);
 
@@ -81,6 +82,13 @@ export function ToolCard({ tool }: { tool: Tool }) {
       setIsSheetOpen(false);
     }
   }, [editState.status, isSheetOpen]);
+
+  // Reset tooltip state when sheet closes
+  useEffect(() => {
+    if (!isSheetOpen) {
+      setCloseTooltipOpen(false);
+    }
+  }, [isSheetOpen]);
 
   return (
     <Card className="p-6">
@@ -170,8 +178,12 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       Update your tool's details. Changes are reflected immediately.
                     </p>
                   </div>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+                  <Tooltip open={closeTooltipOpen}>
+                    <TooltipTrigger
+                      asChild
+                      onPointerEnter={() => setCloseTooltipOpen(true)}
+                      onPointerLeave={() => setCloseTooltipOpen(false)}
+                    >
                       <SheetClose asChild>
                         <Button
                           className="h-8 p-1 md:h-fit md:p-2"
