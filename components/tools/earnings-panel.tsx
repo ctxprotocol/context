@@ -1,21 +1,24 @@
 "use client";
 
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import {
   useReadContextRouterGetUnclaimedBalance,
   useWriteContextRouterClaimEarnings,
 } from "@/lib/generated";
 
-interface EarningsPanelProps {
-  developerAddress: `0x${string}` | undefined;
-}
-
-export function EarningsPanel({ developerAddress }: EarningsPanelProps) {
+export function EarningsPanel() {
+  // Get wallet address from Privy smart wallet or embedded wallet
+  const { activeWallet } = useWalletIdentity();
+  const { client: smartWalletClient } = useSmartWallets();
+  const developerAddress = (smartWalletClient?.account?.address ||
+    activeWallet?.address) as `0x${string}` | undefined;
   const [lastTxHash, setLastTxHash] = useState<`0x${string}`>();
 
   // Read unclaimed balance

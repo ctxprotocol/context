@@ -13,6 +13,7 @@ declare module "next-auth" {
     user: {
       id: string;
       type: UserType;
+      isDeveloper: boolean;
     } & DefaultSession["user"];
   }
 
@@ -21,6 +22,7 @@ declare module "next-auth" {
     id?: string;
     email?: string | null;
     type: UserType;
+    isDeveloper?: boolean;
   }
 }
 
@@ -28,6 +30,7 @@ declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     id: string;
     type: UserType;
+    isDeveloper: boolean;
   }
 }
 
@@ -85,6 +88,7 @@ export const {
             id: dbUser.id,
             email: dbUser.email,
             type: "regular", // Assign a default user type
+            isDeveloper: dbUser.isDeveloper,
           };
         } catch (error) {
           console.error("Database error during authorize:", error);
@@ -98,6 +102,7 @@ export const {
       if (user) {
         token.id = user.id as string;
         token.type = user.type;
+        token.isDeveloper = user.isDeveloper ?? false;
       }
 
       return token;
@@ -106,6 +111,7 @@ export const {
       if (session.user) {
         session.user.id = token.id;
         session.user.type = token.type;
+        session.user.isDeveloper = token.isDeveloper;
       }
 
       return session;

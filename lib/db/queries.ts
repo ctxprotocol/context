@@ -912,6 +912,87 @@ export async function updateAIToolEmbedding({
 }
 
 /**
+ * Update AI tool metadata and optionally refresh embedding
+ * Used when developer edits their tool or refreshes MCP skills
+ */
+export async function updateAITool({
+  id,
+  name,
+  description,
+  category,
+  pricePerQuery,
+  toolSchema,
+}: {
+  id: string;
+  name?: string;
+  description?: string;
+  category?: string | null;
+  pricePerQuery?: string;
+  toolSchema?: Record<string, unknown>;
+}) {
+  try {
+    // Build update object with only provided fields
+    const updates: Partial<{
+      name: string;
+      description: string;
+      category: string | null;
+      pricePerQuery: string;
+      toolSchema: unknown;
+      updatedAt: Date;
+    }> = { updatedAt: new Date() };
+
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (category !== undefined) updates.category = category;
+    if (pricePerQuery !== undefined) updates.pricePerQuery = pricePerQuery;
+    if (toolSchema !== undefined) updates.toolSchema = toolSchema;
+
+    // Update the tool
+    const result = await db
+      .update(aiTool)
+      .set(updates)
+      .where(eq(aiTool.id, id))
+      .returning();
+
+    const updatedTool = result.at(0);
+    if (!updatedTool) return null;
+
+    // Regenerate embedding if any searchable field changed
+    const needsEmbeddingRefresh =
+      name !== undefined ||
+      description !== undefined ||
+      category !== undefined ||
+      toolSchema !== undefined;
+
+    if (needsEmbeddingRefresh) {
+      const searchText = buildSearchText({
+        name: updatedTool.name,
+        description: updatedTool.description,
+        category: updatedTool.category,
+        toolSchema: updatedTool.toolSchema as Record<string, unknown>,
+      });
+
+      try {
+        const embedding = await generateEmbedding(searchText);
+        await updateAIToolEmbedding({
+          id,
+          searchText,
+          embedding,
+        });
+      } catch (embeddingError) {
+        console.warn("[updateAITool] Embedding refresh failed:", embeddingError);
+        // Don't fail the update if embedding fails
+      }
+    }
+
+    return updatedTool;
+  } catch (error) {
+    console.error("Failed to update AI tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to update AI tool");
+  }
+}
+
+/**
  * Get tool data needed for embedding generation
  */
 export async function getAIToolForEmbedding({ id }: { id: string }) {

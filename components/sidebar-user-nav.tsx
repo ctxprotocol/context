@@ -2,7 +2,7 @@
 
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
-import { ArrowUpRight, ChevronUp } from "lucide-react";
+import { ArrowUpRight, ChevronUp, Wrench } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { WithdrawDialog } from "./withdraw-dialog";
 
 export function SidebarUserNav() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const { setTheme, resolvedTheme } = useTheme();
   const {
     ready,
@@ -203,6 +203,14 @@ export function SidebarUserNav() {
                 Contribute a tool
               </Link>
             </DropdownMenuItem>
+            {session?.user?.isDeveloper && (
+              <DropdownMenuItem asChild>
+                <Link className="w-full cursor-pointer" href="/developer/tools">
+                  <Wrench className="mr-2 h-4 w-4" />
+                  My Tools
+                </Link>
+              </DropdownMenuItem>
+            )}
             {isConnected && displayAddress && (
               <>
                 <DropdownMenuSeparator />
