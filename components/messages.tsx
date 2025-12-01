@@ -135,19 +135,16 @@ function PureMessages({
           {messages.length === 0 && stage === "idle" && <Greeting />}
 
           {messages.map((message, index) => {
-            // FIX: Ghost Bubble
-            // Hide the last message if it's an empty assistant message AND we are still showing the thinking bubble.
-            // This prevents the "Ghost" avatar from appearing above the "Thinking..." bubble.
+            // FIX: Ghost Bubble & Double-Icon Prevention
+            // Hide the last assistant message while ThinkingMessage is visible.
+            // This prevents the "double icon" jarring effect during transition.
+            // The ThinkingMessage shows the "thinking" state, then when it exits,
+            // the PreviewMessage appears seamlessly in its place.
             const isLast = index === messages.length - 1;
             const isGhost =
               isLast &&
               message.role === "assistant" &&
-              (!message.parts ||
-                message.parts.length === 0 ||
-                (message.parts.length === 1 &&
-                  message.parts[0].type === "text" &&
-                  (!message.parts[0].text ||
-                    message.parts[0].text.length === 0)));
+              shouldShowThinking;
 
             const hasOnlyDataParts =
               message.role === "assistant" &&
@@ -179,13 +176,6 @@ function PureMessages({
                 // but we no longer thread separate debugCode/debugResult
                 // streams into the message component.
                 isDebugMode={isDebugMode}
-                // Hide the icon for the last assistant message while ThinkingMessage is visible
-                // to prevent "double icon" jarring effect during transition
-                hideIcon={
-                  message.role === "assistant" &&
-                  index === messages.length - 1 &&
-                  shouldShowThinking
-                }
                 isLoading={
                   status === "streaming" && messages.length - 1 === index
                 }

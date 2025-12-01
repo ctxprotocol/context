@@ -39,7 +39,6 @@ const PurePreviewMessage = ({
   isReadonly,
   requiresScrollPadding,
   isDebugMode,
-  hideIcon = false,
 }: {
   chatId: string;
   message: ChatMessage;
@@ -50,7 +49,6 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
   requiresScrollPadding: boolean;
   isDebugMode: boolean;
-  hideIcon?: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -74,7 +72,7 @@ const PurePreviewMessage = ({
           "justify-start": message.role === "assistant",
         })}
       >
-        {message.role === "assistant" && !hideIcon && (
+        {message.role === "assistant" && (
           <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
             <SparklesIcon size={14} />
           </div>
@@ -318,9 +316,6 @@ export const PreviewMessage = memo(
     if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding) {
       return false;
     }
-    if (prevProps.hideIcon !== nextProps.hideIcon) {
-      return false;
-    }
     if (!equal(prevProps.message.parts, nextProps.message.parts)) {
       return false;
     }
@@ -367,7 +362,7 @@ export const ThinkingMessage = ({ isDebugMode = false }: ThinkingMessageProps) =
       className="group/message w-full"
       data-role={role}
       data-testid="message-assistant-loading"
-      exit={{ opacity: 0, transition: { duration: 0.5 } }}
+      exit={{ opacity: 0, transition: { duration: 0 } }}
       initial={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
