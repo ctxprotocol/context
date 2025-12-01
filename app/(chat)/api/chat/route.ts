@@ -36,8 +36,8 @@ import {
   type EnabledToolSummary,
   errorCorrectionPrompt,
   formatToolCallHistory,
-  reflectionPrompt,
   type RequestHints,
+  reflectionPrompt,
   regularPrompt,
   systemPrompt,
 } from "@/lib/ai/prompts";
@@ -46,11 +46,13 @@ import {
   getProviderForUser,
   myProvider,
 } from "@/lib/ai/providers";
-import { decryptApiKey } from "@/lib/crypto";
-import type { BYOKProvider } from "@/lib/db/schema";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
-import type { AllowedToolContext, ToolCallRecord } from "@/lib/ai/skills/runtime";
+import type {
+  AllowedToolContext,
+  ToolCallRecord,
+} from "@/lib/ai/skills/runtime";
 import { isProductionEnvironment } from "@/lib/constants";
+import { decryptApiKey } from "@/lib/crypto";
 import {
   addAccumulatedModelCost,
   createStreamId,
@@ -67,7 +69,7 @@ import {
   saveMessages,
   updateChatLastContextById,
 } from "@/lib/db/queries";
-import type { AITool, DBMessage } from "@/lib/db/schema";
+import type { AITool, BYOKProvider, DBMessage } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import {
   verifyBatchPayment,
@@ -136,12 +138,12 @@ function hasNonEmptyData(data: unknown): boolean {
 
 /**
  * Detect suspicious execution results that might benefit from reflection
- * 
+ *
  * A result is "suspicious" when:
  * 1. Execution succeeded (code ran without errors)
  * 2. Tool calls returned real data (toolCallHistory has results)
  * 3. But the final result has null/undefined values where data should exist
- * 
+ *
  * This pattern suggests the AI's data processing logic had a bug,
  * not that the tools failed.
  */
@@ -156,35 +158,41 @@ function detectSuspiciousResults(
   toolCallHistory?: Array<{ toolName: string; result: unknown }>
 ): SuspiciousResultCheck {
   const nullPaths: string[] = [];
-  
+
   // Only check if we have tool call history with actual data
-  const hasToolData = toolCallHistory && toolCallHistory.length > 0 &&
-    toolCallHistory.some(call => hasNonEmptyData(call.result));
-  
+  const hasToolData =
+    toolCallHistory &&
+    toolCallHistory.length > 0 &&
+    toolCallHistory.some((call) => hasNonEmptyData(call.result));
+
   if (!hasToolData) {
     return { isSuspicious: false, nullPaths: [] };
   }
-  
+
   // Recursively find null values in the execution result
   function findNullPaths(obj: unknown, path: string): void {
     if (obj === null || obj === undefined) {
       nullPaths.push(path);
       return;
     }
-    
+
     if (typeof obj === "object" && !Array.isArray(obj)) {
-      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      for (const [key, value] of Object.entries(
+        obj as Record<string, unknown>
+      )) {
         // Skip metadata fields that are commonly null
-        if (["timestamp", "fetchedAt", "updatedAt", "createdAt"].includes(key)) {
+        if (
+          ["timestamp", "fetchedAt", "updatedAt", "createdAt"].includes(key)
+        ) {
           continue;
         }
         findNullPaths(value, path ? `${path}.${key}` : key);
       }
     }
   }
-  
+
   findNullPaths(executionData, "");
-  
+
   // Suspicious if there are null values in the final result
   // but the raw tool data had values
   if (nullPaths.length > 0) {
@@ -194,7 +202,7 @@ function detectSuspiciousResults(
       nullPaths,
     };
   }
-  
+
   return { isSuspicious: false, nullPaths: [] };
 }
 
@@ -439,14 +447,20 @@ export async function POST(request: Request) {
           const apiKey = decryptApiKey(encryptedKey);
           byokConfig = { provider: byokProvider, apiKey };
         } catch (decryptError) {
-          console.error("[chat-api] Failed to decrypt BYOK API key:", decryptError);
+          console.error(
+            "[chat-api] Failed to decrypt BYOK API key:",
+            decryptError
+          );
           return new ChatSDKError(
             "bad_request:chat",
             "Your API key could not be decrypted. Please update your API key in settings."
           ).toResponse();
         }
       } else {
-        console.warn("[chat-api] BYOK provider selected but no key found:", byokProvider);
+        console.warn(
+          "[chat-api] BYOK provider selected but no key found:",
+          byokProvider
+        );
         return new ChatSDKError(
           "bad_request:chat",
           "No API key configured for your selected provider. Please add an API key in settings."
@@ -741,10 +755,13 @@ export async function POST(request: Request) {
               // Track actual cost for convenience tier
               if (userTier === "convenience" && actualCost > 0) {
                 await addAccumulatedModelCost(session.user.id, actualCost);
-                console.log("[cost-tracking] Accumulated model cost for convenience tier:", {
-                  userId: session.user.id,
-                  costAdded: actualCost,
-                });
+                console.log(
+                  "[cost-tracking] Accumulated model cost for convenience tier:",
+                  {
+                    userId: session.user.id,
+                    costAdded: actualCost,
+                  }
+                );
               }
             } catch (err) {
               console.warn("Unable to persist last usage for chat", id, err);
@@ -953,14 +970,11 @@ DO NOT explain or discuss. ONLY output the code block.`;
 
               const retryCode = extractCodeBlock(retryResult.text);
               if (retryCode) {
-                console.log(
-                  "[chat-api] Auto Mode Discovery: retry succeeded",
-                  {
-                    chatId: id,
-                    attempt: discoveryRetry + 1,
-                    codePreview: retryCode.slice(0, 100),
-                  }
-                );
+                console.log("[chat-api] Auto Mode Discovery: retry succeeded", {
+                  chatId: id,
+                  attempt: discoveryRetry + 1,
+                  codePreview: retryCode.slice(0, 100),
+                });
                 codeBlock = retryCode;
                 planningText = retryResult.text;
               } else {
@@ -992,6 +1006,111 @@ DO NOT explain or discuss. ONLY output the code block.`;
                 data: {
                   message:
                     "I encountered an issue searching for tools. Please try rephrasing your question.",
+                },
+              });
+              return;
+            }
+          }
+
+          // ===========================================================
+          // EXECUTION PHASE VALIDATION: Prevent hallucination
+          // ===========================================================
+          // If in execution phase and no code block was generated, the AI
+          // is trying to answer directly instead of using the paid/free tools.
+          // We must retry with a stronger prompt to force code generation.
+          const MAX_EXECUTION_RETRIES = 2;
+          if (isAutoModeExecution && autoModePayment && !codeBlock) {
+            console.warn(
+              "[chat-api] Auto Mode Execution: AI did not generate code block, retrying",
+              {
+                chatId: id,
+                responsePreview: planningText.slice(0, 200),
+                selectedTools: autoModePayment.selectedTools.map((t) => t.name),
+              }
+            );
+
+            for (
+              let executionRetry = 0;
+              executionRetry < MAX_EXECUTION_RETRIES && !codeBlock;
+              executionRetry++
+            ) {
+              // Build tool list for the retry prompt
+              const toolList = autoModePayment.selectedTools
+                .map((t) => `- ${t.name} (toolId: ${t.toolId})`)
+                .join("\n");
+
+              // Build a stronger retry prompt
+              const retryPrompt = `You MUST respond with a TypeScript code block. Your previous response did not contain code.
+
+CRITICAL: You are in EXECUTION PHASE. The user has PAID for these tools:
+${toolList}
+
+You MUST generate code that:
+1. Imports callMcpSkill from "@/lib/ai/skills/mcp"
+2. Calls the paid/free tools to fetch data
+3. Returns a result object
+
+If the selected tools cannot answer the user's question, you MUST STILL generate code that:
+- Attempts to use the tools
+- Returns { error: "explanation of why tools cannot answer this query" }
+
+DO NOT respond with plain text. ONLY output a \`\`\`ts code block.
+
+The user asked: "${message.parts
+                .filter(
+                  (p): p is { type: "text"; text: string } => p.type === "text"
+                )
+                .map((p) => p.text)
+                .join(" ")}"`;
+
+              const retryResult = await generateText({
+                model: provider.languageModel(selectedChatModel),
+                system: planningSystemInstructions,
+                messages: [
+                  ...baseModelMessages,
+                  { role: "assistant" as const, content: planningText },
+                  { role: "user" as const, content: retryPrompt },
+                ],
+              });
+
+              const retryCode = extractCodeBlock(retryResult.text);
+              if (retryCode) {
+                console.log("[chat-api] Auto Mode Execution: retry succeeded", {
+                  chatId: id,
+                  attempt: executionRetry + 1,
+                  codePreview: retryCode.slice(0, 100),
+                });
+                codeBlock = retryCode;
+                planningText = retryResult.text;
+              } else {
+                console.warn(
+                  "[chat-api] Auto Mode Execution: retry failed to produce code",
+                  {
+                    chatId: id,
+                    attempt: executionRetry + 1,
+                  }
+                );
+              }
+            }
+
+            // If still no code block after retries, signal error and return
+            if (!codeBlock) {
+              console.error(
+                "[chat-api] Auto Mode Execution: failed to generate code after retries",
+                { chatId: id }
+              );
+
+              dataStream.write({
+                type: "data-toolStatus",
+                data: { status: "thinking" },
+              });
+
+              // Return an error - don't let the AI hallucinate
+              dataStream.write({
+                type: "data-error",
+                data: {
+                  message:
+                    "The selected tools could not be used for this query. Please try a different question or select different tools.",
                 },
               });
               return;
@@ -1168,8 +1287,8 @@ Selection reasoning: ${discoveryResult?.selectionReasoning || "Data from previou
 
 IMPORTANT: Use ONLY the data that was fetched in previous turns. Do NOT invent new values.`
                       : discoveryResult?.error
-                      ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
-                      : `Tool discovery completed. No paid tools required for this query.
+                        ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
+                        : `Tool discovery completed. No paid tools required for this query.
 Selection reasoning: ${discoveryResult?.selectionReasoning || "N/A"}`;
                   } else {
                     // Calculate total cost
@@ -1357,11 +1476,14 @@ ${discoveryExecution.logs.join("\n")}`;
                   const isRetry = attempt > 0;
 
                   if (isRetry) {
-                    console.log("[chat-api] Agentic Reflection: retry attempt", {
-                      chatId: id,
-                      attempt,
-                      reason: "suspicious results detected",
-                    });
+                    console.log(
+                      "[chat-api] Agentic Reflection: retry attempt",
+                      {
+                        chatId: id,
+                        attempt,
+                        reason: "suspicious results detected",
+                      }
+                    );
 
                     dataStream.write({
                       type: "data-toolStatus",
@@ -1412,6 +1534,34 @@ ${discoveryExecution.logs.join("\n")}`;
                       data: { status: "fixing" },
                     });
 
+                    // Build tool schema info from allowed tools for error context
+                    const toolSchemaInfo = Array.from(
+                      autoModeAllowedTools.entries()
+                    ).map(([toolId, ctx]) => {
+                      const toolSchema = ctx.tool.toolSchema as Record<
+                        string,
+                        unknown
+                      > | null;
+                      const mcpTools = toolSchema?.tools as
+                        | Array<{
+                            name: string;
+                            description?: string;
+                            inputSchema?: unknown;
+                            outputSchema?: unknown;
+                          }>
+                        | undefined;
+                      return {
+                        toolId,
+                        name: ctx.tool.name,
+                        mcpTools: mcpTools?.map((t) => ({
+                          name: t.name,
+                          description: t.description,
+                          inputSchema: t.inputSchema,
+                          outputSchema: t.outputSchema,
+                        })),
+                      };
+                    });
+
                     // Generate a fix for the runtime error
                     const errorFixResult = await generateText({
                       model: provider.languageModel(selectedChatModel),
@@ -1419,7 +1569,10 @@ ${discoveryExecution.logs.join("\n")}`;
                         currentCode,
                         execution.error,
                         execution.logs,
-                        toolCallHistory.length > 0 ? toolCallHistory : undefined
+                        toolCallHistory.length > 0
+                          ? toolCallHistory
+                          : undefined,
+                        toolSchemaInfo
                       ),
                       messages: [
                         {
@@ -1476,6 +1629,40 @@ ${discoveryExecution.logs.join("\n")}`;
                         }
                       );
 
+                      // Build tool schema section for reflection context
+                      // Include both inputSchema and outputSchema for complete context
+                      const reflectionToolSchemas = Array.from(
+                        autoModeAllowedTools.entries()
+                      )
+                        .map(([, ctx]) => {
+                          const toolSchema = ctx.tool.toolSchema as Record<
+                            string,
+                            unknown
+                          > | null;
+                          const mcpTools = toolSchema?.tools as
+                            | Array<{
+                                name: string;
+                                description?: string;
+                                inputSchema?: unknown;
+                                outputSchema?: unknown;
+                              }>
+                            | undefined;
+                          if (!mcpTools) return "";
+                          return mcpTools
+                            .map(
+                              (t) => `### ${ctx.tool.name} → ${t.name}
+**Input Schema (valid parameters):** \`\`\`json
+${JSON.stringify(t.inputSchema, null, 2) || "{}"}
+\`\`\`
+**Output Schema (response structure):** \`\`\`json
+${JSON.stringify(t.outputSchema, null, 2) || "unknown"}
+\`\`\``
+                            )
+                            .join("\n\n");
+                        })
+                        .filter(Boolean)
+                        .join("\n\n");
+
                       // Build reflection prompt with raw tool outputs
                       const reflectionSystemPrompt = `${reflectionPrompt}
 
@@ -1495,7 +1682,11 @@ ${suspiciousCheck.nullPaths.map((p) => `- \`${p}\``).join("\n")}
 ## Raw Tool Outputs (what the APIs actually returned)
 ${formatToolCallHistory(toolCallHistory)}
 
-Now write ONLY the corrected code block. Fix the bug that caused the null values.`;
+## Tool Schemas (REFERENCE - use correct params and access correct properties!)
+${reflectionToolSchemas || "(No schemas available)"}
+
+Now write ONLY the corrected code block. Fix the bug that caused the null values.
+HINT: Check that you're accessing the correct property names from the Output Schema above.`;
 
                       // Ask AI to reflect and fix
                       const reflectionResult = await generateText({
@@ -1945,10 +2136,13 @@ ${devPrefix}`;
             // Track actual cost for convenience tier
             if (userTier === "convenience" && actualCost > 0) {
               await addAccumulatedModelCost(session.user.id, actualCost);
-              console.log("[cost-tracking] Accumulated model cost for convenience tier:", {
-                userId: session.user.id,
-                costAdded: actualCost,
-              });
+              console.log(
+                "[cost-tracking] Accumulated model cost for convenience tier:",
+                {
+                  userId: session.user.id,
+                  costAdded: actualCost,
+                }
+              );
             }
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);

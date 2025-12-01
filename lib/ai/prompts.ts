@@ -539,7 +539,7 @@ export const titlePrompt = `\n
 
 /**
  * REFLECTION PROMPT (Agentic Retry Loop)
- * 
+ *
  * Used when execution produces suspicious results (nulls where data should exist).
  * Shows the AI the raw tool outputs and asks it to diagnose and fix the issue.
  * This enables Cursor-like agentic behavior where the AI can reason through failures.
@@ -587,6 +587,20 @@ var lowestConfidence = sorted[0]; // Works with any values
 `;
 
 /**
+ * Tool schema info for error correction context
+ */
+export type ToolSchemaInfo = {
+  toolId: string;
+  name: string;
+  mcpTools?: Array<{
+    name: string;
+    description?: string;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+  }>;
+};
+
+/**
  * ERROR CORRECTION PROMPT (Self-Healing for Crashed Executions)
  *
  * Used when code execution throws a runtime error.
@@ -608,13 +622,49 @@ export function errorCorrectionPrompt(
     toolName: string;
     args: Record<string, unknown>;
     result: unknown;
-  }>
+  }>,
+  toolSchemas?: ToolSchemaInfo[]
 ): string {
   const toolHistorySection =
     toolCallHistory && toolCallHistory.length > 0
       ? `
 ## Tool Calls That Succeeded Before Crash
 ${formatToolCallHistory(toolCallHistory)}
+`
+      : "";
+
+  // Build tool schema reference section
+  const toolSchemaSection =
+    toolSchemas && toolSchemas.length > 0
+      ? `
+## Available Tool Schemas (REFERENCE - use these exact parameter names!)
+${toolSchemas
+  .map((tool) => {
+    if (!tool.mcpTools || tool.mcpTools.length === 0) {
+      return `### ${tool.name} (${tool.toolId})\n(No schema available)`;
+    }
+    return tool.mcpTools
+      .map((mcp) => {
+        const inputStr = mcp.inputSchema
+          ? JSON.stringify(mcp.inputSchema, null, 2)
+          : "{}";
+        const outputStr = mcp.outputSchema
+          ? JSON.stringify(mcp.outputSchema, null, 2)
+          : "unknown";
+        return `### ${tool.name} → ${mcp.name}
+**Description:** ${mcp.description || "No description"}
+**Input Schema (valid parameters):**
+\`\`\`json
+${inputStr}
+\`\`\`
+**Output Schema (response structure):**
+\`\`\`json
+${outputStr}
+\`\`\``;
+      })
+      .join("\n\n");
+  })
+  .join("\n\n")}
 `
       : "";
 
@@ -644,18 +694,25 @@ ${error}
 \`\`\`
 ${sanitizedLogs}
 \`\`\`
-${toolHistorySection}
+${toolHistorySection}${toolSchemaSection}
 ## Common Fixes
-1. **Property access on undefined**: Use optional chaining (\`data?.items\`) or nullish coalescing (\`data ?? []\`)
-2. **Wrong property path**: Check the tool output structure - APIs often return \`result.data\` vs \`result\` directly
-3. **Array methods on non-arrays**: Verify the data is actually an array before calling \`.map()\`, \`.filter()\`, etc.
-4. **Type mismatches**: Numbers returned as strings, nested objects instead of flat
-5. **Missing error handling**: Wrap risky operations in try/catch
+1. **Wrong parameter names**: Check the Input Schema above - use EXACT parameter names (e.g., \`ids\` not \`coin_ids\`)
+2. **Property access on undefined**: Use optional chaining (\`data?.items\`) or nullish coalescing (\`data ?? []\`)
+3. **Wrong property path**: Check the Output Schema above - APIs may return \`result.data\` vs \`result\` directly
+4. **Array methods on non-arrays**: Verify the data is actually an array before calling \`.map()\`, \`.filter()\`, etc.
+5. **Type mismatches**: Numbers returned as strings, nested objects instead of flat
+6. **Missing required parameters**: Check Input Schema for required fields
+
+## Debugging Strategy
+1. **Read the error message carefully** - it tells you exactly what went wrong
+2. **Check the tool schemas** - ensure your parameter names match the Input Schema exactly
+3. **Check the Output Schema** - ensure you're accessing the correct response properties
+4. **If tool call failed (400/500 error)** - wrong parameters or invalid values were likely used
 
 ## Output Format
 Return ONLY the corrected JavaScript code block. Do not explain your fix.
 **CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations like \`: any\`, \`: string\`, \`<Type>\`, or type casts. The code runs in a JavaScript VM.**
-Fix the specific error, don't rewrite the entire approach.
+Fix the specific error - use the schemas above to get the correct parameter/property names.
 `;
 }
 

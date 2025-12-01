@@ -44,7 +44,12 @@ export function ContributeForm() {
   const mcpDescriptionPlaceholder = `What does your MCP Tool do? (Skills are auto-discovered)
 
 Example:
-Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism. Returns flat JSON with chainId, estimates array, and fetchedAt timestamp.
+Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism.
+
+Best practices for your MCP server:
+- Use outputSchema in tools/list to define response structure
+- Return data in structuredContent for reliable AI parsing
+- Example response: { content: [...], structuredContent: { price: 72.5, chain: "ethereum" } }
 
 Agent tips (optional):
 - Call list_chains first to get all supported chainIds
