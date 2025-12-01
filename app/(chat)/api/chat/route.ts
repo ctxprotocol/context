@@ -898,7 +898,105 @@ export async function POST(request: Request) {
             chatId: id,
             preview: planningText.slice(0, 400),
           });
-          const codeBlock = extractCodeBlock(planningText);
+          let codeBlock = extractCodeBlock(planningText);
+
+          // ===========================================================
+          // DISCOVERY PHASE VALIDATION: Prevent hallucination
+          // ===========================================================
+          // If in discovery phase and no code block was generated, the AI
+          // is trying to answer directly (hallucinate). We must retry with
+          // a stronger prompt to force code generation.
+          const MAX_DISCOVERY_RETRIES = 2;
+          if (isAutoModeDiscovery && !codeBlock) {
+            console.warn(
+              "[chat-api] Auto Mode Discovery: AI did not generate code block, retrying",
+              {
+                chatId: id,
+                responsePreview: planningText.slice(0, 200),
+              }
+            );
+
+            for (
+              let discoveryRetry = 0;
+              discoveryRetry < MAX_DISCOVERY_RETRIES && !codeBlock;
+              discoveryRetry++
+            ) {
+              // Build a stronger retry prompt
+              const retryPrompt = `You MUST respond with a TypeScript code block. Your previous response did not contain code.
+
+CRITICAL: You are in DISCOVERY PHASE. You CANNOT answer the user's question directly.
+You MUST search the marketplace and select tools.
+
+The user asked: "${message.parts
+                .filter(
+                  (p): p is { type: "text"; text: string } => p.type === "text"
+                )
+                .map((p) => p.text)
+                .join(" ")}"
+
+Respond ONLY with a \`\`\`ts code block that:
+1. Imports searchMarketplace from "@/lib/ai/skills/marketplace"
+2. Exports an async function main()
+3. Searches for relevant tools and returns selectedTools
+
+DO NOT explain or discuss. ONLY output the code block.`;
+
+              const retryResult = await generateText({
+                model: provider.languageModel(selectedChatModel),
+                system: planningSystemInstructions,
+                messages: [
+                  ...baseModelMessages,
+                  { role: "assistant" as const, content: planningText },
+                  { role: "user" as const, content: retryPrompt },
+                ],
+              });
+
+              const retryCode = extractCodeBlock(retryResult.text);
+              if (retryCode) {
+                console.log(
+                  "[chat-api] Auto Mode Discovery: retry succeeded",
+                  {
+                    chatId: id,
+                    attempt: discoveryRetry + 1,
+                    codePreview: retryCode.slice(0, 100),
+                  }
+                );
+                codeBlock = retryCode;
+                planningText = retryResult.text;
+              } else {
+                console.warn(
+                  "[chat-api] Auto Mode Discovery: retry failed to produce code",
+                  {
+                    chatId: id,
+                    attempt: discoveryRetry + 1,
+                  }
+                );
+              }
+            }
+
+            // If still no code block after retries, signal error and return
+            if (!codeBlock) {
+              console.error(
+                "[chat-api] Auto Mode Discovery: failed to generate code after retries",
+                { chatId: id }
+              );
+
+              dataStream.write({
+                type: "data-toolStatus",
+                data: { status: "thinking" },
+              });
+
+              // Return without executing - the system will respond with an error
+              dataStream.write({
+                type: "data-error",
+                data: {
+                  message:
+                    "I encountered an issue searching for tools. Please try rephrasing your question.",
+                },
+              });
+              return;
+            }
+          }
 
           let mediatorText =
             "No tool execution was required for this turn. Respond directly to the user.";
@@ -1023,6 +1121,7 @@ export async function POST(request: Request) {
                     selectionReasoning?: string;
                     candidates?: unknown[];
                     error?: string;
+                    dataAlreadyAvailable?: boolean; // Flag for when data is in conversation
                   };
 
                   // Stream the discovery result for debugging
@@ -1033,13 +1132,16 @@ export async function POST(request: Request) {
 
                   // Check if tools were selected
                   const selectedTools = discoveryResult?.selectedTools ?? [];
+                  const dataAlreadyAvailable =
+                    discoveryResult?.dataAlreadyAvailable === true;
 
                   if (selectedTools.length === 0) {
-                    // No tools selected - either no matches or free tools only
+                    // No tools selected - either no matches, data already available, or error
                     console.log(
                       "[chat-api] Auto Mode Discovery: no paid tools selected",
                       {
                         chatId: id,
+                        dataAlreadyAvailable,
                         reason:
                           discoveryResult?.error ||
                           discoveryResult?.selectionReasoning,
@@ -1058,7 +1160,14 @@ export async function POST(request: Request) {
                       data: { status: "thinking" },
                     });
 
-                    mediatorText = discoveryResult?.error
+                    // When data is already available, provide clear context to the final response
+                    mediatorText = dataAlreadyAvailable
+                      ? `Tool discovery completed. The requested data is already available in the conversation history.
+DATA_ALREADY_AVAILABLE: true
+Selection reasoning: ${discoveryResult?.selectionReasoning || "Data from previous tool calls can be used to answer this question."}
+
+IMPORTANT: Use ONLY the data that was fetched in previous turns. Do NOT invent new values.`
+                      : discoveryResult?.error
                       ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
                       : `Tool discovery completed. No paid tools required for this query.
 Selection reasoning: ${discoveryResult?.selectionReasoning || "N/A"}`;
