@@ -45,7 +45,7 @@ import {
 } from "@/lib/ai/models";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { myProvider } from "@/lib/ai/providers";
-import type { AITool } from "@/lib/db/schema";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import {
   contextRouterAbi,
   useWriteContextRouterExecuteBatchPaidQuery,
@@ -136,8 +136,8 @@ function PureMultimodalInput({
   const { width } = useWindowSize();
   const { selectedTool, clearTool } = useToolSelection();
   const { activeTools } = useSessionTools();
-  const primaryTool: AITool | null = selectedTool ?? activeTools[0] ?? null;
-  const [executingTool, setExecutingTool] = useState<AITool | null>(null);
+  const primaryTool: ToolListItem | null = selectedTool ?? activeTools[0] ?? null;
+  const [executingTool, setExecutingTool] = useState<ToolListItem | null>(null);
   const {
     stage,
     setStage,
@@ -233,7 +233,7 @@ function PureMultimodalInput({
     `0x${string}` | undefined
   >(undefined);
   // Track which tools are being paid for (for batch payments)
-  const [executingTools, setExecutingTools] = useState<AITool[]>([]);
+  const [executingTools, setExecutingTools] = useState<ToolListItem[]>([]);
   const [showAddFundsDialog, setShowAddFundsDialog] = useState(false);
   const [isFundingWallet, setIsFundingWallet] = useState(false);
   const [fundingRequest, setFundingRequest] = useState<{

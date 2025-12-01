@@ -599,6 +599,180 @@ const TOOLS = [
       required: ["marketsAtCap", "count"],
     },
   },
+
+  // ==================== HLP VAULT STATS ====================
+  {
+    name: "get_hlp_vault_stats",
+    description:
+      "Get HLP (Hyperliquidity Provider) vault statistics including APR, TVL, historical performance, and P&L. The HLP vault provides liquidity to the protocol and earns fees. Essential for understanding HLP yield dynamics.",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+    outputSchema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string" },
+        vaultAddress: { type: "string" },
+        apr: { type: "number", description: "Current APR percentage" },
+        tvl: { type: "number", description: "Total Value Locked in USD" },
+        followerCount: { type: "number" },
+        performance: {
+          type: "object",
+          properties: {
+            day: { type: "object" },
+            week: { type: "object" },
+            month: { type: "object" },
+            allTime: { type: "object" },
+          },
+        },
+        lockupPeriod: { type: "string" },
+        fetchedAt: { type: "string" },
+      },
+      required: ["apr", "tvl"],
+    },
+  },
+
+  // ==================== HISTORICAL FUNDING ====================
+  {
+    name: "get_funding_history",
+    description:
+      "Get historical funding rates for a coin over a time period. Essential for analyzing funding trends, understanding if funding is persistently positive/negative, and backtesting carry trades.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        coin: { type: "string", description: 'Coin symbol (e.g., "HYPE")' },
+        days: {
+          type: "number",
+          description: "Number of days of history (default: 30, max: 90)",
+        },
+      },
+      required: ["coin"],
+    },
+    outputSchema: {
+      type: "object" as const,
+      properties: {
+        coin: { type: "string" },
+        fundingHistory: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              time: { type: "string" },
+              fundingRate: { type: "number" },
+              premium: { type: "number" },
+              annualized: { type: "number" },
+            },
+          },
+        },
+        summary: {
+          type: "object",
+          properties: {
+            avgFundingRate: { type: "number" },
+            avgAnnualized: { type: "number" },
+            maxFundingRate: { type: "number" },
+            minFundingRate: { type: "number" },
+            positiveFundingPercent: { type: "number" },
+            trend: { type: "string" },
+          },
+        },
+        fetchedAt: { type: "string" },
+      },
+      required: ["coin", "fundingHistory", "summary"],
+    },
+  },
+
+  // ==================== TOTAL EXCHANGE VOLUME ====================
+  {
+    name: "get_exchange_stats",
+    description:
+      "Get aggregated exchange-wide statistics: total 24h volume across all markets, total open interest, and market counts. Useful for understanding overall Hyperliquid activity levels and trends.",
+    inputSchema: { type: "object" as const, properties: {}, required: [] },
+    outputSchema: {
+      type: "object" as const,
+      properties: {
+        totalVolume24h: {
+          type: "number",
+          description: "Total 24h volume across all perp markets in USD",
+        },
+        totalOpenInterest: {
+          type: "number",
+          description: "Total OI across all markets in USD",
+        },
+        marketCount: { type: "number" },
+        topMarketsByVolume: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              coin: { type: "string" },
+              volume24h: { type: "number" },
+              percentOfTotal: { type: "number" },
+            },
+          },
+        },
+        fetchedAt: { type: "string" },
+      },
+      required: ["totalVolume24h", "totalOpenInterest", "marketCount"],
+    },
+  },
+
+  // ==================== HISTORICAL VOLUME ANALYSIS ====================
+  {
+    name: "get_volume_history",
+    description:
+      "Analyze historical volume trends for a coin or the entire exchange. Returns daily volumes to identify volume increases or decreases over time. Critical for understanding liquidity trends.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        coin: {
+          type: "string",
+          description:
+            'Coin symbol (e.g., "HYPE"). If omitted, analyzes major markets.',
+        },
+        days: {
+          type: "number",
+          description: "Number of days of history (default: 30, max: 90)",
+        },
+      },
+      required: [],
+    },
+    outputSchema: {
+      type: "object" as const,
+      properties: {
+        coin: { type: "string" },
+        dailyVolumes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              date: { type: "string" },
+              volume: { type: "number" },
+            },
+          },
+        },
+        summary: {
+          type: "object",
+          properties: {
+            avgDailyVolume: { type: "number" },
+            maxDailyVolume: { type: "number" },
+            minDailyVolume: { type: "number" },
+            recentVsAvgRatio: {
+              type: "number",
+              description: "Last 7 days avg / overall avg",
+            },
+            trend: {
+              type: "string",
+              description: "increasing, decreasing, or stable",
+            },
+            percentChange: {
+              type: "number",
+              description: "Change from first week to last week",
+            },
+          },
+        },
+        fetchedAt: { type: "string" },
+      },
+      required: ["dailyVolumes", "summary"],
+    },
+  },
 ];
 
 // ============================================================================
@@ -645,6 +819,14 @@ server.setRequestHandler(
           return await handleAnalyzeLargeOrder(args);
         case "get_markets_at_oi_cap":
           return await handleGetMarketsAtOiCap();
+        case "get_hlp_vault_stats":
+          return await handleGetHlpVaultStats();
+        case "get_funding_history":
+          return await handleGetFundingHistory(args);
+        case "get_exchange_stats":
+          return await handleGetExchangeStats();
+        case "get_volume_history":
+          return await handleGetVolumeHistory(args);
         default:
           return errorResult(`Unknown tool: ${name}`);
       }
@@ -1430,6 +1612,277 @@ async function handleGetMarketsAtOiCap(): Promise<CallToolResult> {
   });
 }
 
+// HLP vault address on mainnet
+const HLP_VAULT_ADDRESS = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303";
+
+async function handleGetHlpVaultStats(): Promise<CallToolResult> {
+  const vaultData = await fetchVaultDetails(HLP_VAULT_ADDRESS);
+
+  if (!vaultData) {
+    return errorResult("Failed to fetch HLP vault data");
+  }
+
+  // Calculate TVL from followers
+  const tvl = vaultData.followers?.reduce(
+    (sum: number, f: { vaultEquity: string }) =>
+      sum + Number(f.vaultEquity || 0),
+    0
+  ) ?? 0;
+
+  // Parse portfolio performance data
+  const performance: Record<string, unknown> = {};
+  if (vaultData.portfolio) {
+    for (const [period, data] of vaultData.portfolio) {
+      const pnlHistory = data.pnlHistory || [];
+      const lastPnl = pnlHistory.at(-1)?.[1] ?? "0";
+      const firstPnl = pnlHistory.at(0)?.[1] ?? "0";
+      const volumeInPeriod = Number(data.vlm || 0);
+
+      performance[period] = {
+        pnl: Number(lastPnl) - Number(firstPnl),
+        volume: volumeInPeriod,
+        dataPoints: pnlHistory.length,
+      };
+    }
+  }
+
+  return successResult({
+    name: vaultData.name || "HLP",
+    vaultAddress: HLP_VAULT_ADDRESS,
+    apr: vaultData.apr ?? 0,
+    aprAnnualized: (vaultData.apr ?? 0) * 100,
+    tvl,
+    tvlFormatted: `$${(tvl / 1_000_000).toFixed(2)}M`,
+    followerCount: vaultData.followers?.length ?? 0,
+    leaderCommission: vaultData.leaderCommission ?? 0,
+    performance,
+    lockupPeriod: "4 days",
+    isClosed: vaultData.isClosed ?? false,
+    allowDeposits: vaultData.allowDeposits ?? true,
+    note: "HLP is the protocol vault that provides liquidity. APR reflects recent performance - actual yields depend on trading fees and funding collected.",
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleGetFundingHistory(
+  args: Record<string, unknown> | undefined
+): Promise<CallToolResult> {
+  const coin = args?.coin as string;
+  const days = Math.min((args?.days as number) || 30, 90);
+
+  if (!coin) {
+    return errorResult("coin parameter is required");
+  }
+
+  const endTime = Date.now();
+  const startTime = endTime - days * 24 * 60 * 60 * 1000;
+
+  const fundingData = await fetchFundingHistory(coin, startTime, endTime);
+
+  if (!fundingData || fundingData.length === 0) {
+    return errorResult(`No funding history available for ${coin}`);
+  }
+
+  const parsed = fundingData.map(
+    (f: { time: number; fundingRate: string; premium: string }) => {
+      const rate = Number(f.fundingRate);
+      return {
+        time: new Date(f.time).toISOString(),
+        fundingRate: rate,
+        premium: Number(f.premium),
+        annualized: rate * 24 * 365 * 100,
+      };
+    }
+  );
+
+  // Calculate summary statistics
+  const rates = parsed.map((p: { fundingRate: number }) => p.fundingRate);
+  const avgRate = rates.reduce((a: number, b: number) => a + b, 0) / rates.length;
+  const positiveCount = rates.filter((r: number) => r > 0).length;
+
+  // Determine trend (compare first half vs second half)
+  const halfIdx = Math.floor(rates.length / 2);
+  const firstHalfAvg =
+    rates.slice(0, halfIdx).reduce((a: number, b: number) => a + b, 0) / halfIdx;
+  const secondHalfAvg =
+    rates.slice(halfIdx).reduce((a: number, b: number) => a + b, 0) /
+    (rates.length - halfIdx);
+
+  let trend: string;
+  const trendDiff = secondHalfAvg - firstHalfAvg;
+  if (Math.abs(trendDiff) < 0.00001) {
+    trend = "stable";
+  } else if (trendDiff > 0) {
+    trend = "increasing (becoming more bullish)";
+  } else {
+    trend = "decreasing (becoming less bullish or bearish)";
+  }
+
+  return successResult({
+    coin,
+    daysAnalyzed: days,
+    fundingHistory: parsed,
+    summary: {
+      avgFundingRate: avgRate,
+      avgAnnualized: avgRate * 24 * 365 * 100,
+      maxFundingRate: Math.max(...rates),
+      minFundingRate: Math.min(...rates),
+      positiveFundingPercent: (positiveCount / rates.length) * 100,
+      trend,
+      interpretation:
+        avgRate > 0
+          ? `Longs have paid shorts on average (${(avgRate * 24 * 365 * 100).toFixed(2)}% annualized). This is income for HLP when net long.`
+          : `Shorts have paid longs on average. This reduces HLP income when net short.`,
+    },
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleGetExchangeStats(): Promise<CallToolResult> {
+  const metaAndCtx = await fetchMetaAndAssetCtxs();
+  const meta = metaAndCtx[0];
+  const ctxs = metaAndCtx[1];
+
+  let totalVolume = 0;
+  let totalOI = 0;
+
+  const marketVolumes: Array<{
+    coin: string;
+    volume24h: number;
+    openInterest: number;
+  }> = [];
+
+  for (let i = 0; i < meta.universe.length; i++) {
+    const coin = meta.universe[i].name;
+    const ctx = ctxs[i];
+    const volume = Number(ctx.dayNtlVlm || 0);
+    const markPrice = Number(ctx.markPx || 0);
+    const oi = Number(ctx.openInterest || 0) * markPrice;
+
+    totalVolume += volume;
+    totalOI += oi;
+
+    if (volume > 0) {
+      marketVolumes.push({
+        coin,
+        volume24h: volume,
+        openInterest: oi,
+      });
+    }
+  }
+
+  // Sort by volume and get top 10
+  marketVolumes.sort((a, b) => b.volume24h - a.volume24h);
+  const topMarkets = marketVolumes.slice(0, 10).map((m) => ({
+    coin: m.coin,
+    volume24h: m.volume24h,
+    percentOfTotal:
+      totalVolume > 0
+        ? Number(((m.volume24h / totalVolume) * 100).toFixed(2))
+        : 0,
+  }));
+
+  return successResult({
+    totalVolume24h: totalVolume,
+    totalVolume24hFormatted: `$${(totalVolume / 1_000_000_000).toFixed(2)}B`,
+    totalOpenInterest: totalOI,
+    totalOpenInterestFormatted: `$${(totalOI / 1_000_000_000).toFixed(2)}B`,
+    marketCount: meta.universe.length,
+    activeMarkets: marketVolumes.length,
+    topMarketsByVolume: topMarkets,
+    volumeConcentration: {
+      top3Percent:
+        topMarkets.slice(0, 3).reduce((s, m) => s + m.percentOfTotal, 0),
+      top10Percent: topMarkets.reduce((s, m) => s + m.percentOfTotal, 0),
+    },
+    note: "Volume is 24h notional volume. Compare to historical levels to assess liquidity trends.",
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
+async function handleGetVolumeHistory(
+  args: Record<string, unknown> | undefined
+): Promise<CallToolResult> {
+  const coin = (args?.coin as string) || "HYPE";
+  const days = Math.min((args?.days as number) || 30, 90);
+
+  const now = Date.now();
+  const intervalMs = 24 * 60 * 60 * 1000; // 1 day
+  const startTime = now - intervalMs * days;
+
+  const candles = await fetchCandleSnapshot(coin, "1d", startTime, now);
+
+  if (!candles || candles.length === 0) {
+    return errorResult(`No historical data available for ${coin}`);
+  }
+
+  const dailyVolumes = candles.map(
+    (c: { t: number; v: string; c: string }) => ({
+      date: new Date(c.t).toISOString().split("T")[0],
+      volume: Number(c.v) * Number(c.c), // volume * close price = notional
+      rawVolume: Number(c.v),
+      closePrice: Number(c.c),
+    })
+  );
+
+  const volumes = dailyVolumes.map(
+    (d: { volume: number }) => d.volume
+  );
+  const avgVolume = volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length;
+
+  // Calculate recent (last 7 days) vs overall average
+  const recentVolumes = volumes.slice(-7);
+  const recentAvg =
+    recentVolumes.reduce((a: number, b: number) => a + b, 0) / recentVolumes.length;
+  const recentVsAvgRatio = avgVolume > 0 ? recentAvg / avgVolume : 1;
+
+  // Calculate trend (first week vs last week)
+  const firstWeek = volumes.slice(0, 7);
+  const lastWeek = volumes.slice(-7);
+  const firstWeekAvg =
+    firstWeek.reduce((a: number, b: number) => a + b, 0) / firstWeek.length;
+  const lastWeekAvg =
+    lastWeek.reduce((a: number, b: number) => a + b, 0) / lastWeek.length;
+  const percentChange =
+    firstWeekAvg > 0 ? ((lastWeekAvg - firstWeekAvg) / firstWeekAvg) * 100 : 0;
+
+  let trend: string;
+  if (percentChange > 20) {
+    trend = "significantly increasing";
+  } else if (percentChange > 5) {
+    trend = "increasing";
+  } else if (percentChange < -20) {
+    trend = "significantly decreasing";
+  } else if (percentChange < -5) {
+    trend = "decreasing";
+  } else {
+    trend = "stable";
+  }
+
+  return successResult({
+    coin,
+    daysAnalyzed: dailyVolumes.length,
+    dailyVolumes,
+    summary: {
+      avgDailyVolume: avgVolume,
+      avgDailyVolumeFormatted: `$${(avgVolume / 1_000_000).toFixed(2)}M`,
+      maxDailyVolume: Math.max(...volumes),
+      minDailyVolume: Math.min(...volumes),
+      recentAvg7d: recentAvg,
+      recentVsAvgRatio: Number(recentVsAvgRatio.toFixed(2)),
+      trend,
+      percentChange: Number(percentChange.toFixed(2)),
+      interpretation:
+        recentVsAvgRatio < 0.7
+          ? "Recent volume is significantly below average - liquidity may be drying up"
+          : recentVsAvgRatio > 1.3
+            ? "Recent volume is significantly above average - increased activity"
+            : "Recent volume is within normal range",
+    },
+    fetchedAt: new Date().toISOString(),
+  });
+}
+
 // ============================================================================
 // API FETCH FUNCTIONS
 // ============================================================================
@@ -1517,6 +1970,29 @@ function fetchCandleSnapshot(
   >;
 }
 
+function fetchVaultDetails(
+  vaultAddress: string
+): Promise<VaultDetailsResponse | null> {
+  return hyperliquidPost({
+    type: "vaultDetails",
+    vaultAddress,
+    user: null,
+  }) as Promise<VaultDetailsResponse | null>;
+}
+
+function fetchFundingHistory(
+  coin: string,
+  startTime: number,
+  endTime: number
+): Promise<FundingHistoryResponse[]> {
+  return hyperliquidPost({
+    type: "fundingHistory",
+    coin,
+    startTime,
+    endTime,
+  }) as Promise<FundingHistoryResponse[]>;
+}
+
 // ============================================================================
 // TYPE DEFINITIONS
 // ============================================================================
@@ -1587,6 +2063,47 @@ type ParsedOrderbook = {
   totalBidLiquidity: number;
   totalAskLiquidity: number;
   fetchedAt: string;
+};
+
+type VaultDetailsResponse = {
+  name: string;
+  vaultAddress: string;
+  leader: string;
+  description: string;
+  portfolio: Array<
+    [
+      string,
+      {
+        accountValueHistory: Array<[number, string]>;
+        pnlHistory: Array<[number, string]>;
+        vlm: string;
+      },
+    ]
+  >;
+  apr: number;
+  followerState: unknown;
+  leaderFraction: number;
+  leaderCommission: number;
+  followers: Array<{
+    user: string;
+    vaultEquity: string;
+    pnl: string;
+    allTimePnl: string;
+    daysFollowing: number;
+    vaultEntryTime: number;
+    lockupUntil: number;
+  }>;
+  maxDistributable: number;
+  maxWithdrawable: number;
+  isClosed: boolean;
+  allowDeposits: boolean;
+};
+
+type FundingHistoryResponse = {
+  coin: string;
+  fundingRate: string;
+  premium: string;
+  time: number;
 };
 
 // ============================================================================

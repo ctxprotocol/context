@@ -761,8 +761,66 @@ export async function createAITool({
 
 /**
  * Get all active AI tools (for marketplace listing)
+ * Supports pagination and returns only essential columns for listing
  */
-export async function getActiveAITools() {
+export async function getActiveAITools({
+  limit = 50,
+  offset = 0,
+  category,
+  includeCount = false,
+}: {
+  limit?: number;
+  offset?: number;
+  category?: string;
+  includeCount?: boolean;
+} = {}) {
+  try {
+    const whereConditions = category
+      ? and(eq(aiTool.isActive, true), eq(aiTool.category, category))
+      : eq(aiTool.isActive, true);
+
+    // Select columns needed for listing and payment
+    const tools = await db
+      .select({
+        id: aiTool.id,
+        name: aiTool.name,
+        description: aiTool.description,
+        category: aiTool.category,
+        pricePerQuery: aiTool.pricePerQuery,
+        iconUrl: aiTool.iconUrl,
+        isVerified: aiTool.isVerified,
+        totalQueries: aiTool.totalQueries,
+        averageRating: aiTool.averageRating,
+        toolSchema: aiTool.toolSchema, // Needed to determine tool type (native/MCP)
+        developerWallet: aiTool.developerWallet, // Needed for payment execution
+      })
+      .from(aiTool)
+      .where(whereConditions)
+      .orderBy(desc(aiTool.totalQueries))
+      .limit(limit)
+      .offset(offset);
+
+    if (includeCount) {
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(aiTool)
+        .where(whereConditions);
+
+      return { tools, total, hasMore: offset + tools.length < total };
+    }
+
+    return tools;
+  } catch (error) {
+    console.error("Failed to get active AI tools:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get AI tools");
+  }
+}
+
+/**
+ * Get all active AI tools with full data (for admin pages)
+ * Returns all columns including toolSchema
+ */
+export async function getActiveAIToolsFull() {
   try {
     return await db
       .select()
@@ -770,7 +828,7 @@ export async function getActiveAITools() {
       .where(eq(aiTool.isActive, true))
       .orderBy(desc(aiTool.totalQueries));
   } catch (error) {
-    console.error("Failed to get active AI tools:", error);
+    console.error("Failed to get full AI tools:", error);
     throw new ChatSDKError("bad_request:database", "Failed to get AI tools");
   }
 }
@@ -1183,9 +1241,12 @@ export async function searchAITools({
   limit?: number;
 }) {
   if (!query || query.trim().length === 0) {
-    // No query - return all active tools
+    // No query - return all active tools (without pagination for search)
+    const allTools = await getActiveAITools({ limit: 100 });
+    // getActiveAITools without includeCount returns an array
+    const tools = Array.isArray(allTools) ? allTools : allTools.tools;
     return {
-      tools: await getActiveAITools(),
+      tools,
       searchType: null as "vector" | "fallback" | null,
     };
   }

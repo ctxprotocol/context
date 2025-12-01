@@ -116,7 +116,10 @@ export function SidebarUserNav() {
   // The signer address is the EOA (what gets exported)
   const signerAddress = walletAddress;
 
-  const handleCopyAddress = async (address: string | undefined, label: string) => {
+  const handleCopyAddress = async (
+    address: string | undefined,
+    label: string
+  ) => {
     if (!address) {
       return;
     }
@@ -206,8 +209,7 @@ export function SidebarUserNav() {
             {session?.user?.isDeveloper && (
               <DropdownMenuItem asChild>
                 <Link className="w-full cursor-pointer" href="/developer/tools">
-                  <Wrench className="mr-2 h-4 w-4" />
-                  My Tools
+                  My tools
                 </Link>
               </DropdownMenuItem>
             )}
@@ -224,7 +226,9 @@ export function SidebarUserNav() {
                 <DropdownMenuItem
                   className="cursor-pointer"
                   data-testid="user-nav-item-copy"
-                  onSelect={() => handleCopyAddress(displayAddress, "Wallet address")}
+                  onSelect={() =>
+                    handleCopyAddress(displayAddress, "Wallet address")
+                  }
                 >
                   <span className="flex items-center gap-2">
                     {copied ? (
@@ -262,26 +266,34 @@ export function SidebarUserNav() {
                   Export signer key
                 </DropdownMenuItem>
                 {/* Show signer address for advanced users */}
-                {smartWalletAddress && signerAddress && smartWalletAddress !== signerAddress && (
-                  <DropdownMenuItem
-                    className="cursor-pointer text-muted-foreground text-xs"
-                    onSelect={() => handleCopyAddress(signerAddress, "Signer address")}
-                  >
-                    <span className="flex items-center gap-2">
-                      <CopyIcon size={12} />
-                      <span>Signer: {formatWalletAddress(signerAddress)}</span>
-                    </span>
-                  </DropdownMenuItem>
-                )}
+                {smartWalletAddress &&
+                  signerAddress &&
+                  smartWalletAddress !== signerAddress && (
+                    <DropdownMenuItem
+                      className="cursor-pointer text-muted-foreground text-xs"
+                      onSelect={() =>
+                        handleCopyAddress(signerAddress, "Signer address")
+                      }
+                    >
+                      <span className="flex items-center gap-2">
+                        <CopyIcon size={12} />
+                        <span>
+                          Signer: {formatWalletAddress(signerAddress)}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                  )}
               </>
             )}
-              <DropdownMenuSeparator />
+            <DropdownMenuSeparator />
             <DropdownMenuItem asChild data-testid="user-nav-item-auth">
               <button
                 className="w-full cursor-pointer"
                 onClick={() => {
                   if (status === "loading") {
-                    toast.error("Checking authentication status, please try again!");
+                    toast.error(
+                      "Checking authentication status, please try again!"
+                    );
                     return;
                   }
 

@@ -3,11 +3,11 @@
 import { memo } from "react";
 import { BoxIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
-import type { AITool } from "@/lib/db/schema";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import { ChevronDownIcon } from "../icons";
 
 type ToolPickerProps = {
-  selectedTool: AITool | null;
+  selectedTool: ToolListItem | null;
   isReadonly: boolean;
   onToggleContextSidebar?: () => void;
 };

@@ -26,7 +26,7 @@ import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
-import type { AITool } from "@/lib/db/schema";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import { cn, formatPrice } from "@/lib/utils";
 import { CrossIcon } from "../icons";
 import { Button } from "../ui/button";
@@ -52,10 +52,20 @@ export function ContextSidebar({
   isDebugMode,
   onToggleDebugMode,
 }: ContextSidebarProps) {
-  const { tools, loading, activeToolIds, activeTools, totalCost, toggleTool } =
-    useSessionTools();
+  const {
+    tools,
+    loading,
+    loadingMore,
+    hasMore,
+    total,
+    activeToolIds,
+    activeTools,
+    totalCost,
+    toggleTool,
+    loadMore,
+  } = useSessionTools();
   const [searchQuery, setSearchQuery] = useState("");
-  const [vectorResults, setVectorResults] = useState<AITool[] | null>(null);
+  const [vectorResults, setVectorResults] = useState<ToolListItem[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -105,7 +115,7 @@ export function ContextSidebar({
         toolCount: data.tools?.length ?? 0,
         searchType: data.searchType,
         query: data.query,
-        toolNames: data.tools?.map((t: AITool) => t.name) ?? [],
+        toolNames: data.tools?.map((t: ToolListItem) => t.name) ?? [],
       });
 
       setVectorResults(data.tools || []);
@@ -512,31 +522,55 @@ export function ContextSidebar({
               </SidebarGroup>
             ) : (
               // Default view - grouped by category
-              categories.map((category) => {
-                const categoryTools = toolsByCategory[category];
-                if (categoryTools.length === 0) {
-                  return null;
-                }
-                return (
-                  <SidebarGroup key={category}>
-                    <SidebarGroupLabel className="text-sidebar-foreground/50">
-                      {category}
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {categoryTools.map((tool) => (
-                          <ContextSidebarItem
-                            isActive={activeToolIds.includes(tool.id)}
-                            key={tool.id}
-                            onToggle={toggleTool}
-                            tool={tool}
-                          />
-                        ))}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                );
-              })
+              <>
+                {categories.map((category) => {
+                  const categoryTools = toolsByCategory[category];
+                  if (categoryTools.length === 0) {
+                    return null;
+                  }
+                  return (
+                    <SidebarGroup key={category}>
+                      <SidebarGroupLabel className="text-sidebar-foreground/50">
+                        {category}
+                      </SidebarGroupLabel>
+                      <SidebarGroupContent>
+                        <SidebarMenu>
+                          {categoryTools.map((tool) => (
+                            <ContextSidebarItem
+                              isActive={activeToolIds.includes(tool.id)}
+                              key={tool.id}
+                              onToggle={toggleTool}
+                              tool={tool}
+                            />
+                          ))}
+                        </SidebarMenu>
+                      </SidebarGroupContent>
+                    </SidebarGroup>
+                  );
+                })}
+                {/* Load more button for pagination */}
+                {hasMore && (
+                  <div className="px-2 py-3">
+                    <Button
+                      className="w-full"
+                      disabled={loadingMore}
+                      onClick={loadMore}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2Icon className="mr-2 size-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : (
+                        `Load more${total ? ` (${tools.length}/${total})` : ""}`
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
           </SidebarContent>
           <SidebarFooter className="border-t">

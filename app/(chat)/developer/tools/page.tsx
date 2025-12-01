@@ -35,7 +35,7 @@ export default async function DeveloperToolsPage() {
           </div>
           <Link href="/contribute">
             <Button className="w-full md:w-auto" size="sm">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               Create Tool
             </Button>
           </Link>
@@ -56,7 +56,9 @@ export default async function DeveloperToolsPage() {
                 <div className="rounded-full bg-muted p-3 mb-4">
                   <Plus className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <h3 className="mb-2 font-semibold text-lg">No tools created yet</h3>
+                <h3 className="mb-2 font-semibold text-lg">
+                  No tools created yet
+                </h3>
                 <p className="mb-6 max-w-sm text-muted-foreground text-sm">
                   Start building your portfolio by creating your first AI tool.
                   You'll earn USDC every time someone uses it.

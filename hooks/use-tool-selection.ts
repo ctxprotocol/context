@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import type { AITool } from "@/lib/db/schema";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 
 export function useToolSelection() {
-  const [selectedTool, setSelectedTool] = useState<AITool | null>(null);
+  const [selectedTool, setSelectedTool] = useState<ToolListItem | null>(null);
 
-  const selectTool = useCallback((tool: AITool) => {
+  const selectTool = useCallback((tool: ToolListItem) => {
     setSelectedTool(tool);
   }, []);
 

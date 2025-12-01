@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { getActiveAITools } from "@/lib/db/queries";
+import { getActiveAIToolsFull } from "@/lib/db/queries";
 import {
   Table,
   TableBody,
@@ -23,7 +23,7 @@ export default async function AdminToolsPage() {
     return redirect("/");
   }
 
-  const tools = await getActiveAITools();
+  const tools = await getActiveAIToolsFull();
 
   return (
     <div className="flex min-h-svh flex-col items-center bg-background px-4 py-8">

@@ -4,15 +4,50 @@ import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { createAITool, getActiveAITools } from "@/lib/db/queries";
 
-// GET /api/tools - List all active tools
+// Default page size for pagination
+const DEFAULT_PAGE_SIZE = 30;
+const MAX_PAGE_SIZE = 100;
+
+// GET /api/tools - List all active tools with pagination
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
+    const limitParam = searchParams.get("limit");
+    const offsetParam = searchParams.get("offset");
+    const includeCount = searchParams.get("count") === "true";
 
-    const tools = await getActiveAITools(category || undefined);
+    // Parse pagination params with bounds checking
+    const limit = Math.min(
+      Math.max(1, Number.parseInt(limitParam ?? "", 10) || DEFAULT_PAGE_SIZE),
+      MAX_PAGE_SIZE
+    );
+    const offset = Math.max(
+      0,
+      Number.parseInt(offsetParam ?? "", 10) || 0
+    );
 
-    return NextResponse.json({ tools });
+    const result = await getActiveAITools({
+      limit,
+      offset,
+      category: category || undefined,
+      includeCount,
+    });
+
+    // Handle both paginated (with count) and simple responses
+    const responseData = includeCount
+      ? result
+      : { tools: result };
+
+    const response = NextResponse.json(responseData);
+
+    // Add caching headers - cache for 60 seconds in production, revalidate in background
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=120"
+    );
+
+    return response;
   } catch (error) {
     console.error("Failed to fetch tools:", error);
     return NextResponse.json(

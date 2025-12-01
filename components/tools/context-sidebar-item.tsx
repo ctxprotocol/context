@@ -5,7 +5,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import type { AITool } from "@/lib/db/schema";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import { cn, formatPrice } from "@/lib/utils";
 import { SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 
@@ -14,7 +14,7 @@ const PureContextSidebarItem = ({
   isActive,
   onToggle,
 }: {
-  tool: AITool;
+  tool: ToolListItem;
   isActive: boolean;
   onToggle: (toolId: string) => void;
   similarity?: number | null;
