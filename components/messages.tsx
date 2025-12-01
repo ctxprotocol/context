@@ -189,8 +189,13 @@ function PureMessages({
                 requiresScrollPadding={
                     // Don't apply scroll padding if ThinkingMessage is showing below,
                     // as that would create extra whitespace between the last message
-                    // and the thinking indicator
-                    hasSentMessage && index === messages.length - 1 && !shouldShowThinking
+                    // and the thinking indicator.
+                    // Also don't apply during streaming - wait until fully idle to prevent
+                    // jarring shifts when ThinkingMessage is exiting.
+                    hasSentMessage && 
+                    index === messages.length - 1 && 
+                    !shouldShowThinking &&
+                    status !== "streaming"
                 }
                 setMessages={setMessages}
                 vote={
