@@ -32,20 +32,23 @@ import {
 } from "@/lib/ai/entitlements";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
-  autoModeDiscoveryPrompt,
+  buildToolSelectionPrompt,
   type EnabledToolSummary,
   errorCorrectionPrompt,
   formatToolCallHistory,
+  type MarketplaceToolResult,
   type RequestHints,
   reflectionPrompt,
   regularPrompt,
   systemPrompt,
+  toolSelectionPrompt,
 } from "@/lib/ai/prompts";
 import {
   type BYOKConfig,
   getProviderForUser,
   myProvider,
 } from "@/lib/ai/providers";
+import { searchMarketplace } from "@/lib/ai/skills/marketplace";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
 import type {
   AllowedToolContext,
@@ -100,12 +103,15 @@ const BUILTIN_MODULES: AllowedModule[] = [
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
 const REGISTERED_MODULE_SET = new Set<string>(REGISTERED_SKILL_MODULES);
 const MCP_TOOL_MODULE = "@/lib/ai/skills/mcp" as const;
-const MARKETPLACE_MODULE = "@/lib/ai/skills/marketplace" as const;
 
 // Match code blocks with any language tag (ts, typescript, js, javascript, or none)
 // This regex properly strips language tags so the code executor doesn't interpret them as code
 const CODE_BLOCK_REGEX = /```(?:\w+)?\s*([\s\S]*?)```/i;
 const IMPORT_REGEX = /^import\s+{[^}]+}\s+from\s+["']([^"']+)["'];?/gim;
+
+// JSON extraction regexes for tool selection parsing
+const JSON_CODE_BLOCK_REGEX = /```(?:json)?\s*([\s\S]*?)```/;
+const RAW_JSON_REGEX = /\{[\s\S]*"selectedTools"[\s\S]*\}/;
 
 type ExecutionStatus = "not_executed" | "success" | "failed";
 
@@ -789,17 +795,428 @@ export async function POST(request: Request) {
             isAutoModeExecution,
           });
 
+          // ===========================================================
+          // AUTO MODE DISCOVERY: Two-Step Flow (Early Branch)
+          // ===========================================================
+          // Discovery phase uses TWO-STEP SELECTION:
+          // Step 1: Search marketplace directly (no AI code generation)
+          // Step 2: Ask AI to select from ACTUAL results
+          //
+          // This is more robust than single-step because the AI sees actual
+          // tool descriptions before making selection decisions.
+          if (isAutoModeDiscovery) {
+            // Signal discovery status FIRST for UI feedback
+            dataStream.write({
+              type: "data-toolStatus",
+              data: { status: "discovering-tools" },
+            });
+
+            // Force flush to ensure UI updates immediately
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            console.log(
+              "[chat-api] Auto Mode Discovery: starting two-step selection",
+              { chatId: id }
+            );
+
+            // STEP 1: Extract user query and search marketplace directly
+            const userQuery = message.parts
+              .filter(
+                (p): p is { type: "text"; text: string } => p.type === "text"
+              )
+              .map((p) => p.text)
+              .join(" ");
+
+            // Build conversation context for follow-up detection
+            const conversationContext = uiMessages
+              .slice(-6) // Last 3 turns (user + assistant pairs)
+              .filter((m) => m.role === "assistant" || m.role === "user")
+              .map((m) => {
+                const text = m.parts
+                  .filter(
+                    (p): p is { type: "text"; text: string } =>
+                      p.type === "text"
+                  )
+                  .map((p) => p.text)
+                  .join(" ");
+                return `${m.role}: ${text.slice(0, 200)}${text.length > 200 ? "..." : ""}`;
+              })
+              .join("\n");
+
+            let searchResults: MarketplaceToolResult[] = [];
+            try {
+              // Search with a broad query to find relevant tools
+              searchResults = await searchMarketplace(userQuery, 10);
+              console.log(
+                "[chat-api] Auto Mode Discovery Step 1: search complete",
+                {
+                  chatId: id,
+                  query: userQuery.slice(0, 100),
+                  resultsCount: searchResults.length,
+                }
+              );
+            } catch (searchError) {
+              console.error("[chat-api] Auto Mode Discovery: search failed", {
+                chatId: id,
+                error: searchError,
+              });
+              // Continue with empty results - AI will report no tools found
+            }
+
+            // Log search results (don't stream to UI - the selection stream handles display)
+            console.log(
+              "[chat-api] Auto Mode Discovery Step 1: search results",
+              {
+                chatId: id,
+                tools: searchResults.map((t) => ({
+                  id: t.id,
+                  name: t.name,
+                  price: t.price,
+                })),
+              }
+            );
+
+            // STEP 2: Ask AI to select from actual results (with streaming for UI feedback)
+            const selectionUserPrompt = buildToolSelectionPrompt(
+              userQuery,
+              searchResults,
+              conversationContext
+            );
+
+            console.log(
+              "[chat-api] Auto Mode Discovery Step 2: asking AI to select",
+              { chatId: id }
+            );
+
+            // Stream the selection process so user sees AI reasoning (like planning phase)
+            const selectionStream = streamText({
+              model: provider.languageModel(selectedChatModel),
+              system: toolSelectionPrompt,
+              messages: [{ role: "user", content: selectionUserPrompt }],
+            });
+
+            let selectionText = "";
+            let selectionReasoning = "";
+
+            // Stream chunks to client for real-time display (matches planning phase behavior)
+            for await (const part of selectionStream.fullStream) {
+              if (part.type === "reasoning-delta") {
+                const delta = (part as { text?: string }).text;
+                if (delta) {
+                  selectionReasoning += delta;
+                  dataStream.write({
+                    type: "data-reasoning",
+                    data: selectionReasoning,
+                  });
+                }
+              } else if (part.type === "text-delta") {
+                const delta = (part as { text?: string }).text;
+                if (delta) {
+                  // First text-delta after reasoning means reasoning is complete
+                  if (
+                    selectionReasoning.length > 0 &&
+                    selectionText.length === 0
+                  ) {
+                    dataStream.write({
+                      type: "data-reasoningComplete",
+                      data: true,
+                    });
+                  }
+                  selectionText += delta;
+                  // Stream as debug code so thinking accordion shows it
+                  dataStream.write({
+                    type: "data-debugCode",
+                    data: selectionText,
+                  });
+                }
+              }
+            }
+
+            selectionText = selectionText.trim();
+
+            // Parse the AI's JSON response
+            let discoveryResult: {
+              selectedTools?: Array<{
+                id: string;
+                name: string;
+                price: string;
+                reason?: string;
+              }>;
+              selectionReasoning?: string;
+              error?: string;
+              dataAlreadyAvailable?: boolean;
+            } = { selectedTools: [] };
+
+            try {
+              // Extract JSON from the response (handle markdown code blocks and text before JSON)
+              let jsonText = selectionText;
+
+              // Try to extract from code block first (```json or ``` with no tag)
+              const jsonMatch = JSON_CODE_BLOCK_REGEX.exec(jsonText);
+              if (jsonMatch) {
+                jsonText = jsonMatch[1].trim();
+              } else {
+                // No code block - try to find raw JSON object in the text
+                // Look for { ... } pattern that contains "selectedTools"
+                const rawJsonMatch = RAW_JSON_REGEX.exec(jsonText);
+                if (rawJsonMatch) {
+                  jsonText = rawJsonMatch[0];
+                }
+              }
+
+              discoveryResult = JSON.parse(jsonText);
+              console.log(
+                "[chat-api] Auto Mode Discovery: parsed selection successfully",
+                {
+                  chatId: id,
+                  selectedCount: discoveryResult.selectedTools?.length ?? 0,
+                }
+              );
+            } catch (parseError) {
+              console.error(
+                "[chat-api] Auto Mode Discovery: failed to parse selection",
+                {
+                  chatId: id,
+                  response: selectionText.slice(0, 500),
+                  error: parseError,
+                }
+              );
+              discoveryResult = {
+                selectedTools: [],
+                error: "Failed to parse tool selection response",
+              };
+            }
+
+            // Enrich selected tools with full data from search results
+            const enrichedSelectedTools = (discoveryResult.selectedTools || [])
+              .map((selected) => {
+                const fullTool = searchResults.find(
+                  (t) => t.id === selected.id
+                );
+                if (!fullTool) {
+                  console.warn(
+                    "[chat-api] Selected tool not found in search results:",
+                    selected.id
+                  );
+                  return null;
+                }
+                return {
+                  id: selected.id,
+                  name: fullTool.name,
+                  description: fullTool.description,
+                  price: fullTool.price,
+                  mcpTools: fullTool.mcpTools,
+                  reason: selected.reason,
+                };
+              })
+              .filter(Boolean) as Array<{
+              id: string;
+              name: string;
+              description: string;
+              price: string;
+              mcpTools?: Array<{ name: string; description?: string }>;
+              reason?: string;
+            }>;
+
+            // Stream the selection result for debugging
+            dataStream.write({
+              type: "data-debugResult",
+              data: formatExecutionData({
+                step: "tool_selection",
+                selectedTools: enrichedSelectedTools,
+                selectionReasoning: discoveryResult.selectionReasoning,
+                dataAlreadyAvailable: discoveryResult.dataAlreadyAvailable,
+              }),
+            });
+
+            console.log(
+              "[chat-api] Auto Mode Discovery Step 2: selection complete",
+              {
+                chatId: id,
+                selectedCount: enrichedSelectedTools.length,
+                dataAlreadyAvailable: discoveryResult.dataAlreadyAvailable,
+                tools: enrichedSelectedTools.map((t) => t.name),
+              }
+            );
+
+            // Check if tools were selected
+            const dataAlreadyAvailable =
+              discoveryResult.dataAlreadyAvailable === true;
+
+            if (enrichedSelectedTools.length === 0) {
+              // No tools selected - data available or no matches
+              console.log(
+                "[chat-api] Auto Mode Discovery: no paid tools selected",
+                {
+                  chatId: id,
+                  dataAlreadyAvailable,
+                  reason:
+                    discoveryResult.error || discoveryResult.selectionReasoning,
+                }
+              );
+
+              // Clear discovery content before transitioning
+              dataStream.write({
+                type: "data-clearDiscovery",
+                data: true,
+              });
+
+              dataStream.write({
+                type: "data-toolStatus",
+                data: { status: "thinking" },
+              });
+
+              // Build mediator text and proceed to final response
+              const noToolsMediatorText = dataAlreadyAvailable
+                ? `Tool discovery completed. The requested data is already available in the conversation history.
+DATA_ALREADY_AVAILABLE: true
+Selection reasoning: ${discoveryResult.selectionReasoning || "Data from previous tool calls can be used to answer this question."}
+
+IMPORTANT: Use ONLY the data that was fetched in previous turns. Do NOT invent new values.`
+                : discoveryResult.error
+                  ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
+                  : `Tool discovery completed. No paid tools required for this query.
+Selection reasoning: ${discoveryResult.selectionReasoning || "N/A"}`;
+
+              // Generate final response
+              const mediatorMessage: ChatMessage = {
+                id: generateUUID(),
+                role: "assistant",
+                parts: [
+                  {
+                    type: "text",
+                    text: `[[EXECUTION SUMMARY]]\n${noToolsMediatorText}`,
+                  },
+                ],
+              };
+
+              const finalMessages = convertToModelMessages([
+                ...uiMessages,
+                mediatorMessage,
+              ]);
+
+              const result = streamText({
+                model: provider.languageModel(selectedChatModel),
+                system: `${regularPrompt}
+
+You are responding to the user *after* tools have already been evaluated.
+
+You will see an internal assistant message that starts with "[[EXECUTION SUMMARY]]".
+
+- If DATA_ALREADY_AVAILABLE is true, answer using the data from the conversation history. Do NOT invent new values.
+- If no suitable tools were found, explain this to the user and suggest alternatives if possible.
+- Keep your response concise and helpful.`,
+                messages: finalMessages,
+                stopWhen: stepCountIs(5),
+                experimental_transform: smoothStream({ chunking: "word" }),
+                onFinish: async ({ usage }) => {
+                  try {
+                    const providers = await getTokenlensCatalog();
+                    const modelId =
+                      provider.languageModel(selectedChatModel).modelId;
+                    if (modelId && providers) {
+                      const summary = getUsage({ modelId, usage, providers });
+                      finalMergedUsage = {
+                        ...usage,
+                        ...summary,
+                        modelId,
+                      } as AppUsage;
+                    } else {
+                      finalMergedUsage = usage;
+                    }
+                    dataStream.write({
+                      type: "data-usage",
+                      data: finalMergedUsage,
+                    });
+                  } catch (err) {
+                    console.warn("TokenLens enrichment failed", err);
+                    finalMergedUsage = usage;
+                    dataStream.write({
+                      type: "data-usage",
+                      data: finalMergedUsage,
+                    });
+                  }
+                },
+              });
+
+              result.consumeStream();
+              dataStream.merge(
+                result.toUIMessageStream({ sendReasoning: true })
+              );
+              return;
+            }
+
+            // Tools were selected - calculate cost and await payment
+            const totalCost = enrichedSelectedTools.reduce((sum, tool) => {
+              return sum + Number(tool.price ?? 0);
+            }, 0);
+
+            console.log("[chat-api] Auto Mode Discovery: tools selected", {
+              chatId: id,
+              toolCount: enrichedSelectedTools.length,
+              totalCost,
+              tools: enrichedSelectedTools.map((t) => ({
+                id: t.id,
+                name: t.name,
+                price: t.price,
+              })),
+            });
+
+            // Fetch full tool details
+            const toolDetails = await Promise.all(
+              enrichedSelectedTools.map(async (selected) => {
+                const tool = await getAIToolById({ id: selected.id });
+                return {
+                  toolId: selected.id,
+                  name: selected.name,
+                  description: selected.description || tool?.description || "",
+                  price: selected.price,
+                  developerWallet: tool?.developerWallet || "",
+                  mcpTools: selected.mcpTools,
+                  reason: selected.reason,
+                };
+              })
+            );
+
+            // Send tool selection to client for approval
+            dataStream.write({
+              type: "data-autoModeToolSelection",
+              data: {
+                selectedTools: toolDetails,
+                totalCost: totalCost.toFixed(6),
+                selectionReasoning: discoveryResult.selectionReasoning,
+                originalQuery: userQuery,
+              },
+            });
+
+            // Signal awaiting payment
+            dataStream.write({
+              type: "data-toolStatus",
+              data: { status: "awaiting-tool-approval" },
+            });
+
+            console.log("[chat-api] Auto Mode Discovery: awaiting payment", {
+              chatId: id,
+              totalCost,
+            });
+
+            // Return early - wait for payment
+            return;
+          }
+
           // Choose the appropriate prompt based on the phase
           let planningSystemInstructions: string;
 
-          if (isAutoModeDiscovery) {
-            // Discovery phase: Use focused discovery prompt for tool selection
-            planningSystemInstructions = autoModeDiscoveryPrompt({
-              selectedChatModel,
-              requestHints,
+          if (isAutoModeExecution && autoModePayment) {
+            // Execution phase: Signal status IMMEDIATELY before any async work
+            // This ensures client sees "Planning execution..." right away, not "Confirming payment..."
+            dataStream.write({
+              type: "data-toolStatus",
+              data: { status: "planning" },
             });
-          } else if (isAutoModeExecution && autoModePayment) {
-            // Execution phase: Build tool summaries from paid-for tools
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Build tool summaries from paid-for tools
             const executionToolSummaries: EnabledToolSummary[] =
               await Promise.all(
                 autoModePayment.selectedTools.map(async (selected) => {
@@ -918,99 +1335,11 @@ export async function POST(request: Request) {
           let codeBlock = extractCodeBlock(planningText);
 
           // ===========================================================
-          // DISCOVERY PHASE VALIDATION: Prevent hallucination
+          // TWO-STEP DISCOVERY: No code block needed for discovery phase
           // ===========================================================
-          // If in discovery phase and no code block was generated, the AI
-          // is trying to answer directly (hallucinate). We must retry with
-          // a stronger prompt to force code generation.
-          const MAX_DISCOVERY_RETRIES = 2;
-          if (isAutoModeDiscovery && !codeBlock) {
-            console.warn(
-              "[chat-api] Auto Mode Discovery: AI did not generate code block, retrying",
-              {
-                chatId: id,
-                responsePreview: planningText.slice(0, 200),
-              }
-            );
-
-            for (
-              let discoveryRetry = 0;
-              discoveryRetry < MAX_DISCOVERY_RETRIES && !codeBlock;
-              discoveryRetry++
-            ) {
-              // Build a stronger retry prompt
-              const retryPrompt = `You MUST respond with a TypeScript code block. Your previous response did not contain code.
-
-CRITICAL: You are in DISCOVERY PHASE. You CANNOT answer the user's question directly.
-You MUST search the marketplace and select tools.
-
-The user asked: "${message.parts
-                .filter(
-                  (p): p is { type: "text"; text: string } => p.type === "text"
-                )
-                .map((p) => p.text)
-                .join(" ")}"
-
-Respond ONLY with a \`\`\`ts code block that:
-1. Imports searchMarketplace from "@/lib/ai/skills/marketplace"
-2. Exports an async function main()
-3. Searches for relevant tools and returns selectedTools
-
-DO NOT explain or discuss. ONLY output the code block.`;
-
-              const retryResult = await generateText({
-                model: provider.languageModel(selectedChatModel),
-                system: planningSystemInstructions,
-                messages: [
-                  ...baseModelMessages,
-                  { role: "assistant" as const, content: planningText },
-                  { role: "user" as const, content: retryPrompt },
-                ],
-              });
-
-              const retryCode = extractCodeBlock(retryResult.text);
-              if (retryCode) {
-                console.log("[chat-api] Auto Mode Discovery: retry succeeded", {
-                  chatId: id,
-                  attempt: discoveryRetry + 1,
-                  codePreview: retryCode.slice(0, 100),
-                });
-                codeBlock = retryCode;
-                planningText = retryResult.text;
-              } else {
-                console.warn(
-                  "[chat-api] Auto Mode Discovery: retry failed to produce code",
-                  {
-                    chatId: id,
-                    attempt: discoveryRetry + 1,
-                  }
-                );
-              }
-            }
-
-            // If still no code block after retries, signal error and return
-            if (!codeBlock) {
-              console.error(
-                "[chat-api] Auto Mode Discovery: failed to generate code after retries",
-                { chatId: id }
-              );
-
-              dataStream.write({
-                type: "data-toolStatus",
-                data: { status: "thinking" },
-              });
-
-              // Return without executing - the system will respond with an error
-              dataStream.write({
-                type: "data-error",
-                data: {
-                  message:
-                    "I encountered an issue searching for tools. Please try rephrasing your question.",
-                },
-              });
-              return;
-            }
-          }
+          // With two-step discovery, we directly search the marketplace and
+          // ask the AI to select tools - no code generation required.
+          // Skip straight to the discovery flow below.
 
           // ===========================================================
           // EXECUTION PHASE VALIDATION: Prevent hallucination
@@ -1139,13 +1468,11 @@ The user asked: "${message.parts
               chatId: id,
             });
 
-            // Signal execution status
+            // Signal execution status - ensures UI shows "Executing..." immediately
             dataStream.write({
               type: "data-toolStatus",
               data: { status: "executing" },
             });
-
-            // Force a tiny delay to ensure the chunk is flushed before blocking execution
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             const modulesUsed = findImportedModules(codeBlock);
@@ -1195,192 +1522,6 @@ The user asked: "${message.parts
                   "[chat-api] no authorized skills found after filtering; falling back to direct answer",
                   { chatId: id }
                 );
-              } else if (
-                isAutoModeDiscovery &&
-                allowedModules.has(MARKETPLACE_MODULE)
-              ) {
-                // ===========================================================
-                // AUTO MODE DISCOVERY PHASE: Search and select tools
-                // ===========================================================
-                // This phase only searches the marketplace and selects tools.
-                // It does NOT execute paid tools. Execution happens after payment.
-
-                console.log(
-                  "[chat-api] Auto Mode Discovery: executing search",
-                  {
-                    chatId: id,
-                  }
-                );
-
-                // Execute the discovery code (only marketplace search, no paid tools)
-                const discoveryExecution = await executeSkillCode({
-                  code: codeBlock,
-                  allowedModules: Array.from(allowedModules),
-                  runtime: {
-                    session,
-                    dataStream,
-                    requestId: id,
-                    chatId: id,
-                    isAutoMode: true,
-                    isDiscoveryPhase: true, // Flag to prevent paid tool execution
-                  },
-                });
-
-                if (discoveryExecution.ok) {
-                  // Parse the discovery result to extract selected tools
-                  const discoveryResult = discoveryExecution.data as {
-                    selectedTools?: Array<{
-                      id: string;
-                      name: string;
-                      description?: string;
-                      price: string;
-                      mcpTools?: Array<{ name: string; description?: string }>;
-                      reason?: string;
-                    }>;
-                    selectionReasoning?: string;
-                    candidates?: unknown[];
-                    error?: string;
-                    dataAlreadyAvailable?: boolean; // Flag for when data is in conversation
-                  };
-
-                  // Stream the discovery result for debugging
-                  dataStream.write({
-                    type: "data-debugResult",
-                    data: formatExecutionData(discoveryResult),
-                  });
-
-                  // Check if tools were selected
-                  const selectedTools = discoveryResult?.selectedTools ?? [];
-                  const dataAlreadyAvailable =
-                    discoveryResult?.dataAlreadyAvailable === true;
-
-                  if (selectedTools.length === 0) {
-                    // No tools selected - either no matches, data already available, or error
-                    console.log(
-                      "[chat-api] Auto Mode Discovery: no paid tools selected",
-                      {
-                        chatId: id,
-                        dataAlreadyAvailable,
-                        reason:
-                          discoveryResult?.error ||
-                          discoveryResult?.selectionReasoning,
-                      }
-                    );
-
-                    // Clear discovery content before transitioning to final response
-                    // This prevents the accordion from showing stale discovery content
-                    dataStream.write({
-                      type: "data-clearDiscovery",
-                      data: true,
-                    });
-
-                    dataStream.write({
-                      type: "data-toolStatus",
-                      data: { status: "thinking" },
-                    });
-
-                    // When data is already available, provide clear context to the final response
-                    mediatorText = dataAlreadyAvailable
-                      ? `Tool discovery completed. The requested data is already available in the conversation history.
-DATA_ALREADY_AVAILABLE: true
-Selection reasoning: ${discoveryResult?.selectionReasoning || "Data from previous tool calls can be used to answer this question."}
-
-IMPORTANT: Use ONLY the data that was fetched in previous turns. Do NOT invent new values.`
-                      : discoveryResult?.error
-                        ? `Tool discovery completed but no suitable tools found: ${discoveryResult.error}`
-                        : `Tool discovery completed. No paid tools required for this query.
-Selection reasoning: ${discoveryResult?.selectionReasoning || "N/A"}`;
-                  } else {
-                    // Calculate total cost
-                    const totalCost = selectedTools.reduce((sum, tool) => {
-                      return sum + Number(tool.price ?? 0);
-                    }, 0);
-
-                    console.log(
-                      "[chat-api] Auto Mode Discovery: tools selected",
-                      {
-                        chatId: id,
-                        toolCount: selectedTools.length,
-                        totalCost,
-                        tools: selectedTools.map((t) => ({
-                          id: t.id,
-                          name: t.name,
-                          price: t.price,
-                        })),
-                      }
-                    );
-
-                    // Fetch full tool details for each selected tool
-                    const toolDetails = await Promise.all(
-                      selectedTools.map(async (selected) => {
-                        const tool = await getAIToolById({ id: selected.id });
-                        return {
-                          toolId: selected.id,
-                          name: selected.name,
-                          description:
-                            selected.description || tool?.description || "",
-                          price: selected.price,
-                          developerWallet: tool?.developerWallet || "",
-                          mcpTools: selected.mcpTools,
-                          reason: selected.reason,
-                        };
-                      })
-                    );
-
-                    // Send tool selection to client for approval
-                    // This is the PAY-BEFORE-DELIVERY model
-                    dataStream.write({
-                      type: "data-autoModeToolSelection",
-                      data: {
-                        selectedTools: toolDetails,
-                        totalCost: totalCost.toFixed(6),
-                        selectionReasoning: discoveryResult?.selectionReasoning,
-                        originalQuery: message.parts
-                          .filter(
-                            (p): p is { type: "text"; text: string } =>
-                              p.type === "text"
-                          )
-                          .map((p) => p.text)
-                          .join(" "),
-                      },
-                    });
-
-                    // Signal awaiting payment - stream will end here
-                    // Client must pay and send a new request with autoModePayment
-                    dataStream.write({
-                      type: "data-toolStatus",
-                      data: { status: "awaiting-tool-approval" },
-                    });
-
-                    // Don't continue to response generation - wait for payment
-                    console.log(
-                      "[chat-api] Auto Mode Discovery: awaiting payment",
-                      {
-                        chatId: id,
-                        totalCost,
-                      }
-                    );
-
-                    // Return early - don't generate response until payment confirmed
-                    return;
-                  }
-                } else {
-                  console.error("[chat-api] Auto Mode Discovery failed", {
-                    chatId: id,
-                    error: discoveryExecution.error,
-                  });
-
-                  dataStream.write({
-                    type: "data-toolStatus",
-                    data: { status: "thinking" },
-                  });
-
-                  mediatorText = `Tool discovery failed: ${discoveryExecution.error}
-HAS_DATA: false
-STATUS: failed
-Logs:
-${discoveryExecution.logs.join("\n")}`;
-                }
               } else if (isAutoModeExecution && autoModePayment) {
                 // ===========================================================
                 // AUTO MODE EXECUTION PHASE: After payment confirmed
@@ -1489,6 +1630,7 @@ ${discoveryExecution.logs.join("\n")}`;
                       type: "data-toolStatus",
                       data: { status: "reflecting" },
                     });
+                    await new Promise((resolve) => setTimeout(resolve, 10));
                   }
 
                   // Create runtime with fresh toolCallHistory for this attempt
@@ -1533,6 +1675,7 @@ ${discoveryExecution.logs.join("\n")}`;
                       type: "data-toolStatus",
                       data: { status: "fixing" },
                     });
+                    await new Promise((resolve) => setTimeout(resolve, 10));
 
                     // Build tool schema info from allowed tools for error context
                     const toolSchemaInfo = Array.from(
@@ -1565,15 +1708,16 @@ ${discoveryExecution.logs.join("\n")}`;
                     // Generate a fix for the runtime error
                     const errorFixResult = await generateText({
                       model: provider.languageModel(selectedChatModel),
-                      system: errorCorrectionPrompt(
-                        currentCode,
-                        execution.error,
-                        execution.logs,
-                        toolCallHistory.length > 0
-                          ? toolCallHistory
-                          : undefined,
-                        toolSchemaInfo
-                      ),
+                      system: errorCorrectionPrompt({
+                        code: currentCode,
+                        error: execution.error,
+                        logs: execution.logs,
+                        toolCallHistory:
+                          toolCallHistory.length > 0
+                            ? toolCallHistory
+                            : undefined,
+                        toolSchemas: toolSchemaInfo,
+                      }),
                       messages: [
                         {
                           role: "user",

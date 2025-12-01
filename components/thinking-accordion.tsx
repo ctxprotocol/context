@@ -26,8 +26,9 @@ type ThinkingAccordionProps = {
 
 // Extract code block from planning response
 // Handles both complete blocks (with closing ```) and partial blocks (still streaming)
-const COMPLETE_CODE_BLOCK_REGEX = /```(?:ts|typescript)?\s*([\s\S]*?)```/i;
-const LANG_IDENTIFIER_REGEX = /^(ts|typescript)\s*/i;
+// Supports: ts, typescript, json (for tool selection), js, javascript
+const COMPLETE_CODE_BLOCK_REGEX = /```(?:ts|typescript|json|js|javascript)?\s*([\s\S]*?)```/i;
+const LANG_IDENTIFIER_REGEX = /^(ts|typescript|json|js|javascript)\s*/i;
 const WHITESPACE_REGEX = /^\s*/;
 
 function extractCodeFromPlanningText(
@@ -608,9 +609,13 @@ function PureThinkingAccordion({
             )}
 
             {/* Result preview with fade - only show meaningful results */}
-            {hasResult && stage !== "executing" && stage !== "thinking" && (
-              <FadedResultPreview result={debugResult ?? ""} />
-            )}
+            {/* Hide during discovering-tools since we show the streaming selection instead */}
+            {hasResult &&
+              stage !== "executing" &&
+              stage !== "thinking" &&
+              stage !== "discovering-tools" && (
+                <FadedResultPreview result={debugResult ?? ""} />
+              )}
           </div>
         </div>
       )}

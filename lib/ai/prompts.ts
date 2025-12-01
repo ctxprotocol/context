@@ -538,6 +538,127 @@ export const titlePrompt = `\n
     - do not use quotes or colons`;
 
 /**
+ * TWO-STEP DISCOVERY: Tool Selection Prompt (Step 2)
+ *
+ * This prompt is used AFTER searching the marketplace. The AI sees actual tool
+ * results with full descriptions and mcpTools, then selects the best tools.
+ *
+ * Key advantage: The AI makes selection decisions with FULL CONTEXT about what
+ * tools are actually available, instead of writing blind pattern-matching code.
+ */
+export const toolSelectionPrompt = `
+You are selecting tools from a marketplace to answer a user's question.
+You will be shown the ACTUAL tools available and must choose which ones to use.
+
+## Selection Process
+
+1. **Understand the user's intent** - What data or capability do they actually need?
+2. **Read each tool's description** - Understand what each tool ACTUALLY provides
+3. **Match capabilities to needs** - Don't just keyword match; understand semantic meaning
+4. **Avoid confusions** - Similar names may serve completely different purposes
+5. **Check conversation history** - If data was already fetched, no new tools needed
+
+## Key Principles
+
+- A tool's name is just a label - READ THE DESCRIPTION to know what it does
+- Follow-up questions often need the same tool type as the original question
+- If the user asks about something new, you likely need to fetch new data
+- Multiple tools may be needed if the user asks for different types of data
+
+## Response Format
+
+Think through your selection, then output a JSON code block:
+
+\`\`\`json
+{
+  "selectedTools": [
+    {
+      "id": "tool-uuid-from-list",
+      "name": "Tool Name",
+      "price": "0.0001",
+      "reason": "Why this tool answers the question"
+    }
+  ],
+  "selectionReasoning": "Brief explanation of selection logic"
+}
+\`\`\`
+
+## Special Cases
+
+**Data already in conversation:**
+\`\`\`json
+{ "selectedTools": [], "dataAlreadyAvailable": true, "selectionReasoning": "Data was fetched in a previous turn" }
+\`\`\`
+
+**No matching tools:**
+\`\`\`json
+{ "selectedTools": [], "error": "No tools can provide this data type", "selectionReasoning": "Explanation" }
+\`\`\`
+
+**Multiple tools needed:**
+\`\`\`json
+{ "selectedTools": [{ "id": "...", "name": "Tool A", "price": "...", "reason": "..." }, { "id": "...", "name": "Tool B", "price": "...", "reason": "..." }], "selectionReasoning": "Different data types require different tools" }
+\`\`\`
+`;
+
+/**
+ * Tool search result from marketplace (for formatting in selection prompt)
+ */
+export type MarketplaceToolResult = {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+  mcpTools?: Array<{ name: string; description?: string }>;
+};
+
+/**
+ * Build the full selection prompt with actual search results
+ * This is used in Step 2 of Two-Step Discovery
+ */
+export function buildToolSelectionPrompt(
+  userMessage: string,
+  searchResults: MarketplaceToolResult[],
+  conversationContext?: string
+): string {
+  const toolsSection = searchResults
+    .map((tool, index) => {
+      const mcpToolsList = tool.mcpTools?.length
+        ? tool.mcpTools
+            .map((t) => `    - ${t.name}: ${t.description || "No description"}`)
+            .join("\n")
+        : "    (No methods listed)";
+
+      return `### ${index + 1}. ${tool.name} (ID: ${tool.id})
+**Price:** $${Number(tool.price || 0).toFixed(4)}/query
+**Description:** ${tool.description}
+**Available Methods:**
+${mcpToolsList}`;
+    })
+    .join("\n\n");
+
+  const contextSection = conversationContext
+    ? `
+## Previous Conversation Context
+${conversationContext}
+`
+    : "";
+
+  return `## User Question
+${userMessage}
+${contextSection}
+## Available Tools (from marketplace search)
+
+${toolsSection || "(No tools found in search)"}
+
+## Your Task
+Select the tool(s) that can answer the user's question.
+Remember: Read descriptions carefully! "Ethereum" in a tool name could mean crypto prices OR blockchain gas.
+
+Respond with ONLY valid JSON.`;
+}
+
+/**
  * REFLECTION PROMPT (Agentic Retry Loop)
  *
  * Used when execution produces suspicious results (nulls where data should exist).
@@ -601,6 +722,22 @@ export type ToolSchemaInfo = {
 };
 
 /**
+ * Options for error correction prompt
+ */
+export type ErrorCorrectionOptions = {
+  code: string;
+  error: string;
+  logs: string[];
+  toolCallHistory?: Array<{
+    toolId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }>;
+  toolSchemas?: ToolSchemaInfo[];
+};
+
+/**
  * ERROR CORRECTION PROMPT (Self-Healing for Crashed Executions)
  *
  * Used when code execution throws a runtime error.
@@ -613,18 +750,8 @@ export type ToolSchemaInfo = {
  * - API returned unexpected format causing crash
  * - Tool threw an error (400, 500, timeout)
  */
-export function errorCorrectionPrompt(
-  code: string,
-  error: string,
-  logs: string[],
-  toolCallHistory?: Array<{
-    toolId: string;
-    toolName: string;
-    args: Record<string, unknown>;
-    result: unknown;
-  }>,
-  toolSchemas?: ToolSchemaInfo[]
-): string {
+export function errorCorrectionPrompt(options: ErrorCorrectionOptions): string {
+  const { code, error, logs, toolCallHistory, toolSchemas } = options;
   const toolHistorySection =
     toolCallHistory && toolCallHistory.length > 0
       ? `
