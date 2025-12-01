@@ -76,6 +76,8 @@ function extractCodeFromPlanningText(
 }
 
 // Check if we're in an active phase (show chevron for expandable content)
+// Note: "thinking" is intentionally excluded - it's a brief transitional stage
+// and including it causes jarring layout shifts when transitioning to the response
 function isActivePhase(stage: PaymentStage): boolean {
   return (
     stage === "setting-cap" ||
@@ -86,7 +88,6 @@ function isActivePhase(stage: PaymentStage): boolean {
     stage === "executing" ||
     stage === "fixing" ||
     stage === "reflecting" ||
-    stage === "thinking" ||
     stage === "querying-tool"
   );
 }
@@ -568,58 +569,26 @@ function PureThinkingAccordion({
             )}
 
             {/* Fixing stage - AI is attempting to fix a runtime error
-                One continuous stream: reasoning flows into code */}
+                Just show indicator - fix generation happens server-side via generateText */}
             {stage === "fixing" && (
-              <>
-                {/* Show indicator only when no content yet */}
-                {!extractedCode && !hasReasoning && (
-                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                    <div className="size-1.5 animate-pulse rounded-full bg-orange-500/70" />
-                    <span className="font-mono">diagnosing error...</span>
-                  </div>
-                )}
-
-                {/* Combined stream: reasoning then code in one container */}
-                {(hasReasoning || extractedCode) && (
-                  <CombinedStreamPreview
-                    reasoning={streamingReasoning}
-                    code={extractedCode}
-                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
-                  />
-                )}
-              </>
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-orange-500/70" />
+                <span className="font-mono">diagnosing error...</span>
+              </div>
             )}
 
             {/* Reflecting stage - AI is reflecting on suspicious results
-                One continuous stream: reasoning flows into code */}
+                Just show indicator - reflection happens server-side via generateText */}
             {stage === "reflecting" && (
-              <>
-                {/* Show indicator only when no content yet */}
-                {!extractedCode && !hasReasoning && (
-                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                    <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
-                    <span className="font-mono">reflecting on data...</span>
-                  </div>
-                )}
-
-                {/* Combined stream: reasoning then code in one container */}
-                {(hasReasoning || extractedCode) && (
-                  <CombinedStreamPreview
-                    reasoning={streamingReasoning}
-                    code={extractedCode}
-                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Thinking indicator */}
-            {stage === "thinking" && !hasResult && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
-                <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
-                <span className="font-mono">analyzing results...</span>
+                <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
+                <span className="font-mono">reflecting on data...</span>
               </div>
             )}
+
+            {/* Note: "thinking" stage intentionally has no expandable content.
+                It's a brief transitional stage - just shows the status text.
+                Adding content here causes jarring layout shifts. */}
 
             {/* Querying tool indicator */}
             {stage === "querying-tool" && (
