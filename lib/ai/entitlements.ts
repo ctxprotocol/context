@@ -46,7 +46,7 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
  * Free tier daily limit for regular users.
  * Users can upgrade to BYOK or Convenience tier for unlimited queries.
  */
-export const FREE_TIER_DAILY_LIMIT = 20;
+export const FREE_TIER_DAILY_LIMIT = 1000;
 
 /**
  * Check if a user has exceeded their free tier limit.

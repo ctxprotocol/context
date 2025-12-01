@@ -420,6 +420,19 @@ export function Chat({
           }
           break;
         }
+
+        // Clear discovery content when no tools found (clean transition to final response)
+        case "data-clearDiscovery": {
+          if (part.data === true) {
+            setStreamingCode(null);
+            setStreamingReasoning(null);
+            setReasoningComplete(false);
+            // Also clear the refs to prevent stale updates
+            streamingCodeRef.current = null;
+            streamingReasoningRef.current = null;
+          }
+          break;
+        }
         
         // Auto Mode: Server has selected tools and is awaiting payment approval
         case "data-autoModeToolSelection": {

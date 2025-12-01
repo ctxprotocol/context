@@ -84,6 +84,8 @@ function isActivePhase(stage: PaymentStage): boolean {
     stage === "discovering-tools" ||
     stage === "awaiting-tool-approval" ||
     stage === "executing" ||
+    stage === "fixing" ||
+    stage === "reflecting" ||
     stage === "thinking" ||
     stage === "querying-tool"
   );
@@ -159,6 +161,54 @@ function FadedReasoningPreview({
       >
         <pre className="whitespace-pre-wrap break-words p-3">
           {reasoning}
+          {isStreaming && (
+            <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
+          )}
+        </pre>
+      </div>
+
+      {/* Fade gradient overlay */}
+      <div className="fade-to-background pointer-events-none absolute inset-0" />
+    </div>
+  );
+}
+
+// Combined reasoning + code preview - one continuous stream
+// Reasoning appears first, then code streams in after. All in one scrollable container.
+function CombinedStreamPreview({
+  reasoning,
+  code,
+  isStreaming,
+}: {
+  reasoning: string | null;
+  code: string | null;
+  isStreaming: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentLength = (reasoning?.length ?? 0) + (code?.length ?? 0);
+
+  // Auto-scroll to bottom as content streams
+  // biome-ignore lint/correctness/useExhaustiveDependencies: contentLength triggers scroll when content changes
+  useEffect(() => {
+    if (containerRef.current && isStreaming) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [contentLength, isStreaming]);
+
+  return (
+    <div className="relative mt-2 max-h-32 overflow-hidden rounded-md">
+      <div
+        className="overflow-y-auto font-mono text-muted-foreground/70 text-xs leading-relaxed"
+        ref={containerRef}
+        style={{ maxHeight: "8rem" }}
+      >
+        <pre className="whitespace-pre-wrap break-words p-3">
+          {/* Reasoning first */}
+          {reasoning}
+          {/* Code after reasoning (with a newline separator if both exist) */}
+          {reasoning && code && "\n\n"}
+          {code}
+          {/* Pulsing cursor while streaming */}
           {isStreaming && (
             <span className="ml-0.5 inline-block h-3 w-1.5 animate-pulse bg-muted-foreground/50" />
           )}
@@ -348,7 +398,12 @@ function PureThinkingAccordion({
   const [userToggled, setUserToggled] = useState(false);
 
   // Determine if we're actively streaming code
-  const isStreamingCode = stage === "planning";
+  // Include all stages that generate/stream code for real-time partial block display
+  const isStreamingCode =
+    stage === "planning" ||
+    stage === "discovering-tools" ||
+    stage === "fixing" ||
+    stage === "reflecting";
   const hasReasoning = Boolean(streamingReasoning);
   const isStreamingReasoning = hasReasoning && !isReasoningComplete;
 
@@ -392,7 +447,9 @@ function PureThinkingAccordion({
   }
 
   return (
-    <div className="w-full">
+    // overflow-anchor: none prevents this element from being used as a scroll anchor
+    // This fixes the jarring "snap back" when the accordion content changes/collapses
+    <div className="w-full" style={{ overflowAnchor: "none" }}>
       {/* Main status row with animated gradient text */}
       <button
         className={cn(
@@ -449,18 +506,11 @@ function PureThinkingAccordion({
               <TransactionStatusPreview transactionInfo={transactionInfo} />
             )}
 
-            {/* Discovering tools stage - Auto Mode searching marketplace */}
+            {/* Discovering tools stage - Auto Mode searching marketplace
+                One continuous stream: reasoning flows into code in same container */}
             {stage === "discovering-tools" && (
               <>
-                {/* Show reasoning while searching */}
-                {hasReasoning && (
-                  <FadedReasoningPreview
-                    isStreaming={isStreamingReasoning}
-                    reasoning={streamingReasoning ?? ""}
-                  />
-                )}
-
-                {/* Show searching indicator when no reasoning yet */}
+                {/* Show searching indicator only when no content yet */}
                 {!hasReasoning && !extractedCode && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-cyan-500/70" />
@@ -468,14 +518,19 @@ function PureThinkingAccordion({
                   </div>
                 )}
 
-                {/* Show code as it streams */}
-                {extractedCode && (
-                  <FadedCodePreview code={extractedCode} isStreaming={true} />
+                {/* Combined stream: reasoning then code in one container */}
+                {(hasReasoning || extractedCode) && (
+                  <CombinedStreamPreview
+                    reasoning={streamingReasoning}
+                    code={extractedCode}
+                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                  />
                 )}
               </>
             )}
 
-            {/* Awaiting tool approval stage - tools selected, waiting for payment */}
+            {/* Awaiting tool approval stage - tools selected, waiting for payment
+                Just show indicator - discovery content was already shown in previous stage */}
             {stage === "awaiting-tool-approval" && (
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                 <div className="size-1.5 animate-pulse rounded-full bg-green-500/70" />
@@ -485,24 +540,10 @@ function PureThinkingAccordion({
               </div>
             )}
 
-            {/* Planning stage with reasoning support:
-                Sequential flow - only show ONE section at a time:
-                1. "thinking..." indicator when nothing yet
-                2. Reasoning content as it streams
-                3. "generating code..." when reasoning done but no code yet
-                4. Code as it streams (reasoning hidden)
-            */}
+            {/* Planning stage - one continuous stream: reasoning flows into code */}
             {stage === "planning" && (
               <>
-                {/* Phase 1: Show reasoning while it's streaming (before code starts) */}
-                {hasReasoning && !extractedCode && (
-                  <FadedReasoningPreview
-                    isStreaming={isStreamingReasoning}
-                    reasoning={streamingReasoning ?? ""}
-                  />
-                )}
-
-                {/* Phase 2: Show "generating code..." when waiting for first content to arrive */}
+                {/* Show "generating code..." only when no content yet */}
                 {!extractedCode && !hasReasoning && (
                   <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                     <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
@@ -510,9 +551,13 @@ function PureThinkingAccordion({
                   </div>
                 )}
 
-                {/* Phase 3: Show code when it starts streaming (reasoning hidden) */}
-                {extractedCode && (
-                  <FadedCodePreview code={extractedCode} isStreaming={true} />
+                {/* Combined stream: reasoning then code in one container */}
+                {(hasReasoning || extractedCode) && (
+                  <CombinedStreamPreview
+                    reasoning={streamingReasoning}
+                    code={extractedCode}
+                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                  />
                 )}
               </>
             )}
@@ -520,6 +565,52 @@ function PureThinkingAccordion({
             {/* Executing - show real-time execution logs */}
             {stage === "executing" && (
               <ExecutionLogsPreview isExecuting={true} logs={executionLogs} />
+            )}
+
+            {/* Fixing stage - AI is attempting to fix a runtime error
+                One continuous stream: reasoning flows into code */}
+            {stage === "fixing" && (
+              <>
+                {/* Show indicator only when no content yet */}
+                {!extractedCode && !hasReasoning && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                    <div className="size-1.5 animate-pulse rounded-full bg-orange-500/70" />
+                    <span className="font-mono">diagnosing error...</span>
+                  </div>
+                )}
+
+                {/* Combined stream: reasoning then code in one container */}
+                {(hasReasoning || extractedCode) && (
+                  <CombinedStreamPreview
+                    reasoning={streamingReasoning}
+                    code={extractedCode}
+                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Reflecting stage - AI is reflecting on suspicious results
+                One continuous stream: reasoning flows into code */}
+            {stage === "reflecting" && (
+              <>
+                {/* Show indicator only when no content yet */}
+                {!extractedCode && !hasReasoning && (
+                  <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                    <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
+                    <span className="font-mono">reflecting on data...</span>
+                  </div>
+                )}
+
+                {/* Combined stream: reasoning then code in one container */}
+                {(hasReasoning || extractedCode) && (
+                  <CombinedStreamPreview
+                    reasoning={streamingReasoning}
+                    code={extractedCode}
+                    isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                  />
+                )}
+              </>
             )}
 
             {/* Thinking indicator */}

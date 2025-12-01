@@ -1046,6 +1046,13 @@ export async function POST(request: Request) {
                       }
                     );
 
+                    // Clear discovery content before transitioning to final response
+                    // This prevents the accordion from showing stale discovery content
+                    dataStream.write({
+                      type: "data-clearDiscovery",
+                      data: true,
+                    });
+
                     dataStream.write({
                       type: "data-toolStatus",
                       data: { status: "thinking" },
