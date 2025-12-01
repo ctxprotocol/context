@@ -429,11 +429,18 @@ function PureThinkingAccordion({
     }
   }, [isActive, isDebugMode, stage, userToggled]);
 
-  // Reset userToggled when stage changes to allow auto-expand on new queries
-  // biome-ignore lint/correctness/useExhaustiveDependencies: stage is used as a trigger
+  // Only reset userToggled when starting a NEW query (transitioning from idle to active)
+  // This allows the accordion to stay collapsed if the user manually closed it during a flow
+  const prevStageRef = useRef<PaymentStage>(stage);
   useEffect(() => {
-    setUserToggled(false);
-  }, [stage]);
+    const prevStage = prevStageRef.current;
+    prevStageRef.current = stage;
+    
+    // Only reset when going from idle to an active stage (new query starting)
+    if (prevStage === "idle" && isActive) {
+      setUserToggled(false);
+    }
+  }, [stage, isActive]);
 
   const statusMessage = getPaymentStatusMessage(stage, toolName);
   const hasCode = Boolean(extractedCode);

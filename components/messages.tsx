@@ -179,6 +179,13 @@ function PureMessages({
                 // but we no longer thread separate debugCode/debugResult
                 // streams into the message component.
                 isDebugMode={isDebugMode}
+                // Hide the icon for the last assistant message while ThinkingMessage is visible
+                // to prevent "double icon" jarring effect during transition
+                hideIcon={
+                  message.role === "assistant" &&
+                  index === messages.length - 1 &&
+                  shouldShowThinking
+                }
                 isLoading={
                   status === "streaming" && messages.length - 1 === index
                 }

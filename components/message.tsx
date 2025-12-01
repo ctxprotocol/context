@@ -39,6 +39,7 @@ const PurePreviewMessage = ({
   isReadonly,
   requiresScrollPadding,
   isDebugMode,
+  hideIcon = false,
 }: {
   chatId: string;
   message: ChatMessage;
@@ -49,6 +50,7 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
   requiresScrollPadding: boolean;
   isDebugMode: boolean;
+  hideIcon?: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -72,7 +74,7 @@ const PurePreviewMessage = ({
           "justify-start": message.role === "assistant",
         })}
       >
-        {message.role === "assistant" && (
+        {message.role === "assistant" && !hideIcon && (
           <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
             <SparklesIcon size={14} />
           </div>
@@ -314,6 +316,9 @@ export const PreviewMessage = memo(
       return false;
     }
     if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding) {
+      return false;
+    }
+    if (prevProps.hideIcon !== nextProps.hideIcon) {
       return false;
     }
     if (!equal(prevProps.message.parts, nextProps.message.parts)) {
