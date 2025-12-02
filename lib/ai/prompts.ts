@@ -410,21 +410,18 @@ export const systemPrompt = ({
   // Developer Mode, tools enabled, or Auto Mode execution - include coding agent
   let toolsPrompt: string;
 
-  if (isAutoModeExecution) {
-    // Auto Mode Execution Phase: Tools have been selected and paid for
-    // The AI should focus purely on using these tools to answer the question
-    toolsPrompt = `**AUTO MODE - EXECUTION PHASE**
-The following tools have been selected and authorized for this query:
-${enabledTools.map((tool, index) => formatEnabledTool(tool, index)).join("\n")}
-
-Focus on using these tools to answer the user's question. Do NOT search for additional tools.`;
-  } else if (enabledTools.length === 0) {
+  if (enabledTools.length === 0) {
     toolsPrompt =
       "No paid marketplace skills are authorized for this turn. Do not attempt to import them.";
   } else {
-    toolsPrompt = `Paid marketplace tools authorized for this turn:\n${enabledTools
-      .map((tool, index) => formatEnabledTool(tool, index))
-      .join("\n")}`;
+    // Both Auto Mode Execution and Manual Mode use the same battle-tested prompt
+    // Tools have been selected and paid for - focus on using them to answer the question
+    const modeLabel = isAutoModeExecution ? "AUTO MODE" : "MANUAL MODE";
+    toolsPrompt = `**${modeLabel} - TOOLS AUTHORIZED**
+The following tools have been selected and authorized for this query:
+${enabledTools.map((tool, index) => formatEnabledTool(tool, index)).join("\n")}
+
+Focus on using these tools to answer the user's question.${isAutoModeExecution ? " Do NOT search for additional tools." : ""}`;
   }
 
   const basePrompt = `${regularPrompt}\n\n${codingAgentPrompt}\n\n${toolsPrompt}\n\n${requestPrompt}`;
