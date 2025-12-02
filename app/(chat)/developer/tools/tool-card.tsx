@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { cn, formatPrice } from "@/lib/utils";
 import {
   editTool,
   refreshMCPSkills,
@@ -127,7 +127,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
           </div>
           <div className="flex flex-col items-end gap-1">
             <span className="font-medium">
-              ${Number(tool.totalRevenue).toFixed(2)}
+              ${formatPrice(tool.totalRevenue)}
             </span>
             <span className="text-muted-foreground text-xs">Total Revenue</span>
           </div>

@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
+import { formatPrice } from "@/lib/utils";
 
 type AutoPayApprovalDialogProps = {
   open: boolean;
@@ -245,7 +246,7 @@ export function AutoPayApprovalDialog({
             <div className="rounded-md bg-muted/50 p-3 text-sm">
               <span className="text-muted-foreground">Current allowance: </span>
               <span className="font-medium">
-                ${currentAllowanceNum.toFixed(2)}
+                ${formatPrice(currentAllowanceNum)}
               </span>
               {hasSufficientAllowance && (
                 <span className="ml-2 text-green-600">

@@ -1,6 +1,5 @@
 "use client";
 
-import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useState } from "react";
 import { formatUnits } from "viem";
 import { useWaitForTransactionReceipt } from "wagmi";
@@ -12,13 +11,16 @@ import {
   useReadContextRouterGetUnclaimedBalance,
   useWriteContextRouterClaimEarnings,
 } from "@/lib/generated";
+import { formatPrice } from "@/lib/utils";
 
 export function EarningsPanel() {
-  // Get wallet address from Privy smart wallet or embedded wallet
-  const { activeWallet } = useWalletIdentity();
-  const { client: smartWalletClient } = useSmartWallets();
-  const developerAddress = (smartWalletClient?.account?.address ||
-    activeWallet?.address) as `0x${string}` | undefined;
+  // Use the embedded wallet (EOA/signer) address for earnings query.
+  // This is typically what developers registered with when contributing tools.
+  // If user registered with a different wallet, earnings will be at that address.
+  // 
+  // Priority: embeddedWallet (stable EOA) > activeWallet (could be smart wallet)
+  const { embeddedWallet, activeWallet } = useWalletIdentity();
+  const developerAddress = (embeddedWallet?.address || activeWallet?.address) as `0x${string}` | undefined;
   const [lastTxHash, setLastTxHash] = useState<`0x${string}`>();
 
   // Read unclaimed balance
@@ -70,7 +72,7 @@ export function EarningsPanel() {
     <Card className="p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h3 className="font-bold text-2xl">${balanceUSD.toFixed(2)}</h3>
+          <h3 className="font-bold text-2xl">${formatPrice(balanceUSD)}</h3>
           <p className="text-muted-foreground text-sm">Unclaimed Earnings</p>
         </div>
         <Button
