@@ -319,7 +319,11 @@ export async function POST(request: Request) {
       console.log("[chat-api] request debug flags", {
         chatId: id,
         isDebugMode,
+        isAutoMode,
+        isAutoModeDiscovery,
+        isAutoModeExecution,
         toolInvocationsCount: toolInvocations.length,
+        willIgnoreToolInvocations: isAutoModeDiscovery,
       });
     }
 
@@ -405,8 +409,12 @@ export async function POST(request: Request) {
     // Get the appropriate provider based on tier and BYOK config
     const provider = byokConfig ? getProviderForUser(byokConfig) : myProvider;
 
+    // In Auto Mode Discovery phase, ignore manually selected tools
+    // Auto mode will discover and select tools itself
+    const effectiveToolInvocations = isAutoModeDiscovery ? [] : toolInvocations;
+
     const paidTools = await Promise.all(
-      toolInvocations.map(async (invocation) => {
+      effectiveToolInvocations.map(async (invocation) => {
         let tool = await getAIToolById({ id: invocation.toolId });
         if (!tool) {
           throw new ChatSDKError("not_found:chat", "Requested tool not found");

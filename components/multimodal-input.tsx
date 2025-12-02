@@ -146,7 +146,7 @@ function PureMultimodalInput({
   } = usePaymentStatus();
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
   const { fundWallet } = useFundWallet();
-  const { isAutoPay, canAfford, recordSpend } = useAutoPay();
+  const { isAutoPay, canAfford, recordSpend, isAutoMode } = useAutoPay();
   const { client: smartWalletClient } = useSmartWallets();
 
   // Wallet and contract addresses
@@ -368,9 +368,11 @@ function PureMultimodalInput({
       const trimmedInput = input.trim();
       const hasText = trimmedInput.length > 0;
 
+      // In Auto Mode, ignore manually selected tools - let auto mode discover tools itself
       if (
         !toolInvocation &&
         !isReadonly &&
+        !isAutoMode &&
         (selectedTool || activeTools.length > 0)
       ) {
         // Calculate total cost - tool fees + estimated model cost
@@ -435,6 +437,7 @@ function PureMultimodalInput({
       };
 
       // Handle both single and batch tool invocations
+      // In Auto Mode, don't send toolInvocations - let auto mode discover tools itself
       let sendOptions:
         | {
             body: {
@@ -445,7 +448,7 @@ function PureMultimodalInput({
             };
           }
         | undefined;
-      if (toolInvocation) {
+      if (toolInvocation && !isAutoMode) {
         if ("toolInvocations" in toolInvocation) {
           // Batch invocation
           sendOptions = {
@@ -490,6 +493,7 @@ function PureMultimodalInput({
       isAutoPay,
       canAfford,
       selectedModelId,
+      isAutoMode,
     ]
   );
 
