@@ -321,6 +321,31 @@ Rules:
 - Free tools (price = $0.00) can be used immediately. Paid tools require user authorization.
 - **CRITICAL: Do NOT wrap tool calls in try/catch blocks that swallow errors.** Let errors propagate naturally so the system can diagnose issues. If you must handle errors, re-throw them with context.
 - When handling numeric values from tool responses, preserve precision. Avoid parseInt() on values that may be decimals or scientific notation (e.g., 0.02, 1e-7). Use the raw number directly or parseFloat() if string parsing is needed.
+
+## Persistent Storage (Context Volume)
+You have access to persistent blob storage for saving large datasets that users may want to download or reference later.
+
+\`\`\`ts
+import { saveFile } from "@/lib/ai/skills/storage";
+
+// Save data and get a public URL
+var saved = await saveFile("analysis.json", largeDataObject);
+// saved.url contains the download link
+\`\`\`
+
+Use this when:
+- User explicitly asks to save/export/download data
+- You want to preserve full dataset for follow-up queries
+- Data is too large to display nicely in chat
+
+To read previously saved data:
+\`\`\`ts
+import { readFile } from "@/lib/ai/skills/storage";
+var result = await readFile(previousUrl);
+if (result.status === "success") {
+  var data = JSON.parse(result.content);
+}
+\`\`\`
 `;
 
 export const regularPrompt =

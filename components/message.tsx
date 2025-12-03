@@ -28,6 +28,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import { ThinkingAccordion } from "./thinking-accordion";
 import { parseToolContext, ToolContext } from "./tool-context";
 import { Weather } from "./weather";
+import { BlobDownloadList, extractBlobUrls } from "./blob-download-card";
 
 const PurePreviewMessage = ({
   chatId,
@@ -134,6 +135,12 @@ const PurePreviewMessage = ({
                     ? parseToolContext(part.text)
                     : { userText: part.text, toolContext: null };
 
+                // Extract blob URLs from assistant messages for download cards
+                const blobUrls =
+                  message.role === "assistant"
+                    ? extractBlobUrls(userText)
+                    : [];
+
                 return (
                   <div className="flex flex-col gap-2" key={key}>
                     <MessageContent
@@ -151,6 +158,9 @@ const PurePreviewMessage = ({
                       }
                     >
                       <Response>{sanitizeText(userText)}</Response>
+                      {blobUrls.length > 0 && (
+                        <BlobDownloadList urls={blobUrls} />
+                      )}
                     </MessageContent>
                     {toolContext && (
                       <ToolContext

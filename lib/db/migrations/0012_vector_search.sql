@@ -22,3 +22,5 @@ ON "AITool" USING hnsw ("embedding" vector_cosine_ops);
 
 
 
+
+

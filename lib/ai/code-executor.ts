@@ -4,6 +4,7 @@ import * as documentSkills from "@/lib/ai/skills/document";
 import * as marketplaceSkills from "@/lib/ai/skills/marketplace";
 import * as mcpSkills from "@/lib/ai/skills/mcp";
 import { type SkillRuntime, setSkillRuntime } from "@/lib/ai/skills/runtime";
+import * as storageSkills from "@/lib/ai/skills/storage";
 import * as suggestionSkills from "@/lib/ai/skills/suggestions";
 import * as weatherSkills from "@/lib/ai/skills/weather";
 
@@ -20,6 +21,8 @@ const BUILTIN_MODULES_MAP = {
   "@/lib/ai/skills/mcp": mcpSkills,
   // Marketplace Discovery (Always Free)
   "@/lib/ai/skills/marketplace": marketplaceSkills,
+  // Persistent Storage (Context Volume)
+  "@/lib/ai/skills/storage": storageSkills,
 } as const;
 
 // 2. Community modules (from the index barrel file)

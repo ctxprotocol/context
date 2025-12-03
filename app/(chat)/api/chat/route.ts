@@ -96,6 +96,8 @@ const BUILTIN_MODULES: AllowedModule[] = [
   "@/lib/ai/skills/weather",
   // Marketplace search is always free
   "@/lib/ai/skills/marketplace",
+  // Persistent storage for large data (Context Volume)
+  "@/lib/ai/skills/storage",
 ];
 
 const BUILTIN_MODULE_SET = new Set(BUILTIN_MODULES);
