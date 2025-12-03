@@ -255,6 +255,31 @@ export function SettingsForm() {
     }
   };
 
+  // Switch to Convenience tier (pay-as-you-go model costs)
+  const handleSwitchToConvenienceTier = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enableModelCostPassthrough: true }),
+      });
+
+      if (response.ok) {
+        toast.success(
+          "Switched to Convenience tier. Model costs will be tracked per query."
+        );
+        await refreshSettings();
+      } else {
+        toast.error("Failed to switch tier");
+      }
+    } catch (_error) {
+      toast.error("Failed to switch tier");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card>
@@ -354,7 +379,8 @@ export function SettingsForm() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Payment collection coming soon. Costs are tracked per query.
+                Model costs are paid per query and go to the platform to cover
+                API expenses.
               </p>
             </div>
           )}
@@ -560,32 +586,83 @@ export function SettingsForm() {
         </CardContent>
       </Card>
 
-      {/* Convenience Tier (Coming Soon) */}
-      <Card className="opacity-60">
+      {/* Convenience Tier - Pay-as-you-go model costs */}
+      <Card
+        className={cn(
+          "transition-all",
+          settings.tier === "convenience" && "border-primary bg-primary/5"
+        )}
+      >
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-secondary">
-              <Zap className="size-5 text-secondary-foreground" />
+            <div
+              className={cn(
+                "flex size-10 items-center justify-center rounded-lg",
+                settings.tier === "convenience"
+                  ? "bg-primary/10"
+                  : "bg-secondary"
+              )}
+            >
+              <Zap
+                className={cn(
+                  "size-5",
+                  settings.tier === "convenience"
+                    ? "text-primary"
+                    : "text-secondary-foreground"
+                )}
+              />
             </div>
             <div>
-              <CardTitle className="text-lg">
-                Convenience Tier
-                <Badge className="ml-2" variant="outline">
-                  Coming Soon
-                </Badge>
-              </CardTitle>
+              <CardTitle className="text-lg">Convenience Tier</CardTitle>
               <CardDescription>
                 Pay-as-you-go model costs without managing API keys
               </CardDescription>
             </div>
+            {settings.tier === "convenience" && (
+              <Badge className="ml-auto" variant="default">
+                Active
+              </Badge>
+            )}
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            The convenience tier will let you pay actual model costs as a
-            pass-through, without needing to manage your own API key. Perfect
-            for users who want unlimited queries with simple billing.
+            Pay actual model costs as a pass-through, without needing to manage
+            your own API key. Model costs are estimated upfront and tracked per
+            query. Works with both Manual Mode (selected tools) and Auto Mode
+            (AI-discovered tools).
           </p>
+
+          {/* Show accumulated costs when on convenience tier */}
+          {settings.tier === "convenience" && (
+            <div className="rounded-md border bg-muted/30 p-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  Accumulated model costs
+                </span>
+                <span className="font-medium font-mono">
+                  ${Number(settings.accumulatedModelCost).toFixed(4)}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Model costs are estimated upfront and paid to the platform. In
+                agentic flows, multiple AI calls may occur per response.
+              </p>
+            </div>
+          )}
+
+          {/* Show enable button when not on convenience tier */}
+          {settings.tier !== "convenience" && (
+            <Button
+              className="w-full"
+              disabled={saving}
+              onClick={handleSwitchToConvenienceTier}
+              variant="outline"
+            >
+              {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Switch to Convenience Tier
+            </Button>
+          )}
         </CardContent>
       </Card>
 

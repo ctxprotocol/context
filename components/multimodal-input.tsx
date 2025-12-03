@@ -33,24 +33,25 @@ import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { useAutoPay } from "@/hooks/use-auto-pay";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useToolSelection } from "@/hooks/use-tool-selection";
+import { useUserSettings } from "@/hooks/use-user-settings";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
-import { useUserSettings } from "@/hooks/use-user-settings";
 import {
   chatModels,
   getChatModelsForProvider,
   getEstimatedModelCost,
 } from "@/lib/ai/models";
-import type { BYOKProvider } from "@/lib/db/schema";
 import { myProvider } from "@/lib/ai/providers";
-import type { ToolListItem } from "@/hooks/use-session-tools";
+import type { BYOKProvider } from "@/lib/db/schema";
 import {
   contextRouterAbi,
   useWriteContextRouterExecuteBatchPaidQuery,
   useWriteContextRouterExecutePaidQuery,
 } from "@/lib/generated";
+
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn, formatPrice } from "@/lib/utils";
@@ -136,7 +137,10 @@ function PureMultimodalInput({
   const { width } = useWindowSize();
   const { selectedTool, clearTool } = useToolSelection();
   const { activeTools } = useSessionTools();
-  const primaryTool: ToolListItem | null = selectedTool ?? activeTools[0] ?? null;
+  // Get user tier to determine if model costs should be included (only for convenience tier)
+  const { settings } = useUserSettings();
+  const primaryTool: ToolListItem | null =
+    selectedTool ?? activeTools[0] ?? null;
   const [executingTool, setExecutingTool] = useState<ToolListItem | null>(null);
   const {
     stage,
@@ -375,7 +379,7 @@ function PureMultimodalInput({
         !isAutoMode &&
         (selectedTool || activeTools.length > 0)
       ) {
-        // Calculate total cost - tool fees + estimated model cost
+        // Calculate total cost - tool fees + model cost (only for convenience tier)
         const toolsToPay = selectedTool ? [selectedTool] : activeTools;
         const paidTools = toolsToPay.filter(
           (t) => Number(t.pricePerQuery ?? 0) > 0
@@ -384,11 +388,15 @@ function PureMultimodalInput({
           (sum, t) => sum + Number(t.pricePerQuery ?? 0),
           0
         );
-        const modelCost = getEstimatedModelCost(selectedModelId);
+        // Model cost only applies to convenience tier - free/BYOK users don't pay model costs
+        const modelCost =
+          settings.tier === "convenience"
+            ? getEstimatedModelCost(selectedModelId)
+            : 0;
         const totalCost = toolCost + modelCost;
 
-        // If there are paid tools or model cost, handle payment
-        const needsPayment = paidTools.length > 0 || modelCost > 0;
+        // If there are paid tools, handle payment (model cost alone doesn't require payment for non-convenience tiers)
+        const needsPayment = paidTools.length > 0;
 
         if (needsPayment) {
           // If Auto Pay is enabled and within budget, trigger auto-payment
@@ -494,6 +502,7 @@ function PureMultimodalInput({
       canAfford,
       selectedModelId,
       isAutoMode,
+      settings.tier, // Needed to determine if model cost applies (convenience tier only)
     ]
   );
 
@@ -745,11 +754,15 @@ function PureMultimodalInput({
       toolFees += parseUnits(tool.pricePerQuery ?? "0.00", 6);
     }
 
-    // Calculate estimated model cost (convert from USD to USDC micro-units)
-    const modelCostUSD = getEstimatedModelCost(selectedModelId);
+    // Model cost only applies to convenience tier - free/BYOK users don't pay model costs upfront
+    // (BYOK users pay directly to their provider, free tier model costs are absorbed by platform)
+    const modelCostUSD =
+      settings.tier === "convenience"
+        ? getEstimatedModelCost(selectedModelId)
+        : 0;
     const modelCostUnits = parseUnits(modelCostUSD.toFixed(6), 6);
 
-    // Total amount = tool fees + estimated model cost
+    // Total amount = tool fees + model cost (model cost only for convenience tier)
     const totalAmount = toolFees + modelCostUnits;
     const totalAmountStr = formatPrice(Number(totalAmount) / 1_000_000);
     const toolNames = toolsToPay.map((t) => t.name).join(", ");
@@ -809,15 +822,36 @@ function PureMultimodalInput({
         recordSpend(totalCostUSD);
 
         // Encode the contract call
+        // For convenience tier with model cost, use executeQueryWithModelCost
+        // which sends tool fees to developer (90/10) and model cost 100% to platform
         let txData: Hex;
+        const hasModelCost =
+          settings.tier === "convenience" && modelCostUnits > 0n;
+
         if (toolsToPay.length === 1) {
           const tool = toolsToPay[0];
           setExecutingTool(tool);
-          txData = encodeFunctionData({
-            abi: contextRouterAbi,
-            functionName: "executePaidQuery",
-            args: [0n, tool.developerWallet as `0x${string}`, totalAmount],
-          });
+
+          if (hasModelCost) {
+            // Convenience tier: separate tool fees and model cost
+            txData = encodeFunctionData({
+              abi: contextRouterAbi,
+              functionName: "executeQueryWithModelCost",
+              args: [
+                0n,
+                tool.developerWallet as `0x${string}`,
+                toolFees, // Tool amount (90/10 split)
+                modelCostUnits, // Model cost (100% to platform)
+              ],
+            });
+          } else {
+            // Free/BYOK tier: only tool fees, no model cost
+            txData = encodeFunctionData({
+              abi: contextRouterAbi,
+              functionName: "executePaidQuery",
+              args: [0n, tool.developerWallet as `0x${string}`, toolFees],
+            });
+          }
         } else {
           setExecutingTools(toolsToPay);
           const toolIds = toolsToPay.map(() => 0n);
@@ -827,6 +861,8 @@ function PureMultimodalInput({
           const amounts = toolsToPay.map((t) =>
             parseUnits(t.pricePerQuery ?? "0.00", 6)
           );
+          // Note: Batch with model cost not yet implemented in contract
+          // For now, batch payments don't include model cost separation
           txData = encodeFunctionData({
             abi: contextRouterAbi,
             functionName: "executeBatchPaidQuery",
@@ -942,15 +978,35 @@ function PureMultimodalInput({
       recordSpend(totalCostUSD);
 
       // Encode the payment transaction
+      // For convenience tier with model cost, use executeQueryWithModelCost
       let txData: Hex;
+      const hasModelCost =
+        settings.tier === "convenience" && modelCostUnits > 0n;
+
       if (toolsToPay.length === 1) {
         const tool = toolsToPay[0];
         setExecutingTool(tool);
-        txData = encodeFunctionData({
-          abi: contextRouterAbi,
-          functionName: "executePaidQuery",
-          args: [0n, tool.developerWallet as `0x${string}`, totalAmount],
-        });
+
+        if (hasModelCost) {
+          // Convenience tier: separate tool fees and model cost
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeQueryWithModelCost",
+            args: [
+              0n,
+              tool.developerWallet as `0x${string}`,
+              toolFees, // Tool amount (90/10 split)
+              modelCostUnits, // Model cost (100% to platform)
+            ],
+          });
+        } else {
+          // Free/BYOK tier: only tool fees
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executePaidQuery",
+            args: [0n, tool.developerWallet as `0x${string}`, toolFees],
+          });
+        }
       } else {
         setExecutingTools(toolsToPay);
         const toolIds = toolsToPay.map(() => 0n);
@@ -960,6 +1016,7 @@ function PureMultimodalInput({
         const amounts = toolsToPay.map((t) =>
           parseUnits(t.pricePerQuery ?? "0.00", 6)
         );
+        // Note: Batch with model cost not yet implemented in contract
         txData = encodeFunctionData({
           abi: contextRouterAbi,
           functionName: "executeBatchPaidQuery",
@@ -1073,6 +1130,7 @@ function PureMultimodalInput({
     cleanupPaymentState,
     submitForm,
     selectedModelId,
+    settings.tier, // Needed to determine if model cost applies (convenience tier only)
   ]);
 
   // Auto-execute payment when Auto Pay is enabled and triggered
@@ -1260,7 +1318,11 @@ function PureMultimodalInput({
                   (sum, t) => sum + Number(t.pricePerQuery ?? 0),
                   0
                 );
-            const modelCost = getEstimatedModelCost(selectedModelId);
+            // Model cost only shown for convenience tier users
+            const modelCost =
+              settings.tier === "convenience"
+                ? getEstimatedModelCost(selectedModelId)
+                : 0;
             const totalCost = toolCost + modelCost;
             const breakdown: PaymentBreakdown = {
               toolCost,

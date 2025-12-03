@@ -8,6 +8,8 @@
     "coverage": "hardhat coverage",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
     "deploy:base": "hardhat run scripts/deploy.ts --network baseMainnet",
+    "add-operator:sepolia": "hardhat run scripts/add-operator.ts --network baseSepolia",
+    "add-operator:base": "hardhat run scripts/add-operator.ts --network baseMainnet",
     "verify": "hardhat run scripts/verify.ts"
   },
   "keywords": [

@@ -46,6 +46,8 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     event PlatformFeesClaimed(address indexed platform, uint256 amount);
     event OperatorAdded(address indexed operator);
     event OperatorRemoved(address indexed operator);
+    // Model cost event for Convenience tier (100% to platform)
+    event ModelCostPaid(address indexed user, uint256 amount);
 
     // Modifiers
     modifier onlyOperator() {
@@ -56,10 +58,15 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Initialize the ContextRouter with USDC token address
      * @param _usdcAddress The address of the USDC token contract on this chain
+     * @dev Deployer is automatically registered as an operator for Auto Pay
      */
     constructor(address _usdcAddress) Ownable(msg.sender) {
         require(_usdcAddress != address(0), "Invalid USDC address");
         usdc = IERC20(_usdcAddress);
+        
+        // Auto-register deployer as operator for Auto Pay convenience
+        operators[msg.sender] = true;
+        emit OperatorAdded(msg.sender);
     }
 
     /**
@@ -229,6 +236,89 @@ contract ContextRouter is Ownable, ReentrancyGuard {
             platformBalance += platformFee;
 
             emit QueryPaid(toolIds[i], msg.sender, developerWallets[i], amounts[i], platformFee);
+        }
+    }
+
+    // ============================================================
+    // MODEL COST FUNCTIONS (Convenience Tier - 100% to Platform)
+    // ============================================================
+
+    /**
+     * @notice User pays for AI model costs (Convenience tier)
+     * @dev 100% goes to platform balance - used for pass-through model API costs
+     * @param toolAmount The tool fee amount (will be split 90/10 with developer)
+     * @param developerWallet The wallet address of the tool creator
+     * @param modelCost The model cost amount (100% to platform)
+     * @param toolId The ID of the tool being used
+     */
+    function executeQueryWithModelCost(
+        uint256 toolId,
+        address developerWallet,
+        uint256 toolAmount,
+        uint256 modelCost
+    ) external nonReentrant {
+        require(developerWallet != address(0), "Invalid developer address");
+        require(toolAmount > 0 || modelCost > 0, "Total amount must be greater than 0");
+
+        uint256 totalAmount = toolAmount + modelCost;
+        
+        // Transfer total USDC from user to this contract
+        usdc.safeTransferFrom(msg.sender, address(this), totalAmount);
+
+        // Handle tool payment (90/10 split) if there's a tool fee
+        if (toolAmount > 0) {
+            uint256 platformFee = (toolAmount * PLATFORM_FEE_PERCENT) / 100;
+            uint256 developerEarning = toolAmount - platformFee;
+            developerBalances[developerWallet] += developerEarning;
+            platformBalance += platformFee;
+            emit QueryPaid(toolId, msg.sender, developerWallet, toolAmount, platformFee);
+        }
+
+        // Handle model cost (100% to platform)
+        if (modelCost > 0) {
+            platformBalance += modelCost;
+            emit ModelCostPaid(msg.sender, modelCost);
+        }
+    }
+
+    /**
+     * @notice Operator triggers query payment with model cost on behalf of user
+     * @dev For Auto Mode with Convenience tier - combines tool fee + model cost
+     * @param user The user's wallet address
+     * @param toolId The ID of the tool being used
+     * @param developerWallet The wallet address of the tool creator
+     * @param toolAmount The tool fee amount (90/10 split)
+     * @param modelCost The model cost amount (100% to platform)
+     */
+    function executeQueryWithModelCostFor(
+        address user,
+        uint256 toolId,
+        address developerWallet,
+        uint256 toolAmount,
+        uint256 modelCost
+    ) external onlyOperator nonReentrant {
+        require(user != address(0), "Invalid user address");
+        require(developerWallet != address(0), "Invalid developer address");
+        require(toolAmount > 0 || modelCost > 0, "Total amount must be greater than 0");
+
+        uint256 totalAmount = toolAmount + modelCost;
+        
+        // Transfer total USDC from user to this contract
+        usdc.safeTransferFrom(user, address(this), totalAmount);
+
+        // Handle tool payment (90/10 split) if there's a tool fee
+        if (toolAmount > 0) {
+            uint256 platformFee = (toolAmount * PLATFORM_FEE_PERCENT) / 100;
+            uint256 developerEarning = toolAmount - platformFee;
+            developerBalances[developerWallet] += developerEarning;
+            platformBalance += platformFee;
+            emit QueryPaid(toolId, user, developerWallet, toolAmount, platformFee);
+        }
+
+        // Handle model cost (100% to platform)
+        if (modelCost > 0) {
+            platformBalance += modelCost;
+            emit ModelCostPaid(user, modelCost);
         }
     }
 

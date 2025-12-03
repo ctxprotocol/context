@@ -14,18 +14,18 @@ import { base } from "viem/chains";
  * Auto Pay Executor
  *
  * Server-side service for executing JIT (Just-In-Time) payments
- * in Auto Mode. Uses a SERVER WALLET (operator) to execute payments
+ * in Auto Mode. Uses the DEPLOYER WALLET (operator) to execute payments
  * on behalf of users via the ContextRouter contract.
  *
  * Flow:
  * 1. User has pre-approved ContextRouter to spend their USDC (Auto Pay setup)
- * 2. Server wallet (operator) calls executePaidQueryFor(user, toolId, developer, amount)
+ * 2. Deployer wallet (operator) calls executePaidQueryFor(user, toolId, developer, amount)
  * 3. ContextRouter transfers USDC from user's wallet to developer
- * 4. Server wallet pays gas (funded separately)
+ * 4. Deployer wallet pays gas (funded separately)
  *
  * Requirements:
- * - AUTO_PAY_OPERATOR_PRIVATE_KEY: Private key for the operator wallet
- * - The operator wallet must be registered as an operator on ContextRouter
+ * - DEPLOYER_KEY: Private key for the deployer/operator wallet
+ * - The deployer wallet must be registered as an operator on ContextRouter
  * - User must have approved ContextRouter to spend their USDC
  */
 
@@ -55,6 +55,20 @@ const CONTEXT_ROUTER_ABI = [
     stateMutability: "nonpayable",
     type: "function",
   },
+  // Convenience tier: separate tool fees (90/10) from model cost (100% platform)
+  {
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "toolId", type: "uint256" },
+      { name: "developerWallet", type: "address" },
+      { name: "toolAmount", type: "uint256" },
+      { name: "modelCost", type: "uint256" },
+    ],
+    name: "executeQueryWithModelCostFor",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const;
 
 // Types
@@ -67,7 +81,8 @@ export type AutoPayResult = {
 export type AutoPayToolPayment = {
   toolId: string;
   developerWallet: string;
-  priceUsd: string; // Price in USD string (e.g., "0.0001")
+  priceUsd: string; // Tool price in USD string (e.g., "0.0001")
+  modelCostUsd?: string; // Optional model cost for Convenience tier (100% to platform)
 };
 
 // Clients (lazy initialized)
@@ -104,10 +119,11 @@ function getPublicClient() {
 
 function getOperatorAccount() {
   if (!operatorAccount) {
-    const privateKey = process.env.AUTO_PAY_OPERATOR_PRIVATE_KEY;
+    // Use DEPLOYER_KEY - the deployer is also the operator for Auto Pay
+    const privateKey = process.env.DEPLOYER_KEY;
     if (!privateKey) {
       throw new Error(
-        "AUTO_PAY_OPERATOR_PRIVATE_KEY not configured. This is required for Auto Pay."
+        "DEPLOYER_KEY not configured. This is required for Auto Pay operator."
       );
     }
     operatorAccount = privateKeyToAccount(privateKey as `0x${string}`);
@@ -209,27 +225,47 @@ export async function executeAutoPayment(
     }
 
     const toolIdUint = toolIdToUint256(payment.toolId);
-    const amount = usdToUsdcAmount(payment.priceUsd);
+    const toolAmount = usdToUsdcAmount(payment.priceUsd);
+    const modelCost = payment.modelCostUsd
+      ? usdToUsdcAmount(payment.modelCostUsd)
+      : 0n;
+    const hasModelCost = modelCost > 0n;
 
     console.log("[auto-pay] Executing payment via operator wallet:", {
       operator: wallet.account.address,
       user: userAddress,
       toolId: payment.toolId,
       developer: payment.developerWallet,
-      amount: amount.toString(),
+      toolAmount: toolAmount.toString(),
+      modelCost: modelCost.toString(),
+      hasModelCost,
     });
 
-    // Encode the contract call - using executePaidQueryFor
-    const data = encodeFunctionData({
-      abi: CONTEXT_ROUTER_ABI,
-      functionName: "executePaidQueryFor",
-      args: [
-        userAddress,
-        toolIdUint,
-        payment.developerWallet as `0x${string}`,
-        amount,
-      ],
-    });
+    // Encode the contract call
+    // Use executeQueryWithModelCostFor for Convenience tier (has model cost)
+    // Use executePaidQueryFor for Free/BYOK tier (no model cost)
+    const data = hasModelCost
+      ? encodeFunctionData({
+          abi: CONTEXT_ROUTER_ABI,
+          functionName: "executeQueryWithModelCostFor",
+          args: [
+            userAddress,
+            toolIdUint,
+            payment.developerWallet as `0x${string}`,
+            toolAmount,
+            modelCost,
+          ],
+        })
+      : encodeFunctionData({
+          abi: CONTEXT_ROUTER_ABI,
+          functionName: "executePaidQueryFor",
+          args: [
+            userAddress,
+            toolIdUint,
+            payment.developerWallet as `0x${string}`,
+            toolAmount,
+          ],
+        });
 
     // Execute from operator wallet
     const hash = await wallet.sendTransaction({
