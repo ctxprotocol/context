@@ -17,8 +17,8 @@ import {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const contextRouterAbi = [
   {
@@ -242,6 +242,39 @@ export const contextRouterAbi = [
   {
     type: 'function',
     inputs: [
+      { name: 'toolIds', internalType: 'uint256[]', type: 'uint256[]' },
+      {
+        name: 'developerWallets',
+        internalType: 'address[]',
+        type: 'address[]',
+      },
+      { name: 'amounts', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'modelCost', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'executeBatchQueryWithModelCost',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'user', internalType: 'address', type: 'address' },
+      { name: 'toolIds', internalType: 'uint256[]', type: 'uint256[]' },
+      {
+        name: 'developerWallets',
+        internalType: 'address[]',
+        type: 'address[]',
+      },
+      { name: 'amounts', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'modelCost', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'executeBatchQueryWithModelCostFor',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: 'toolId', internalType: 'uint256', type: 'uint256' },
       { name: 'developerWallet', internalType: 'address', type: 'address' },
       { name: 'amount', internalType: 'uint256', type: 'uint256' },
@@ -360,17 +393,17 @@ export const contextRouterAbi = [
 ] as const
 
 /**
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const contextRouterAddress = {
-  8453: '0x676645eF4d3133181572622DABFaeC2170Db670B',
-  84532: '0x676645eF4d3133181572622DABFaeC2170Db670B',
+  8453: '0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4',
+  84532: '0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4',
 } as const
 
 /**
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const contextRouterConfig = {
   address: contextRouterAddress,
@@ -1375,8 +1408,8 @@ export const safeErc20Abi = [
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouter = /*#__PURE__*/ createUseReadContract({
   abi: contextRouterAbi,
@@ -1386,8 +1419,8 @@ export const useReadContextRouter = /*#__PURE__*/ createUseReadContract({
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"PLATFORM_FEE_PERCENT"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterPlatformFeePercent =
   /*#__PURE__*/ createUseReadContract({
@@ -1399,8 +1432,8 @@ export const useReadContextRouterPlatformFeePercent =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"developerBalances"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterDeveloperBalances =
   /*#__PURE__*/ createUseReadContract({
@@ -1412,8 +1445,8 @@ export const useReadContextRouterDeveloperBalances =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getPlatformBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterGetPlatformBalance =
   /*#__PURE__*/ createUseReadContract({
@@ -1425,8 +1458,8 @@ export const useReadContextRouterGetPlatformBalance =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getUnclaimedBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterGetUnclaimedBalance =
   /*#__PURE__*/ createUseReadContract({
@@ -1438,8 +1471,8 @@ export const useReadContextRouterGetUnclaimedBalance =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"isOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterIsOperator =
   /*#__PURE__*/ createUseReadContract({
@@ -1451,8 +1484,8 @@ export const useReadContextRouterIsOperator =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"operators"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterOperators =
   /*#__PURE__*/ createUseReadContract({
@@ -1464,8 +1497,8 @@ export const useReadContextRouterOperators =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"owner"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterOwner = /*#__PURE__*/ createUseReadContract({
   abi: contextRouterAbi,
@@ -1476,8 +1509,8 @@ export const useReadContextRouterOwner = /*#__PURE__*/ createUseReadContract({
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"platformBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterPlatformBalance =
   /*#__PURE__*/ createUseReadContract({
@@ -1489,8 +1522,8 @@ export const useReadContextRouterPlatformBalance =
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"usdc"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useReadContextRouterUsdc = /*#__PURE__*/ createUseReadContract({
   abi: contextRouterAbi,
@@ -1501,8 +1534,8 @@ export const useReadContextRouterUsdc = /*#__PURE__*/ createUseReadContract({
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouter = /*#__PURE__*/ createUseWriteContract({
   abi: contextRouterAbi,
@@ -1512,8 +1545,8 @@ export const useWriteContextRouter = /*#__PURE__*/ createUseWriteContract({
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"addOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterAddOperator =
   /*#__PURE__*/ createUseWriteContract({
@@ -1525,8 +1558,8 @@ export const useWriteContextRouterAddOperator =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimEarnings"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterClaimEarnings =
   /*#__PURE__*/ createUseWriteContract({
@@ -1538,8 +1571,8 @@ export const useWriteContextRouterClaimEarnings =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimPlatformFees"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterClaimPlatformFees =
   /*#__PURE__*/ createUseWriteContract({
@@ -1551,8 +1584,8 @@ export const useWriteContextRouterClaimPlatformFees =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecuteBatchPaidQuery =
   /*#__PURE__*/ createUseWriteContract({
@@ -1564,8 +1597,8 @@ export const useWriteContextRouterExecuteBatchPaidQuery =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecuteBatchPaidQueryFor =
   /*#__PURE__*/ createUseWriteContract({
@@ -1575,10 +1608,36 @@ export const useWriteContextRouterExecuteBatchPaidQueryFor =
   })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCost"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const useWriteContextRouterExecuteBatchQueryWithModelCost =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCost',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCostFor"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const useWriteContextRouterExecuteBatchQueryWithModelCostFor =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCostFor',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecutePaidQuery =
   /*#__PURE__*/ createUseWriteContract({
@@ -1590,8 +1649,8 @@ export const useWriteContextRouterExecutePaidQuery =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecutePaidQueryFor =
   /*#__PURE__*/ createUseWriteContract({
@@ -1603,8 +1662,8 @@ export const useWriteContextRouterExecutePaidQueryFor =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCost"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecuteQueryWithModelCost =
   /*#__PURE__*/ createUseWriteContract({
@@ -1616,8 +1675,8 @@ export const useWriteContextRouterExecuteQueryWithModelCost =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCostFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterExecuteQueryWithModelCostFor =
   /*#__PURE__*/ createUseWriteContract({
@@ -1629,8 +1688,8 @@ export const useWriteContextRouterExecuteQueryWithModelCostFor =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"removeOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterRemoveOperator =
   /*#__PURE__*/ createUseWriteContract({
@@ -1642,8 +1701,8 @@ export const useWriteContextRouterRemoveOperator =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"renounceOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterRenounceOwnership =
   /*#__PURE__*/ createUseWriteContract({
@@ -1655,8 +1714,8 @@ export const useWriteContextRouterRenounceOwnership =
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWriteContextRouterTransferOwnership =
   /*#__PURE__*/ createUseWriteContract({
@@ -1668,8 +1727,8 @@ export const useWriteContextRouterTransferOwnership =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouter = /*#__PURE__*/ createUseSimulateContract(
   { abi: contextRouterAbi, address: contextRouterAddress },
@@ -1678,8 +1737,8 @@ export const useSimulateContextRouter = /*#__PURE__*/ createUseSimulateContract(
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"addOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterAddOperator =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1691,8 +1750,8 @@ export const useSimulateContextRouterAddOperator =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimEarnings"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterClaimEarnings =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1704,8 +1763,8 @@ export const useSimulateContextRouterClaimEarnings =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimPlatformFees"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterClaimPlatformFees =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1717,8 +1776,8 @@ export const useSimulateContextRouterClaimPlatformFees =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecuteBatchPaidQuery =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1730,8 +1789,8 @@ export const useSimulateContextRouterExecuteBatchPaidQuery =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecuteBatchPaidQueryFor =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1741,10 +1800,36 @@ export const useSimulateContextRouterExecuteBatchPaidQueryFor =
   })
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCost"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const useSimulateContextRouterExecuteBatchQueryWithModelCost =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCost',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCostFor"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const useSimulateContextRouterExecuteBatchQueryWithModelCostFor =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCostFor',
+  })
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecutePaidQuery =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1756,8 +1841,8 @@ export const useSimulateContextRouterExecutePaidQuery =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecutePaidQueryFor =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1769,8 +1854,8 @@ export const useSimulateContextRouterExecutePaidQueryFor =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCost"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecuteQueryWithModelCost =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1782,8 +1867,8 @@ export const useSimulateContextRouterExecuteQueryWithModelCost =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCostFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterExecuteQueryWithModelCostFor =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1795,8 +1880,8 @@ export const useSimulateContextRouterExecuteQueryWithModelCostFor =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"removeOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterRemoveOperator =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1808,8 +1893,8 @@ export const useSimulateContextRouterRemoveOperator =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"renounceOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterRenounceOwnership =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1821,8 +1906,8 @@ export const useSimulateContextRouterRenounceOwnership =
 /**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useSimulateContextRouterTransferOwnership =
   /*#__PURE__*/ createUseSimulateContract({
@@ -1834,8 +1919,8 @@ export const useSimulateContextRouterTransferOwnership =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1846,8 +1931,8 @@ export const useWatchContextRouterEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"EarningsClaimed"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterEarningsClaimedEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1859,8 +1944,8 @@ export const useWatchContextRouterEarningsClaimedEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"ModelCostPaid"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterModelCostPaidEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1872,8 +1957,8 @@ export const useWatchContextRouterModelCostPaidEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OperatorAdded"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterOperatorAddedEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1885,8 +1970,8 @@ export const useWatchContextRouterOperatorAddedEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OperatorRemoved"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterOperatorRemovedEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1898,8 +1983,8 @@ export const useWatchContextRouterOperatorRemovedEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OwnershipTransferred"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterOwnershipTransferredEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1911,8 +1996,8 @@ export const useWatchContextRouterOwnershipTransferredEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"PlatformFeesClaimed"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterPlatformFeesClaimedEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -1924,8 +2009,8 @@ export const useWatchContextRouterPlatformFeesClaimedEvent =
 /**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"QueryPaid"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const useWatchContextRouterQueryPaidEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
@@ -2795,8 +2880,8 @@ export const useWatchOwnableOwnershipTransferredEvent =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouter = /*#__PURE__*/ createReadContract({
   abi: contextRouterAbi,
@@ -2806,8 +2891,8 @@ export const readContextRouter = /*#__PURE__*/ createReadContract({
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"PLATFORM_FEE_PERCENT"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterPlatformFeePercent =
   /*#__PURE__*/ createReadContract({
@@ -2819,8 +2904,8 @@ export const readContextRouterPlatformFeePercent =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"developerBalances"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterDeveloperBalances =
   /*#__PURE__*/ createReadContract({
@@ -2832,8 +2917,8 @@ export const readContextRouterDeveloperBalances =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getPlatformBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterGetPlatformBalance =
   /*#__PURE__*/ createReadContract({
@@ -2845,8 +2930,8 @@ export const readContextRouterGetPlatformBalance =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getUnclaimedBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterGetUnclaimedBalance =
   /*#__PURE__*/ createReadContract({
@@ -2858,8 +2943,8 @@ export const readContextRouterGetUnclaimedBalance =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"isOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterIsOperator = /*#__PURE__*/ createReadContract({
   abi: contextRouterAbi,
@@ -2870,8 +2955,8 @@ export const readContextRouterIsOperator = /*#__PURE__*/ createReadContract({
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"operators"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterOperators = /*#__PURE__*/ createReadContract({
   abi: contextRouterAbi,
@@ -2882,8 +2967,8 @@ export const readContextRouterOperators = /*#__PURE__*/ createReadContract({
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"owner"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterOwner = /*#__PURE__*/ createReadContract({
   abi: contextRouterAbi,
@@ -2894,8 +2979,8 @@ export const readContextRouterOwner = /*#__PURE__*/ createReadContract({
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"platformBalance"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterPlatformBalance =
   /*#__PURE__*/ createReadContract({
@@ -2907,8 +2992,8 @@ export const readContextRouterPlatformBalance =
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"usdc"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const readContextRouterUsdc = /*#__PURE__*/ createReadContract({
   abi: contextRouterAbi,
@@ -2919,8 +3004,8 @@ export const readContextRouterUsdc = /*#__PURE__*/ createReadContract({
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouter = /*#__PURE__*/ createWriteContract({
   abi: contextRouterAbi,
@@ -2930,8 +3015,8 @@ export const writeContextRouter = /*#__PURE__*/ createWriteContract({
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"addOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterAddOperator = /*#__PURE__*/ createWriteContract({
   abi: contextRouterAbi,
@@ -2942,8 +3027,8 @@ export const writeContextRouterAddOperator = /*#__PURE__*/ createWriteContract({
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimEarnings"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterClaimEarnings =
   /*#__PURE__*/ createWriteContract({
@@ -2955,8 +3040,8 @@ export const writeContextRouterClaimEarnings =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimPlatformFees"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterClaimPlatformFees =
   /*#__PURE__*/ createWriteContract({
@@ -2968,8 +3053,8 @@ export const writeContextRouterClaimPlatformFees =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecuteBatchPaidQuery =
   /*#__PURE__*/ createWriteContract({
@@ -2981,8 +3066,8 @@ export const writeContextRouterExecuteBatchPaidQuery =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecuteBatchPaidQueryFor =
   /*#__PURE__*/ createWriteContract({
@@ -2992,10 +3077,36 @@ export const writeContextRouterExecuteBatchPaidQueryFor =
   })
 
 /**
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCost"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const writeContextRouterExecuteBatchQueryWithModelCost =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCost',
+  })
+
+/**
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCostFor"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const writeContextRouterExecuteBatchQueryWithModelCostFor =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCostFor',
+  })
+
+/**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecutePaidQuery =
   /*#__PURE__*/ createWriteContract({
@@ -3007,8 +3118,8 @@ export const writeContextRouterExecutePaidQuery =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecutePaidQueryFor =
   /*#__PURE__*/ createWriteContract({
@@ -3020,8 +3131,8 @@ export const writeContextRouterExecutePaidQueryFor =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCost"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecuteQueryWithModelCost =
   /*#__PURE__*/ createWriteContract({
@@ -3033,8 +3144,8 @@ export const writeContextRouterExecuteQueryWithModelCost =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCostFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterExecuteQueryWithModelCostFor =
   /*#__PURE__*/ createWriteContract({
@@ -3046,8 +3157,8 @@ export const writeContextRouterExecuteQueryWithModelCostFor =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"removeOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterRemoveOperator =
   /*#__PURE__*/ createWriteContract({
@@ -3059,8 +3170,8 @@ export const writeContextRouterRemoveOperator =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"renounceOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterRenounceOwnership =
   /*#__PURE__*/ createWriteContract({
@@ -3072,8 +3183,8 @@ export const writeContextRouterRenounceOwnership =
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const writeContextRouterTransferOwnership =
   /*#__PURE__*/ createWriteContract({
@@ -3085,8 +3196,8 @@ export const writeContextRouterTransferOwnership =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouter = /*#__PURE__*/ createSimulateContract({
   abi: contextRouterAbi,
@@ -3096,8 +3207,8 @@ export const simulateContextRouter = /*#__PURE__*/ createSimulateContract({
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"addOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterAddOperator =
   /*#__PURE__*/ createSimulateContract({
@@ -3109,8 +3220,8 @@ export const simulateContextRouterAddOperator =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimEarnings"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterClaimEarnings =
   /*#__PURE__*/ createSimulateContract({
@@ -3122,8 +3233,8 @@ export const simulateContextRouterClaimEarnings =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimPlatformFees"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterClaimPlatformFees =
   /*#__PURE__*/ createSimulateContract({
@@ -3135,8 +3246,8 @@ export const simulateContextRouterClaimPlatformFees =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecuteBatchPaidQuery =
   /*#__PURE__*/ createSimulateContract({
@@ -3148,8 +3259,8 @@ export const simulateContextRouterExecuteBatchPaidQuery =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchPaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecuteBatchPaidQueryFor =
   /*#__PURE__*/ createSimulateContract({
@@ -3159,10 +3270,36 @@ export const simulateContextRouterExecuteBatchPaidQueryFor =
   })
 
 /**
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCost"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const simulateContextRouterExecuteBatchQueryWithModelCost =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCost',
+  })
+
+/**
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeBatchQueryWithModelCostFor"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ */
+export const simulateContextRouterExecuteBatchQueryWithModelCostFor =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'executeBatchQueryWithModelCostFor',
+  })
+
+/**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQuery"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecutePaidQuery =
   /*#__PURE__*/ createSimulateContract({
@@ -3174,8 +3311,8 @@ export const simulateContextRouterExecutePaidQuery =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executePaidQueryFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecutePaidQueryFor =
   /*#__PURE__*/ createSimulateContract({
@@ -3187,8 +3324,8 @@ export const simulateContextRouterExecutePaidQueryFor =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCost"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecuteQueryWithModelCost =
   /*#__PURE__*/ createSimulateContract({
@@ -3200,8 +3337,8 @@ export const simulateContextRouterExecuteQueryWithModelCost =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"executeQueryWithModelCostFor"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterExecuteQueryWithModelCostFor =
   /*#__PURE__*/ createSimulateContract({
@@ -3213,8 +3350,8 @@ export const simulateContextRouterExecuteQueryWithModelCostFor =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"removeOperator"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterRemoveOperator =
   /*#__PURE__*/ createSimulateContract({
@@ -3226,8 +3363,8 @@ export const simulateContextRouterRemoveOperator =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"renounceOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterRenounceOwnership =
   /*#__PURE__*/ createSimulateContract({
@@ -3239,8 +3376,8 @@ export const simulateContextRouterRenounceOwnership =
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const simulateContextRouterTransferOwnership =
   /*#__PURE__*/ createSimulateContract({
@@ -3252,8 +3389,8 @@ export const simulateContextRouterTransferOwnership =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterEvent = /*#__PURE__*/ createWatchContractEvent({
   abi: contextRouterAbi,
@@ -3263,8 +3400,8 @@ export const watchContextRouterEvent = /*#__PURE__*/ createWatchContractEvent({
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"EarningsClaimed"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterEarningsClaimedEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3276,8 +3413,8 @@ export const watchContextRouterEarningsClaimedEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"ModelCostPaid"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterModelCostPaidEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3289,8 +3426,8 @@ export const watchContextRouterModelCostPaidEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OperatorAdded"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterOperatorAddedEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3302,8 +3439,8 @@ export const watchContextRouterOperatorAddedEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OperatorRemoved"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterOperatorRemovedEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3315,8 +3452,8 @@ export const watchContextRouterOperatorRemovedEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"OwnershipTransferred"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterOwnershipTransferredEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3328,8 +3465,8 @@ export const watchContextRouterOwnershipTransferredEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"PlatformFeesClaimed"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterPlatformFeesClaimedEvent =
   /*#__PURE__*/ createWatchContractEvent({
@@ -3341,8 +3478,8 @@ export const watchContextRouterPlatformFeesClaimedEvent =
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"QueryPaid"`
  *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x676645eF4d3133181572622DABFaeC2170Db670B)
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0xA2e75c0BdeB99a261AF06dEcBCf65dAae745F6a4)
  */
 export const watchContextRouterQueryPaidEvent =
   /*#__PURE__*/ createWatchContractEvent({

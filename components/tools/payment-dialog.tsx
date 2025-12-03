@@ -21,6 +21,10 @@ export type PaymentBreakdown = {
   toolCost: number;
   modelCost: number;
   totalCost: number;
+  /** Confidence level for model cost estimate */
+  modelCostConfidence?: "high" | "low" | "default";
+  /** Flow type for display purposes */
+  flowType?: "manual_simple" | "manual_tools" | "auto_mode";
 };
 
 export function PaymentDialog({
@@ -90,10 +94,13 @@ export function PaymentDialog({
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">
                     AI model{" "}
-                    <span className="text-muted-foreground/60">(est.)</span>
+                    <span className="text-muted-foreground/60">
+                      (est.{breakdown.modelCostConfidence === "high" ? "" : " ~"})
+                    </span>
                   </span>
                   <span className="font-mono">
-                    ~${formatPrice(breakdown.modelCost)}
+                    {breakdown.modelCostConfidence === "high" ? "$" : "~$"}
+                    {formatPrice(breakdown.modelCost)}
                   </span>
                 </div>
               )}

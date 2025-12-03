@@ -30,6 +30,11 @@ import {
   FREE_TIER_DAILY_LIMIT,
   type UserTier,
 } from "@/lib/ai/entitlements";
+import {
+  determineFlowType,
+  type FlowType,
+  recordActualCost,
+} from "@/lib/ai/cost-estimation";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   buildToolSelectionPrompt,
@@ -577,6 +582,21 @@ export async function POST(request: Request) {
 
     let finalMergedUsage: AppUsage | undefined;
 
+    // === DYNAMIC COST ESTIMATION: Track flow type and AI calls ===
+    // Determine flow type for cost tracking
+    const flowType: FlowType = determineFlowType(
+      isAutoMode,
+      paidTools.length > 0 || isAutoModeExecution
+    );
+    let aiCallCount = 0;
+    let totalActualCost = 0;
+    // Get estimated cost upfront (base cost * flow multiplier)
+    // Multipliers account for self-healing retries (up to 2 per execution)
+    const baseCostEstimate = getEstimatedModelCost(selectedChatModel);
+    const flowMultiplier =
+      flowType === "auto_mode" ? 5.0 : flowType === "manual_tools" ? 3.0 : 1.0;
+    const estimatedTotalCost = baseCostEstimate * flowMultiplier;
+
     // Branch 1: no paid tools selected AND Auto Mode is OFF → simple streaming chat.
     // When Auto Mode is ON, we need the agentic loop to execute searchMarketplace().
     if (paidTools.length === 0 && !isAutoMode) {
@@ -599,6 +619,8 @@ export async function POST(request: Request) {
               functionId: "stream-text",
             },
             onFinish: async ({ usage }) => {
+              // Track AI call for cost estimation
+              aiCallCount++;
               try {
                 const providers = await getTokenlensCatalog();
                 const modelId =
@@ -627,6 +649,10 @@ export async function POST(request: Request) {
                   ...summary,
                   modelId,
                 } as AppUsage;
+                // Track actual cost for dynamic estimation
+                if (finalMergedUsage.costUSD?.totalUSD) {
+                  totalActualCost += Number(finalMergedUsage.costUSD.totalUSD);
+                }
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -675,37 +701,25 @@ export async function POST(request: Request) {
                 context: finalMergedUsage,
               });
 
-              // Phase 2: Track estimated vs actual cost for model cost baking
-              const estimatedCost = getEstimatedModelCost(selectedChatModel);
-              const actualCost =
-                finalMergedUsage.costUSD?.totalUSD !== undefined
-                  ? Number(finalMergedUsage.costUSD.totalUSD)
-                  : 0;
-              const costDelta = actualCost - estimatedCost;
-
-              console.log("[cost-tracking] Model cost comparison:", {
-                chatId: id,
-                model: selectedChatModel,
-                userTier,
-                estimatedCost: `$${estimatedCost.toFixed(6)}`,
-                actualCost: `$${actualCost.toFixed(6)}`,
-                delta: `$${costDelta.toFixed(6)}`,
-                deltaPercent:
-                  estimatedCost > 0
-                    ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
-                    : "N/A",
-              });
-
               // Track actual cost for convenience tier
+              const actualCost = totalActualCost > 0 ? totalActualCost : 
+                (finalMergedUsage.costUSD?.totalUSD !== undefined
+                  ? Number(finalMergedUsage.costUSD.totalUSD)
+                  : 0);
+
               if (userTier === "convenience" && actualCost > 0) {
                 await addAccumulatedModelCost(session.user.id, actualCost);
-                console.log(
-                  "[cost-tracking] Accumulated model cost for convenience tier:",
-                  {
-                    userId: session.user.id,
-                    costAdded: actualCost,
-                  }
-                );
+                
+                // Record cost for dynamic estimation feedback loop
+                await recordActualCost({
+                  userId: session.user.id,
+                  chatId: id,
+                  modelId: selectedChatModel,
+                  flowType,
+                  estimatedCost: estimatedTotalCost,
+                  actualCost,
+                  aiCallCount,
+                });
               }
             } catch (err) {
               console.warn("Unable to persist last usage for chat", id, err);
@@ -869,6 +883,9 @@ export async function POST(request: Request) {
                 }
               }
             }
+
+            // Track AI call for cost estimation (tool selection)
+            aiCallCount++;
 
             selectionText = selectionText.trim();
 
@@ -1048,6 +1065,8 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                 stopWhen: stepCountIs(5),
                 experimental_transform: smoothStream({ chunking: "word" }),
                 onFinish: async ({ usage }) => {
+                  // Track AI call for cost estimation (no-tools final response)
+                  aiCallCount++;
                   try {
                     const providers = await getTokenlensCatalog();
                     const modelId =
@@ -1061,6 +1080,10 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                       } as AppUsage;
                     } else {
                       finalMergedUsage = usage;
+                    }
+                    // Track actual cost for dynamic estimation
+                    if (finalMergedUsage?.costUSD?.totalUSD) {
+                      totalActualCost += Number(finalMergedUsage.costUSD.totalUSD);
                     }
                     dataStream.write({
                       type: "data-usage",
@@ -1265,6 +1288,9 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
             }
           }
 
+          // Track AI call for cost estimation (planning)
+          aiCallCount++;
+
           planningText = planningText.trim();
           console.log("[chat-api] planning response (truncated)", {
             chatId: id,
@@ -1339,6 +1365,9 @@ The user asked: "${message.parts
                   { role: "user" as const, content: retryPrompt },
                 ],
               });
+
+              // Track AI call for cost estimation (retry)
+              aiCallCount++;
 
               const retryCode = extractCodeBlock(retryResult.text);
               if (retryCode) {
@@ -1849,6 +1878,8 @@ ${devPrefix}`;
               functionId: "stream-text",
             },
             onFinish: async ({ usage }) => {
+              // Track AI call for cost estimation (final response)
+              aiCallCount++;
               try {
                 const providers = await getTokenlensCatalog();
                 const modelId =
@@ -1877,6 +1908,10 @@ ${devPrefix}`;
                   ...summary,
                   modelId,
                 } as AppUsage;
+                // Track actual cost for dynamic estimation
+                if (finalMergedUsage.costUSD?.totalUSD) {
+                  totalActualCost += Number(finalMergedUsage.costUSD.totalUSD);
+                }
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -1932,37 +1967,25 @@ ${devPrefix}`;
               context: finalMergedUsage,
             });
 
-            // Phase 2: Track estimated vs actual cost for model cost baking
-            const estimatedCost = getEstimatedModelCost(selectedChatModel);
-            const actualCost =
-              finalMergedUsage.costUSD?.totalUSD !== undefined
-                ? Number(finalMergedUsage.costUSD.totalUSD)
-                : 0;
-            const costDelta = actualCost - estimatedCost;
-
-            console.log("[cost-tracking] Model cost comparison (paid tools):", {
-              chatId: id,
-              model: selectedChatModel,
-              userTier,
-              estimatedCost: `$${estimatedCost.toFixed(6)}`,
-              actualCost: `$${actualCost.toFixed(6)}`,
-              delta: `$${costDelta.toFixed(6)}`,
-              deltaPercent:
-                estimatedCost > 0
-                  ? `${((costDelta / estimatedCost) * 100).toFixed(1)}%`
-                  : "N/A",
-            });
-
             // Track actual cost for convenience tier
+            const actualCost = totalActualCost > 0 ? totalActualCost :
+              (finalMergedUsage.costUSD?.totalUSD !== undefined
+                ? Number(finalMergedUsage.costUSD.totalUSD)
+                : 0);
+
             if (userTier === "convenience" && actualCost > 0) {
               await addAccumulatedModelCost(session.user.id, actualCost);
-              console.log(
-                "[cost-tracking] Accumulated model cost for convenience tier:",
-                {
-                  userId: session.user.id,
-                  costAdded: actualCost,
-                }
-              );
+              
+              // Record cost for dynamic estimation feedback loop
+              await recordActualCost({
+                userId: session.user.id,
+                chatId: id,
+                modelId: selectedChatModel,
+                flowType,
+                estimatedCost: estimatedTotalCost,
+                actualCost,
+                aiCallCount,
+              });
             }
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);

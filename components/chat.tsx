@@ -26,6 +26,7 @@ import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { useDebugMode } from "@/hooks/use-debug-mode";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
+import { useUserSettings } from "@/hooks/use-user-settings";
 import { contextRouterAbi } from "@/lib/generated";
 import { getEstimatedModelCost } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
@@ -107,6 +108,7 @@ export function Chat({
   const { isAutoMode, recordSpend } = useAutoPay();
   const autoModeRef = useRef(isAutoMode);
   const { client: smartWalletClient } = useSmartWallets();
+  const { settings } = useUserSettings();
 
   // Throttled streaming updates to prevent animation freeze
   // Buffer the latest values and commit at intervals
@@ -218,38 +220,70 @@ export function Chat({
         return sum + parseUnits(tool.price ?? "0", 6);
       }, 0n);
 
-      // Calculate model cost for logging (platform absorbs this cost via 10% fee)
-      const modelCostUSD = getEstimatedModelCost(currentModelIdRef.current);
+      // Calculate model cost - convenience tier users pay model costs
+      // Auto Mode uses 5x multiplier: discovery + selection + planning + self-healing + execution
+      const baseModelCost = getEstimatedModelCost(currentModelIdRef.current);
+      const autoModeMultiplier = 5.0; // Matches DEFAULT_MULTIPLIERS.auto_mode in cost-estimation.ts
+      const modelCostUSD = baseModelCost * autoModeMultiplier;
+      const isConvenienceTier = settings.tier === "convenience";
+      const modelCostUnits = isConvenienceTier 
+        ? parseUnits(modelCostUSD.toFixed(6), 6)
+        : 0n;
 
-      // Record ONLY tool fees against budget (model cost is platform operational expense)
+      // Record total spend against budget (tool fees + model cost for convenience tier)
       const toolFeesUSD = Number(toolFees) / 1_000_000;
-      recordSpend(toolFeesUSD);
+      const totalSpend = toolFeesUSD + (isConvenienceTier ? modelCostUSD : 0);
+      recordSpend(totalSpend);
 
       console.log("[chat-client] Auto Mode payment breakdown", {
         toolFees: toolFeesUSD,
-        modelCost: modelCostUSD,
-        note: "Model cost absorbed by platform via 10% fee",
+        modelCost: isConvenienceTier ? modelCostUSD : 0,
+        total: totalSpend,
+        tier: settings.tier,
       });
 
-      // Encode batch payment transaction
-      // Note: Model costs are tracked for budget purposes but NOT included in on-chain payments
-      // Reason: The ContextRouter does 90/10 split - model costs are a pass-through, not developer revenue
-      // The 10% platform fee from tool payments covers operational costs including model API fees
-      // TODO: Future contract upgrade could add separate model cost payment mechanism
-      const toolIds = toolSelection.selectedTools.map(() => 0n); // Tool IDs not used in contract
-      const developerWallets = toolSelection.selectedTools.map(
-        (t) => t.developerWallet as `0x${string}`
-      );
-      // Each developer gets exactly their tool price - no model cost included
-      const amounts = toolSelection.selectedTools.map((t) =>
-        parseUnits(t.price ?? "0", 6)
-      );
+      // Encode payment transaction
+      let txData: Hex;
+      
+      if (toolSelection.selectedTools.length === 1 && isConvenienceTier) {
+        // Single tool with model cost - use executeQueryWithModelCost
+        const tool = toolSelection.selectedTools[0];
+        txData = encodeFunctionData({
+          abi: contextRouterAbi,
+          functionName: "executeQueryWithModelCost",
+          args: [
+            0n, // toolId not used
+            tool.developerWallet as `0x${string}`,
+            parseUnits(tool.price ?? "0", 6), // Tool amount (90/10 split)
+            modelCostUnits, // Model cost (100% to platform)
+          ],
+        });
+      } else {
+        // Batch payment
+        const toolIds = toolSelection.selectedTools.map(() => 0n);
+        const developerWallets = toolSelection.selectedTools.map(
+          (t) => t.developerWallet as `0x${string}`
+        );
+        const amounts = toolSelection.selectedTools.map((t) =>
+          parseUnits(t.price ?? "0", 6)
+        );
 
-      const txData = encodeFunctionData({
-        abi: contextRouterAbi,
-        functionName: "executeBatchPaidQuery",
-        args: [toolIds, developerWallets, amounts],
-      });
+        if (isConvenienceTier) {
+          // Convenience tier: use executeBatchQueryWithModelCost
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchQueryWithModelCost",
+            args: [toolIds, developerWallets, amounts, modelCostUnits],
+          });
+        } else {
+          // Free/BYOK tier: only tool fees, no model cost
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchPaidQuery",
+            args: [toolIds, developerWallets, amounts],
+          });
+        }
+      }
 
       console.log("[chat-client] Sending batch payment transaction");
 

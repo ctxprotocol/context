@@ -10,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -318,3 +319,66 @@ export const toolReport = pgTable("ToolReport", {
 });
 
 export type ToolReport = InferSelectModel<typeof toolReport>;
+
+// ============================================================================
+// MODEL COST TRACKING (Dynamic Estimation)
+// ============================================================================
+
+/**
+ * Flow types for cost estimation
+ * - manual_simple: Single AI call, no tools
+ * - manual_tools: Manual mode with tools (planning + execution)
+ * - auto_mode: Auto mode with discovery + selection + planning + execution
+ */
+export type FlowType = "manual_simple" | "manual_tools" | "auto_mode";
+
+/**
+ * Model cost history for dynamic estimation
+ * Tracks actual vs estimated costs per flow type for feedback loop
+ */
+export const modelCostHistory = pgTable("ModelCostHistory", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id").notNull(),
+  chatId: uuid("chat_id").notNull(),
+  modelId: text("model_id").notNull(),
+
+  // Flow classification
+  flowType: text("flow_type").notNull().$type<FlowType>(),
+
+  // Cost tracking
+  estimatedCost: numeric("estimated_cost", { precision: 18, scale: 6 }).notNull(),
+  actualCost: numeric("actual_cost", { precision: 18, scale: 6 }).notNull(),
+  aiCallCount: integer("ai_call_count").notNull().default(1),
+
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type ModelCostHistory = InferSelectModel<typeof modelCostHistory>;
+
+/**
+ * Flow cost multipliers - learned from historical data
+ * Updated via exponential moving average
+ */
+export const flowCostMultipliers = pgTable(
+  "FlowCostMultipliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    modelId: text("model_id").notNull(),
+    flowType: text("flow_type").notNull().$type<FlowType>(),
+
+    // Learned multiplier (how many times base estimate)
+    multiplier: numeric("multiplier", { precision: 10, scale: 4 })
+      .notNull()
+      .default("1.0"),
+
+    // Confidence tracking
+    sampleCount: integer("sample_count").notNull().default(0),
+    lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqueModelFlow: unique().on(table.modelId, table.flowType),
+  })
+);
+
+export type FlowCostMultiplier = InferSelectModel<typeof flowCostMultipliers>;

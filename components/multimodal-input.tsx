@@ -389,10 +389,13 @@ function PureMultimodalInput({
           0
         );
         // Model cost only applies to convenience tier - free/BYOK users don't pay model costs
+        // Apply flow multiplier heuristic: manual_tools = 3x (planning + self-healing + final)
+        // Note: These match the backend DEFAULT_MULTIPLIERS in cost-estimation.ts
+        const baseCost = getEstimatedModelCost(selectedModelId);
+        const hasTools = toolsToPay.length > 0;
+        const flowMultiplier = hasTools ? 3.0 : 1.0; // manual_tools vs manual_simple
         const modelCost =
-          settings.tier === "convenience"
-            ? getEstimatedModelCost(selectedModelId)
-            : 0;
+          settings.tier === "convenience" ? baseCost * flowMultiplier : 0;
         const totalCost = toolCost + modelCost;
 
         // If there are paid tools, handle payment (model cost alone doesn't require payment for non-convenience tiers)
@@ -756,10 +759,12 @@ function PureMultimodalInput({
 
     // Model cost only applies to convenience tier - free/BYOK users don't pay model costs upfront
     // (BYOK users pay directly to their provider, free tier model costs are absorbed by platform)
+    // Apply flow multiplier: manual_tools = 3x (planning + self-healing + final response)
+    const baseCostUSD = getEstimatedModelCost(selectedModelId);
+    const hasToolsForPayment = toolsToPay.length > 0;
+    const paymentFlowMultiplier = hasToolsForPayment ? 3.0 : 1.0;
     const modelCostUSD =
-      settings.tier === "convenience"
-        ? getEstimatedModelCost(selectedModelId)
-        : 0;
+      settings.tier === "convenience" ? baseCostUSD * paymentFlowMultiplier : 0;
     const modelCostUnits = parseUnits(modelCostUSD.toFixed(6), 6);
 
     // Total amount = tool fees + model cost (model cost only for convenience tier)
@@ -861,13 +866,22 @@ function PureMultimodalInput({
           const amounts = toolsToPay.map((t) =>
             parseUnits(t.pricePerQuery ?? "0.00", 6)
           );
-          // Note: Batch with model cost not yet implemented in contract
-          // For now, batch payments don't include model cost separation
-          txData = encodeFunctionData({
-            abi: contextRouterAbi,
-            functionName: "executeBatchPaidQuery",
-            args: [toolIds, developerWallets, amounts],
-          });
+
+          if (hasModelCost) {
+            // Convenience tier: use executeBatchQueryWithModelCost
+            txData = encodeFunctionData({
+              abi: contextRouterAbi,
+              functionName: "executeBatchQueryWithModelCost",
+              args: [toolIds, developerWallets, amounts, modelCostUnits],
+            });
+          } else {
+            // Free/BYOK tier: only tool fees, no model cost
+            txData = encodeFunctionData({
+              abi: contextRouterAbi,
+              functionName: "executeBatchPaidQuery",
+              args: [toolIds, developerWallets, amounts],
+            });
+          }
         }
 
         // Send via smart wallet with AUTO-SIGNING
@@ -1016,12 +1030,22 @@ function PureMultimodalInput({
         const amounts = toolsToPay.map((t) =>
           parseUnits(t.pricePerQuery ?? "0.00", 6)
         );
-        // Note: Batch with model cost not yet implemented in contract
-        txData = encodeFunctionData({
-          abi: contextRouterAbi,
-          functionName: "executeBatchPaidQuery",
-          args: [toolIds, developerWallets, amounts],
-        });
+
+        if (hasModelCost) {
+          // Convenience tier: use executeBatchQueryWithModelCost
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchQueryWithModelCost",
+            args: [toolIds, developerWallets, amounts, modelCostUnits],
+          });
+        } else {
+          // Free/BYOK tier: only tool fees, no model cost
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchPaidQuery",
+            args: [toolIds, developerWallets, amounts],
+          });
+        }
       }
 
       // Send via smart wallet WITH confirmation popup (gas sponsored!)
@@ -1312,16 +1336,18 @@ function PureMultimodalInput({
       {selectedTool || activeTools.length > 0
         ? (() => {
             // Calculate cost breakdown for payment dialog
-            const toolCost = selectedTool
-              ? Number(selectedTool.pricePerQuery ?? 0)
-              : activeTools.reduce(
-                  (sum, t) => sum + Number(t.pricePerQuery ?? 0),
-                  0
-                );
+            const toolsToPay = selectedTool ? [selectedTool] : activeTools;
+            const toolCost = toolsToPay.reduce(
+              (sum, t) => sum + Number(t.pricePerQuery ?? 0),
+              0
+            );
             // Model cost only shown for convenience tier users
+            // Apply flow multiplier: manual_tools = 3x (planning + self-healing + final)
+            const baseModelCost = getEstimatedModelCost(selectedModelId);
+            const dialogFlowMultiplier = toolsToPay.length > 0 ? 3.0 : 1.0;
             const modelCost =
               settings.tier === "convenience"
-                ? getEstimatedModelCost(selectedModelId)
+                ? baseModelCost * dialogFlowMultiplier
                 : 0;
             const totalCost = toolCost + modelCost;
             const breakdown: PaymentBreakdown = {

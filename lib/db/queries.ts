@@ -1633,3 +1633,11 @@ export async function resetAccumulatedModelCost(userId: string): Promise<void> {
     );
   }
 }
+
+// ============================================================================
+// MODEL COST ESTIMATION QUERIES
+// Note: Main cost estimation logic is in lib/ai/cost-estimation.ts
+// These are convenience re-exports for components that need type access
+// ============================================================================
+
+export type { FlowType } from "./schema";

@@ -323,6 +323,111 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice User pays for multiple tools with model cost in a single transaction
+     * @dev For Convenience tier batch payments - combines tool fees + model cost
+     * @param toolIds Array of tool IDs being used
+     * @param developerWallets Array of wallet addresses for each tool's creator
+     * @param amounts Array of amounts to pay for each tool in USDC (90/10 split each)
+     * @param modelCost The model cost amount (100% to platform)
+     */
+    function executeBatchQueryWithModelCost(
+        uint256[] calldata toolIds,
+        address[] calldata developerWallets,
+        uint256[] calldata amounts,
+        uint256 modelCost
+    ) external nonReentrant {
+        require(toolIds.length == developerWallets.length, "Array length mismatch");
+        require(toolIds.length == amounts.length, "Array length mismatch");
+        require(toolIds.length > 0 || modelCost > 0, "No payment specified");
+
+        // Calculate total tool amount needed
+        uint256 totalToolAmount = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            require(developerWallets[i] != address(0), "Invalid developer address");
+            totalToolAmount += amounts[i];
+        }
+
+        uint256 totalAmount = totalToolAmount + modelCost;
+        require(totalAmount > 0, "Total amount must be greater than 0");
+
+        // Transfer total USDC from user to this contract (ONE transaction)
+        usdc.safeTransferFrom(msg.sender, address(this), totalAmount);
+
+        // Split payments to each developer (90/10 split)
+        for (uint256 i = 0; i < toolIds.length; i++) {
+            if (amounts[i] > 0) {
+                uint256 platformFee = (amounts[i] * PLATFORM_FEE_PERCENT) / 100;
+                uint256 developerEarning = amounts[i] - platformFee;
+
+                developerBalances[developerWallets[i]] += developerEarning;
+                platformBalance += platformFee;
+
+                emit QueryPaid(toolIds[i], msg.sender, developerWallets[i], amounts[i], platformFee);
+            }
+        }
+
+        // Handle model cost (100% to platform)
+        if (modelCost > 0) {
+            platformBalance += modelCost;
+            emit ModelCostPaid(msg.sender, modelCost);
+        }
+    }
+
+    /**
+     * @notice Operator triggers batch payment with model cost on behalf of user
+     * @dev For Auto Mode with Convenience tier - combines multiple tool fees + model cost
+     * @param user The user's wallet address
+     * @param toolIds Array of tool IDs being used
+     * @param developerWallets Array of wallet addresses for each tool's creator
+     * @param amounts Array of amounts to pay for each tool in USDC (90/10 split each)
+     * @param modelCost The model cost amount (100% to platform)
+     */
+    function executeBatchQueryWithModelCostFor(
+        address user,
+        uint256[] calldata toolIds,
+        address[] calldata developerWallets,
+        uint256[] calldata amounts,
+        uint256 modelCost
+    ) external onlyOperator nonReentrant {
+        require(user != address(0), "Invalid user address");
+        require(toolIds.length == developerWallets.length, "Array length mismatch");
+        require(toolIds.length == amounts.length, "Array length mismatch");
+        require(toolIds.length > 0 || modelCost > 0, "No payment specified");
+
+        // Calculate total tool amount needed
+        uint256 totalToolAmount = 0;
+        for (uint256 i = 0; i < amounts.length; i++) {
+            require(developerWallets[i] != address(0), "Invalid developer address");
+            totalToolAmount += amounts[i];
+        }
+
+        uint256 totalAmount = totalToolAmount + modelCost;
+        require(totalAmount > 0, "Total amount must be greater than 0");
+
+        // Transfer total USDC from user to this contract (ONE transaction)
+        usdc.safeTransferFrom(user, address(this), totalAmount);
+
+        // Split payments to each developer (90/10 split)
+        for (uint256 i = 0; i < toolIds.length; i++) {
+            if (amounts[i] > 0) {
+                uint256 platformFee = (amounts[i] * PLATFORM_FEE_PERCENT) / 100;
+                uint256 developerEarning = amounts[i] - platformFee;
+
+                developerBalances[developerWallets[i]] += developerEarning;
+                platformBalance += platformFee;
+
+                emit QueryPaid(toolIds[i], user, developerWallets[i], amounts[i], platformFee);
+            }
+        }
+
+        // Handle model cost (100% to platform)
+        if (modelCost > 0) {
+            platformBalance += modelCost;
+            emit ModelCostPaid(user, modelCost);
+        }
+    }
+
+    /**
      * @notice Developer claims their accumulated earnings
      * @dev Can only claim your own balance
      */
