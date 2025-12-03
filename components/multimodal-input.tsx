@@ -136,7 +136,11 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const { selectedTool, clearTool } = useToolSelection();
-  const { activeTools } = useSessionTools();
+  const {
+    activeTools,
+    loading: toolsLoading,
+    activeToolIds,
+  } = useSessionTools();
   // Get user tier to determine if model costs should be included (only for convenience tier)
   const { settings } = useUserSettings();
   const primaryTool: ToolListItem | null =
@@ -176,6 +180,11 @@ function PureMultimodalInput({
   // Once payment is confirmed, re-enable input even during planning/executing stages
   const isPaymentInProgress =
     stage === "setting-cap" || stage === "confirming-payment";
+
+  // Block sending if tools are loading AND user has selected tools AND not in auto mode
+  // This prevents a race condition where activeTools is empty while tools are still loading
+  const isWaitingForTools =
+    toolsLoading && activeToolIds.length > 0 && !isAutoMode;
 
   // Detect mismatch between Privy active wallet and wagmi account.
   // If this happens while we *think* we're using an embedded wallet,
@@ -1322,6 +1331,7 @@ function PureMultimodalInput({
                 disabled={
                   isReadonly ||
                   isPaymentInProgress ||
+                  isWaitingForTools ||
                   !input.trim() ||
                   uploadQueue.length > 0
                 }
