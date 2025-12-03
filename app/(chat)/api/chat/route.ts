@@ -1830,6 +1830,7 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
 - Use that summary (and the full conversation) to answer the user's question in clear, natural language.
 - Instead, explain the key findings, numbers, and rankings in a concise way.
 - If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.
+- If the result includes a saved file URL (blob.vercel-storage.com), do NOT write the URL in your response. The UI automatically displays a download card. Simply mention that the data was saved.
 
 Anti-Hallucination Rules:
 - Any chains, chain IDs, gas prices, or other numeric values you mention **MUST** appear explicitly in the JSON in the execution summary.
