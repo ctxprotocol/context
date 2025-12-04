@@ -1,7 +1,7 @@
 "use client";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { ChevronDownIcon, ChevronRightIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,9 +37,9 @@ export function ToolContext({
         type="button"
       >
         {isExpanded ? (
-          <ChevronDownIcon className="size-4 shrink-0" />
+          <ChevronDown className="size-4 shrink-0" />
         ) : (
-          <ChevronRightIcon className="size-4 shrink-0" />
+          <ChevronRight className="size-4 shrink-0" />
         )}
         <span className="font-medium text-muted-foreground">
           Tool: {toolName}
