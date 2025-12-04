@@ -45,6 +45,8 @@ export type CustomUIDataTypes = {
   usage: AppUsage;
   debugCode: string;
   debugResult: string;
+  toolStatus: { status: string };
+  executionProgress: { type: string; toolName: string; message: string; timestamp: number };
 };
 
 export type ChatMessage = UIMessage<
