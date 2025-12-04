@@ -2,6 +2,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
+import { useDebugMode } from "@/hooks/use-debug-mode";
 import { useMessages } from "@/hooks/use-messages";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
@@ -28,6 +29,7 @@ function PureArtifactMessages({
   regenerate,
   isReadonly,
 }: ArtifactMessagesProps) {
+  const { isDebugMode } = useDebugMode();
   const {
     containerRef: messagesContainerRef,
     endRef: messagesEndRef,
@@ -46,6 +48,7 @@ function PureArtifactMessages({
       {messages.map((message, index) => (
         <PreviewMessage
           chatId={chatId}
+          isDebugMode={isDebugMode}
           isLoading={status === "streaming" && index === messages.length - 1}
           isReadonly={isReadonly}
           key={message.id}
@@ -64,7 +67,7 @@ function PureArtifactMessages({
       ))}
 
       <AnimatePresence mode="wait">
-        {status === "submitted" && <ThinkingMessage key="thinking" />}
+        {status === "submitted" && <ThinkingMessage isDebugMode={isDebugMode} key="thinking" />}
       </AnimatePresence>
 
       <motion.div
