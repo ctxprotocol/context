@@ -40,7 +40,7 @@ export default async function ContributePage() {
           </p>
         </div>
         <Suspense fallback={<CardSkeleton />}>
-          <ContributeForm developerWallet={session.user.walletAddress || ""} />
+          <ContributeForm />
         </Suspense>
       </div>
     </div>
