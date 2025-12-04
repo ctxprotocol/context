@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
-import { contributeFormSchema, type ContributeFormState } from "./schema";
+import { type ContributeFormState, contributeFormSchema } from "./schema";
 
 /**
  * Determine the appropriate transport type based on endpoint URL pattern
@@ -18,11 +18,11 @@ import { contributeFormSchema, type ContributeFormState } from "./schema";
 function detectTransportType(endpoint: string): "sse" | "http-streaming" {
   const url = new URL(endpoint);
   const pathname = url.pathname.toLowerCase();
-  
-  if (pathname.endsWith('/sse') || pathname.includes('sse')) {
+
+  if (pathname.endsWith("/sse") || pathname.includes("sse")) {
     return "sse";
   }
-  
+
   return "http-streaming";
 }
 
@@ -32,17 +32,23 @@ function detectTransportType(endpoint: string): "sse" | "http-streaming" {
  */
 async function connectAndListTools(endpoint: string): Promise<{
   client: Client;
-  tools: Array<{ name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }>;
+  tools: Array<{
+    name: string;
+    description?: string;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+  }>;
   transportUsed: string;
 }> {
   const url = new URL(endpoint);
   const transportType = detectTransportType(endpoint);
-  
+
   // Try primary transport first
-  const primaryTransport = transportType === "sse"
-    ? new SSEClientTransport(url)
-    : new StreamableHTTPClientTransport(url);
-  
+  const primaryTransport =
+    transportType === "sse"
+      ? new SSEClientTransport(url)
+      : new StreamableHTTPClientTransport(url);
+
   const client = new Client(
     { name: "context-verification", version: "1.0.0" },
     { capabilities: {} }
@@ -51,7 +57,7 @@ async function connectAndListTools(endpoint: string): Promise<{
   try {
     await client.connect(primaryTransport);
     const result = await client.listTools();
-    
+
     return {
       client,
       tools: result.tools.map((t) => ({
@@ -65,18 +71,21 @@ async function connectAndListTools(endpoint: string): Promise<{
   } catch (primaryError) {
     // If primary fails and it was HTTP Streaming, try SSE fallback
     if (transportType === "http-streaming") {
-      console.log("[contribute] HTTP Streaming failed, trying SSE fallback for:", endpoint);
-      
+      console.log(
+        "[contribute] HTTP Streaming failed, trying SSE fallback for:",
+        endpoint
+      );
+
       const fallbackClient = new Client(
         { name: "context-verification", version: "1.0.0" },
         { capabilities: {} }
       );
-      
+
       try {
         const sseTransport = new SSEClientTransport(url);
         await fallbackClient.connect(sseTransport);
         const result = await fallbackClient.listTools();
-        
+
         return {
           client: fallbackClient,
           tools: result.tools.map((t) => ({
@@ -92,7 +101,7 @@ async function connectAndListTools(endpoint: string): Promise<{
         throw primaryError;
       }
     }
-    
+
     // SSE was primary and failed, no fallback
     throw primaryError;
   }
@@ -111,7 +120,6 @@ export async function submitTool(
     name: formData.get("name"),
     description: formData.get("description"),
     category: formData.get("category") || undefined,
-    kind: formData.get("kind") || "mcp",
     endpoint: formData.get("endpoint"),
     price: formData.get("price"),
     developerWallet: formData.get("developerWallet"),
@@ -138,123 +146,90 @@ export async function submitTool(
     };
   }
 
-  // Prevent duplicate tools for the same developer and endpoint/module
+  // Prevent duplicate tools for the same developer and endpoint
   const existingTools = await getAIToolsByDeveloper({
     developerId: session.user.id,
   });
 
-  const normalizedEndpoint =
-    typeof parsed.data.endpoint === "string"
-      ? parsed.data.endpoint.trim()
-      : undefined;
+  const normalizedEndpoint = parsed.data.endpoint.trim();
 
-  if (normalizedEndpoint) {
-    const isDuplicate = existingTools.some((tool) => {
-      const schema = tool.toolSchema as Record<string, unknown> | null;
-      if (!schema || typeof schema !== "object") {
-        return false;
-      }
-
-      const schemaKind = (schema as { kind?: unknown }).kind;
-
-      if (parsed.data.kind === "mcp" && schemaKind === "mcp") {
-        return (schema as { endpoint?: unknown }).endpoint === normalizedEndpoint;
-      }
-
-      if (parsed.data.kind === "skill" && schemaKind === "skill") {
-        const skill = (schema as { skill?: { module?: unknown } }).skill;
-        return skill && skill.module === normalizedEndpoint;
-      }
-
+  const isDuplicate = existingTools.some((tool) => {
+    const schema = tool.toolSchema as Record<string, unknown> | null;
+    if (!schema || typeof schema !== "object") {
       return false;
-    });
-
-    if (isDuplicate) {
-      return {
-        status: "error",
-        message: "You already have a tool registered with this endpoint/module.",
-        fieldErrors: {
-          endpoint: "This endpoint or module is already registered.",
-        },
-        payload,
-      };
-    }
-  }
-
-  // Build tool schema based on kind
-  let toolSchema: Record<string, unknown>;
-  let mcpTools: { name: string; description?: string; inputSchema?: unknown }[] = [];
-
-  if (parsed.data.kind === "mcp") {
-    // Verify MCP server by connecting and listing tools
-    if (!parsed.data.endpoint) {
-      return {
-        status: "error",
-        message: "MCP endpoint is required.",
-        fieldErrors: { endpoint: "MCP endpoint is required" },
-        payload,
-      };
     }
 
-    try {
-      // Auto-detect and use appropriate transport (HTTP Streaming or SSE)
-      const { client, tools, transportUsed } = await connectAndListTools(parsed.data.endpoint);
-      console.log(`[contribute] Connected via ${transportUsed} to:`, parsed.data.endpoint);
-      
-      // Close client - ignore AbortError which is expected for SSE transport
-      try {
-        await client.close();
-      } catch (closeErr) {
-        // AbortError is expected when closing SSE connections
-        if (!(closeErr instanceof Error && closeErr.name === "AbortError")) {
-          console.warn("[contribute] Error closing MCP client:", closeErr);
-        }
-      }
-
-      if (!tools || tools.length === 0) {
-        return {
-          status: "error",
-          message: "MCP server has no tools. Please expose at least one tool.",
-          fieldErrors: { endpoint: "No tools found on this MCP server" },
-          payload,
-        };
-      }
-
-      // Cache the discovered tools (including outputSchema for AI to understand response structure)
-      mcpTools = tools;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      return {
-        status: "error",
-        message: `Could not connect to MCP server: ${message}`,
-        fieldErrors: { endpoint: "MCP connection failed" },
-        payload,
-      };
+    if (schema.kind === "mcp") {
+      return schema.endpoint === normalizedEndpoint;
     }
 
-    toolSchema = {
-      kind: "mcp",
-      endpoint: parsed.data.endpoint,
-      tools: mcpTools,
-    };
-  } else {
-    // Native skill
-    if (!parsed.data.endpoint) {
-      return {
-        status: "error",
-        message: "Module path is required.",
-        fieldErrors: { endpoint: "Module path is required" },
-        payload,
-      };
-    }
+    return false;
+  });
 
-    toolSchema = {
-      kind: "skill",
-      skill: {
-        module: parsed.data.endpoint,
+  if (isDuplicate) {
+    return {
+      status: "error",
+      message: "You already have a tool registered with this endpoint.",
+      fieldErrors: {
+        endpoint: "This endpoint is already registered.",
       },
+      payload,
     };
   }
+
+  // Verify MCP server by connecting and listing tools
+  let mcpTools: {
+    name: string;
+    description?: string;
+    inputSchema?: unknown;
+  }[] = [];
+
+  try {
+    // Auto-detect and use appropriate transport (HTTP Streaming or SSE)
+    const { client, tools, transportUsed } = await connectAndListTools(
+      parsed.data.endpoint
+    );
+    console.log(
+      `[contribute] Connected via ${transportUsed} to:`,
+      parsed.data.endpoint
+    );
+
+    // Close client - ignore AbortError which is expected for SSE transport
+    try {
+      await client.close();
+    } catch (closeErr) {
+      // AbortError is expected when closing SSE connections
+      if (!(closeErr instanceof Error && closeErr.name === "AbortError")) {
+        console.warn("[contribute] Error closing MCP client:", closeErr);
+      }
+    }
+
+    if (!tools || tools.length === 0) {
+      return {
+        status: "error",
+        message: "MCP server has no tools. Please expose at least one tool.",
+        fieldErrors: { endpoint: "No tools found on this MCP server" },
+        payload,
+      };
+    }
+
+    // Cache the discovered tools (including outputSchema for AI to understand response structure)
+    mcpTools = tools;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return {
+      status: "error",
+      message: `Could not connect to MCP server: ${message}`,
+      fieldErrors: { endpoint: "MCP connection failed" },
+      payload,
+    };
+  }
+
+  const toolSchema = {
+    kind: "mcp",
+    endpoint: parsed.data.endpoint,
+    tools: mcpTools,
+  };
 
   await createAITool({
     name: parsed.data.name,
@@ -271,9 +246,9 @@ export async function submitTool(
 
   const skillCount = mcpTools.length;
   const skillWord = skillCount === 1 ? "skill" : "skills";
-  
+
   return {
     status: "success",
-    message: `Tool submitted! ${parsed.data.kind === "mcp" ? `Discovered ${skillCount} ${skillWord} from your MCP server.` : "It will be reviewed shortly."}`,
+    message: `Tool submitted! Discovered ${skillCount} ${skillWord} from your MCP server.`,
   };
 }

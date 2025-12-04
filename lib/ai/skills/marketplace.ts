@@ -1,7 +1,7 @@
-import { eq, and, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { generateEmbedding, formatEmbeddingForPg } from "@/lib/ai/embeddings";
+import { formatEmbeddingForPg, generateEmbedding } from "@/lib/ai/embeddings";
 import { aiTool } from "@/lib/db/schema";
 
 /**
@@ -18,6 +18,8 @@ import { aiTool } from "@/lib/db/schema";
 type McpToolInfo = {
   name: string;
   description?: string;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
 };
 
 type MarketplaceSearchResult = {
@@ -25,10 +27,9 @@ type MarketplaceSearchResult = {
   name: string;
   description: string;
   price: string;
-  kind: "mcp" | "skill";
   category: string | null;
   isVerified: boolean;
-  // For MCP tools: the available methods/tools on the MCP server
+  // The available methods/tools on the MCP server
   // The AI needs this to know what toolName to pass to callMcpSkill
   mcpTools?: McpToolInfo[];
 };
@@ -38,31 +39,35 @@ type MarketplaceSearchResult = {
 const client = postgres(process.env.POSTGRES_URL!);
 const db = drizzle(client);
 
-function getToolKind(schema: Record<string, unknown> | null): "mcp" | "skill" {
-  if (schema?.kind === "mcp") {
-    return "mcp";
-  }
-  // Default to skill for native tools
-  return "skill";
-}
-
 /**
  * Extract MCP tools from the tool schema
- * Returns the available methods/tools on the MCP server
+ * Returns the available methods/tools on the MCP server, including schemas.
  */
-function getMcpTools(schema: Record<string, unknown> | null): McpToolInfo[] | undefined {
+function getMcpTools(
+  schema: Record<string, unknown> | null
+): McpToolInfo[] | undefined {
   if (!schema || schema.kind !== "mcp") {
-    return undefined;
+    return;
   }
-  
-  const tools = schema.tools as Array<{ name: string; description?: string }> | undefined;
+
+  const tools = schema.tools as
+    | Array<{
+        name: string;
+        description?: string;
+        inputSchema?: unknown;
+        outputSchema?: unknown;
+      }>
+    | undefined;
+
   if (!tools || !Array.isArray(tools)) {
-    return undefined;
+    return;
   }
-  
+
   return tools.map((t) => ({
     name: t.name,
     description: t.description,
+    inputSchema: t.inputSchema,
+    outputSchema: t.outputSchema,
   }));
 }
 
@@ -130,8 +135,10 @@ async function searchMarketplaceVector(
   `);
 
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
-  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
-  
+  const rows = (
+    Array.isArray(results) ? results : (results.rows ?? [])
+  ) as Array<Record<string, unknown>>;
+
   return rows.map((tool) => {
     const schema = tool.toolSchema as Record<string, unknown> | null;
     return {
@@ -139,7 +146,6 @@ async function searchMarketplaceVector(
       name: tool.name as string,
       description: tool.description as string,
       price: (tool.pricePerQuery as string) ?? "0",
-      kind: getToolKind(schema),
       category: tool.category as string | null,
       isVerified: tool.isVerified as boolean,
       mcpTools: getMcpTools(schema),
@@ -176,8 +182,10 @@ async function searchMarketplaceFallback(
   `);
 
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
-  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<Record<string, unknown>>;
-  
+  const rows = (
+    Array.isArray(results) ? results : (results.rows ?? [])
+  ) as Array<Record<string, unknown>>;
+
   return rows.map((tool) => {
     const schema = tool.toolSchema as Record<string, unknown> | null;
     return {
@@ -185,7 +193,6 @@ async function searchMarketplaceFallback(
       name: tool.name as string,
       description: tool.description as string,
       price: (tool.pricePerQuery as string) ?? "0",
-      kind: getToolKind(schema),
       category: tool.category as string | null,
       isVerified: tool.isVerified as boolean,
       mcpTools: getMcpTools(schema),
@@ -225,7 +232,6 @@ export async function getFeaturedTools(
         name: tool.name,
         description: tool.description,
         price: tool.pricePerQuery ?? "0",
-        kind: getToolKind(schema),
         category: tool.category,
         isVerified: tool.isVerified,
         mcpTools: getMcpTools(schema),
@@ -270,7 +276,6 @@ export async function getToolsByCategory(
         name: tool.name,
         description: tool.description,
         price: tool.pricePerQuery ?? "0",
-        kind: getToolKind(schema),
         category: tool.category,
         isVerified: tool.isVerified,
         mcpTools: getMcpTools(schema),

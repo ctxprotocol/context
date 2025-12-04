@@ -515,7 +515,7 @@ export function SettingsForm() {
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             <Label htmlFor={`apiKey-${provider}`}>
                               API Key
                             </Label>

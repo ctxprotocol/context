@@ -6,7 +6,6 @@ import type { ChatMessage } from "@/lib/types";
 export type AllowedToolContext = {
   tool: AITool;
   transactionHash: string;
-  kind: "skill" | "mcp";
   executionCount: number;
 };
 
@@ -37,18 +36,18 @@ export type SkillRuntime = {
   requestId?: string;
   chatId?: string;
   allowedTools?: Map<string, AllowedToolContext>;
-  
+
   // Auto Mode: AI can discover and use tools dynamically
   isAutoMode?: boolean;
-  
+
   // Auto Mode Discovery Phase: Only search marketplace, don't execute paid tools
   // When true, callMcpSkill will reject paid tool calls
   isDiscoveryPhase?: boolean;
-  
+
   // Track tools USED during Auto Mode execution (tool ID -> usage info)
   // Populated as callMcpSkill is called, used for batch payment at end
   autoModeToolsUsed?: Map<string, AutoModeToolUsage>;
-  
+
   // Agentic Reflection: Capture raw tool outputs for diagnosis
   // When execution produces suspicious results, we can show these to the AI
   toolCallHistory?: ToolCallRecord[];

@@ -20,21 +20,25 @@ import { getUsage } from "tokenlens/helpers";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import {
+  buildMediatorText,
+  executeWithSelfHealing,
+} from "@/lib/ai/agentic-execution";
+import {
   type AllowedModule,
   executeSkillCode,
   REGISTERED_SKILL_MODULES,
 } from "@/lib/ai/code-executor";
+import {
+  determineFlowType,
+  type FlowType,
+  recordActualCost,
+} from "@/lib/ai/cost-estimation";
 import {
   canMakeQuery,
   entitlementsByUserType,
   FREE_TIER_DAILY_LIMIT,
   type UserTier,
 } from "@/lib/ai/entitlements";
-import {
-  determineFlowType,
-  type FlowType,
-  recordActualCost,
-} from "@/lib/ai/cost-estimation";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import {
   buildToolSelectionPrompt,
@@ -53,10 +57,6 @@ import {
 import { searchMarketplace } from "@/lib/ai/skills/marketplace";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
 import type { AllowedToolContext } from "@/lib/ai/skills/runtime";
-import {
-  buildMediatorText,
-  executeWithSelfHealing,
-} from "@/lib/ai/agentic-execution";
 import { isProductionEnvironment } from "@/lib/constants";
 import { decryptApiKey } from "@/lib/crypto";
 import {
@@ -151,7 +151,6 @@ type PaidToolContext = {
   tool: AITool;
   transactionHash: string;
   module: AllowedModule;
-  kind: "skill" | "mcp";
 };
 
 function extractCodeBlock(text: string) {
@@ -187,38 +186,15 @@ function formatExecutionData(data: unknown, maxLength = 1200) {
   }
 }
 
-function getSkillModuleFromTool(tool: AITool): AllowedModule | null {
-  const schema = tool.toolSchema;
-  if (!schema || typeof schema !== "object") {
-    return null;
-  }
-  const skillField = (schema as Record<string, unknown>).skill;
-  if (!skillField) {
-    return null;
-  }
-  const entry = Array.isArray(skillField) ? skillField[0] : skillField;
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-  const moduleId = (entry as Record<string, unknown>).module;
-  if (typeof moduleId === "string" && REGISTERED_MODULE_SET.has(moduleId)) {
-    return moduleId as AllowedModule;
-  }
-  return null;
-}
-
 function buildAllowedToolRuntimeMap(paidTools: PaidToolContext[]) {
   const map = new Map<string, AllowedToolContext>();
   for (const context of paidTools) {
-    // MCP tools need to be tracked for billing
-    if (context.kind === "mcp") {
-      map.set(context.tool.id, {
-        tool: context.tool,
-        transactionHash: context.transactionHash,
-        kind: "mcp",
-        executionCount: 0,
-      });
-    }
+    // All tools are MCP tools - track for billing
+    map.set(context.tool.id, {
+      tool: context.tool,
+      transactionHash: context.transactionHash,
+      executionCount: 0,
+    });
   }
   return map;
 }
@@ -431,51 +407,39 @@ export async function POST(request: Request) {
           ? (tool.toolSchema as Record<string, unknown>).kind
           : undefined;
 
-        // MCP tools use the MCP module
-        if (toolKind === "mcp") {
-          // Self-healing: Refresh MCP tool schema if stale (TTL-based, 1 hour)
-          // This ensures we always have the latest outputSchema from the MCP server
-          try {
-            const wasRefreshed = await refreshMcpToolSchema(tool);
-            if (wasRefreshed) {
-              // Re-fetch the tool to get the updated schema
-              const refreshedTool = await getAIToolById({
-                id: invocation.toolId,
-              });
-              if (refreshedTool) {
-                tool = refreshedTool;
-              }
-            }
-          } catch (err) {
-            // Don't fail the request if schema refresh fails
-            console.warn(
-              `[chat-api] Schema refresh failed for ${tool.name}:`,
-              err
-            );
-          }
-
-          return {
-            tool,
-            transactionHash: invocation.transactionHash,
-            module: MCP_TOOL_MODULE,
-            kind: "mcp" as const,
-          };
-        }
-
-        // Native skills use their module path
-        const module = getSkillModuleFromTool(tool);
-        if (!module) {
+        // All tools are MCP tools
+        if (toolKind !== "mcp") {
           throw new ChatSDKError(
             "bad_request:chat",
-            "Tool is not configured for code execution."
+            `Tool "${tool.name}" is not a valid MCP tool.`
+          );
+        }
+
+        // Self-healing: Refresh MCP tool schema if stale (TTL-based, 1 hour)
+        // This ensures we always have the latest outputSchema from the MCP server
+        try {
+          const wasRefreshed = await refreshMcpToolSchema(tool);
+          if (wasRefreshed) {
+            // Re-fetch the tool to get the updated schema
+            const refreshedTool = await getAIToolById({
+              id: invocation.toolId,
+            });
+            if (refreshedTool) {
+              tool = refreshedTool;
+            }
+          }
+        } catch (err) {
+          // Don't fail the request if schema refresh fails
+          console.warn(
+            `[chat-api] Schema refresh failed for ${tool.name}:`,
+            err
           );
         }
 
         return {
           tool,
           transactionHash: invocation.transactionHash,
-          module,
-          kind: "skill" as const,
+          module: MCP_TOOL_MODULE,
         };
       })
     );
@@ -492,42 +456,10 @@ export async function POST(request: Request) {
         name: entry.tool.name,
         description: entry.tool.description,
         price: entry.tool.pricePerQuery,
-        module: entry.kind === "skill" ? entry.module : undefined,
-        kind: entry.kind,
+        kind: "mcp",
         usage: getToolUsage(entry.tool),
-        mcpTools: entry.kind === "mcp" ? getMcpTools(entry.tool) : undefined,
+        mcpTools: getMcpTools(entry.tool),
       });
-    }
-
-    // Inject module content for Native Skills
-    for (const tool of enabledToolSummaries) {
-      if (tool.kind === "skill" && tool.module) {
-        try {
-          // In a real production environment, we would read this from a cache or pre-loaded map
-          // Here we use dynamic import to inspect the module's exports if possible,
-          // but since we can't easily read source code at runtime in this environment without
-          // FS access (which we have, but it's tricky with Next.js bundling),
-          // we will assume the developer provided a good description.
-          //
-          // However, to fulfill the requirement: "Update System Prompt logic to load the module content"
-          // We will implement a best-effort read if running locally, or rely on a new field in the DB.
-          //
-          // For now, we will update the prompt generation to explicitly look for 'moduleContent' if we add it later.
-          //
-          // A simpler approach for this MVP:
-          // We trust the description and the 'usage' field (if any).
-          // If we really want to load code, we need to read the file from disk.
-          // Let's try to read the file content for known community skills.
-
-          if (tool.module.startsWith("@/lib/ai/skills/community/")) {
-            // This would require fs.readFileSync which might fail in Vercel Edge/Serverless if not bundled assets.
-            // So we will skip actual file reading for safety and rely on the robust "Instruction Manual" description
-            // we just enforced in the UI.
-          }
-        } catch (e) {
-          console.warn(`Failed to load module content for ${tool.module}`, e);
-        }
-      }
     }
 
     const chat = await getChatById({ id });
@@ -702,14 +634,16 @@ export async function POST(request: Request) {
               });
 
               // Track actual cost for convenience tier
-              const actualCost = totalActualCost > 0 ? totalActualCost : 
-                (finalMergedUsage.costUSD?.totalUSD !== undefined
-                  ? Number(finalMergedUsage.costUSD.totalUSD)
-                  : 0);
+              const actualCost =
+                totalActualCost > 0
+                  ? totalActualCost
+                  : finalMergedUsage.costUSD?.totalUSD !== undefined
+                    ? Number(finalMergedUsage.costUSD.totalUSD)
+                    : 0;
 
               if (userTier === "convenience" && actualCost > 0) {
                 await addAccumulatedModelCost(session.user.id, actualCost);
-                
+
                 // Record cost for dynamic estimation feedback loop
                 await recordActualCost({
                   userId: session.user.id,
@@ -1083,7 +1017,9 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                     }
                     // Track actual cost for dynamic estimation
                     if (finalMergedUsage?.costUSD?.totalUSD) {
-                      totalActualCost += Number(finalMergedUsage.costUSD.totalUSD);
+                      totalActualCost += Number(
+                        finalMergedUsage.costUSD.totalUSD
+                      );
                     }
                     dataStream.write({
                       type: "data-usage",
@@ -1569,21 +1505,24 @@ The user asked: "${message.parts
                 // AGENTIC EXECUTION WITH SELF-HEALING (shared function)
                 // =============================================================
                 // Execute code with automatic error correction and reflection
-                console.log("[chat-api] Auto Mode: starting agentic execution", {
-                        chatId: id,
-                  toolCount: autoModeAllowedTools.size,
-                });
+                console.log(
+                  "[chat-api] Auto Mode: starting agentic execution",
+                  {
+                    chatId: id,
+                    toolCount: autoModeAllowedTools.size,
+                  }
+                );
 
                 const agenticResult = await executeWithSelfHealing({
                   initialCode: codeBlock,
                   allowedModules: Array.from(allowedModules),
                   allowedTools: autoModeAllowedTools,
-                    dataStream,
+                  dataStream,
                   getLanguageModel: () =>
                     provider.languageModel(selectedChatModel),
                   session,
-                    chatId: id,
-                    isAutoMode: true,
+                  chatId: id,
+                  isAutoMode: true,
                 });
 
                 const execution = agenticResult.execution;
@@ -1670,18 +1609,19 @@ The user asked: "${message.parts
                       verification.error || "Payment verification failed."
                     );
                   }
-                  if (context.kind === "skill") {
-                    verifiedSkillContexts.push(context);
-                  }
+                  verifiedSkillContexts.push(context);
                 }
 
                 const allowedToolMap = buildAllowedToolRuntimeMap(paidTools);
 
-                console.log("[chat-api] Manual Mode: starting agentic execution with self-healing", {
-                  chatId: id,
-                  allowedModules: Array.from(allowedModules),
-                  httpTools: Array.from(allowedToolMap.keys()),
-                });
+                console.log(
+                  "[chat-api] Manual Mode: starting agentic execution with self-healing",
+                  {
+                    chatId: id,
+                    allowedModules: Array.from(allowedModules),
+                    httpTools: Array.from(allowedToolMap.keys()),
+                  }
+                );
 
                 // =============================================================
                 // AGENTIC EXECUTION WITH SELF-HEALING (shared function)
@@ -1692,11 +1632,11 @@ The user asked: "${message.parts
                   initialCode: codeBlock,
                   allowedModules: Array.from(allowedModules),
                   allowedTools: allowedToolMap,
-                    dataStream,
+                  dataStream,
                   getLanguageModel: () =>
                     provider.languageModel(selectedChatModel),
                   session,
-                    chatId: id,
+                  chatId: id,
                   isAutoMode: false, // Manual mode
                 });
 
@@ -1753,13 +1693,16 @@ The user asked: "${message.parts
                 }
 
                 if (!execution.ok) {
-                  console.error("[chat-api] skill execution failed after self-healing attempts", {
-                    chatId: id,
-                    error: execution.error,
-                    logs: execution.logs,
-                    code: codeBlock,
-                    attemptCount: agenticResult.attemptCount,
-                  });
+                  console.error(
+                    "[chat-api] skill execution failed after self-healing attempts",
+                    {
+                      chatId: id,
+                      error: execution.error,
+                      logs: execution.logs,
+                      code: codeBlock,
+                      attemptCount: agenticResult.attemptCount,
+                    }
+                  );
                 }
 
                 // Build mediator text with retry info for transparency
@@ -1968,14 +1911,16 @@ ${devPrefix}`;
             });
 
             // Track actual cost for convenience tier
-            const actualCost = totalActualCost > 0 ? totalActualCost :
-              (finalMergedUsage.costUSD?.totalUSD !== undefined
-                ? Number(finalMergedUsage.costUSD.totalUSD)
-                : 0);
+            const actualCost =
+              totalActualCost > 0
+                ? totalActualCost
+                : finalMergedUsage.costUSD?.totalUSD !== undefined
+                  ? Number(finalMergedUsage.costUSD.totalUSD)
+                  : 0;
 
             if (userTier === "convenience" && actualCost > 0) {
               await addAccumulatedModelCost(session.user.id, actualCost);
-              
+
               // Record cost for dynamic estimation feedback loop
               await recordActualCost({
                 userId: session.user.id,

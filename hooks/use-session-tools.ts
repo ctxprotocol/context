@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import type { AITool } from "@/lib/db/schema";
 
@@ -32,6 +32,10 @@ export function useSessionTools() {
   const [total, setTotal] = useState<number | null>(null);
   const offsetRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Extra tools found via search that aren't in the main paginated list
+  // This ensures tools toggled from search results are available for payment
+  const [extraTools, setExtraTools] = useState<ToolListItem[]>([]);
 
   // Fetch initial page of tools
   useEffect(() => {
@@ -96,11 +100,41 @@ export function useSessionTools() {
     [setActiveToolIds]
   );
 
+  // Add a tool from search results to ensure it's available for payment
+  // Called when toggling a tool that might not be in the main paginated list
+  const addToolFromSearch = useCallback((tool: ToolListItem) => {
+    setExtraTools((prev) => {
+      // Don't add if already exists
+      if (prev.some((t) => t.id === tool.id)) {
+        return prev;
+      }
+      return [...prev, tool];
+    });
+  }, []);
+
   const clearAllTools = useCallback(() => {
     setActiveToolIds([]);
   }, [setActiveToolIds]);
 
-  const activeTools = tools.filter((tool) => activeToolIds.includes(tool.id));
+  // Merge paginated tools with extra tools from search
+  // Use a Map to dedupe by ID (paginated tools take precedence)
+  const allTools = useMemo(() => {
+    const toolMap = new Map<string, ToolListItem>();
+    // Add extra tools first (lower priority)
+    for (const tool of extraTools) {
+      toolMap.set(tool.id, tool);
+    }
+    // Add paginated tools (higher priority, overwrites extras)
+    for (const tool of tools) {
+      toolMap.set(tool.id, tool);
+    }
+    return Array.from(toolMap.values());
+  }, [tools, extraTools]);
+
+  // Active tools from the merged list
+  const activeTools = allTools.filter((tool) =>
+    activeToolIds.includes(tool.id)
+  );
 
   const totalCost = activeTools.reduce(
     (sum, tool) => sum + Number(tool.pricePerQuery),
@@ -117,6 +151,7 @@ export function useSessionTools() {
     activeTools,
     totalCost,
     toggleTool,
+    addToolFromSearch,
     clearAllTools,
     loadMore,
   };

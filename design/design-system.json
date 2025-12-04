@@ -236,6 +236,7 @@
         "pageGutters": "p-4 to p-6 on containers; card p-6",
         "inlineGap": "gap-2 between icon and label",
         "stackGap": "space-y-2 (compact) | space-y-4 (comfortable)",
+        "formGroup": "space-y-3 (label + input)",
         "sectionGap": "space-y-8"
       }
     },
@@ -293,6 +294,11 @@
         "disabled:pointer-events-none disabled:opacity-50",
         "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0"
       ],
+      "iconSpacing": {
+        "rule": "NEVER use mr-2 or ml-2 on icons inside buttons. The button's gap-2 handles spacing automatically.",
+        "correct": "<Button><Plus className=\"size-4\" />New Key</Button>",
+        "incorrect": "<Button><Plus className=\"mr-2 size-4\" />New Key</Button>"
+      },
       "variants": {
         "default": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm",
         "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
@@ -318,13 +324,30 @@
     },
     "Input": {
       "base": "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base md:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
-      "file": "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground"
+      "file": "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
+      "grouping": "Always wrap Input/Textarea + Label in a container with space-y-3 for optimal legibility."
     },
     "EmptyState": {
       "container": "flex flex-col items-center justify-center p-8 text-center animate-in fade-in-50 zoom-in-95",
       "icon": "h-12 w-12 text-muted-foreground/50 mb-4",
       "title": "text-lg font-semibold text-foreground mb-2",
       "description": "text-sm text-muted-foreground max-w-sm mb-6"
+    },
+    "Dialog": {
+      "content": {
+        "base": "rounded-xl",
+        "note": "Default max-w-lg is usually fine. Only override width when necessary."
+      },
+      "structure": {
+        "header": "DialogHeader with DialogTitle and DialogDescription",
+        "body": "flex flex-col gap-4 for form content",
+        "footer": "DialogFooter className='mt-2' for action buttons"
+      },
+      "patterns": {
+        "simpleForm": "Header → Body (gap-4) → Footer (mt-2)",
+        "destructive": "Use AlertDialog for destructive actions",
+        "footerButtons": "Cancel (outline) on left, primary action on right"
+      }
     }
   },
   "patterns": {
@@ -338,12 +361,13 @@
       "Use Tailwind utilities mapped to tokens (bg-background, text-foreground, etc.)",
       "Honor .dark class for theming; never hardcode colors for core roles",
       "Keep controls compact (h-10) and text-sm by default",
-      "Use rounded-md for controls, rounded-lg for surfaces",
+      "Use rounded-md for controls, rounded-lg for surfaces, rounded-xl for dialogs",
       "Pair focus-visible with ring and ring-offset helpers",
       "Use Radix/shadcn primitives for menus, dialogs, and sheets",
       "Respect spacing defaults (p-6 on surfaces, gap-2 for icon+label)",
       "Use 'text-muted-foreground' for supporting text to create hierarchy",
-      "Use 'shadow-sm' on borders to add subtle depth, but avoid heavy shadows"
+      "Use 'shadow-sm' on borders to add subtle depth, but avoid heavy shadows",
+      "Let button's gap-2 handle icon spacing - just use size-4 on icons"
     ],
     "doNot": [
       "Introduce new brand colors or gradients outside tokens",
@@ -351,7 +375,8 @@
       "Use oversized padding on core controls",
       "Mix radii styles inconsistently (e.g., rounded-full on inputs)",
       "Override tokens with hardcoded hex values for core roles",
-      "Use non-semantic ARIA roles or invalid aria-* attributes"
+      "Use non-semantic ARIA roles or invalid aria-* attributes",
+      "Use mr-2/ml-2 on icons inside buttons (gap-2 handles spacing)"
     ]
   }
 }

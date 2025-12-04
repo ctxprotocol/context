@@ -1,4 +1,4 @@
-import { Info, Zap } from "lucide-react";
+import { Info } from "lucide-react";
 import { memo } from "react";
 import {
   HoverCard,
@@ -21,8 +21,6 @@ const PureContextSidebarItem = ({
 }) => {
   const formattedPrice = formatPrice(tool.pricePerQuery ?? 0);
 
-  const isNative = (tool.toolSchema as any)?.kind === "skill";
-
   return (
     <SidebarMenuItem>
       <div className="flex w-full items-center gap-1">
@@ -35,12 +33,6 @@ const PureContextSidebarItem = ({
           <div className="flex min-w-0 flex-col items-start gap-1 text-left">
             <div className="flex w-full items-center gap-2">
               <span className="truncate font-medium text-sm">{tool.name}</span>
-              {isNative && (
-                <Zap
-                  aria-label="Native Skill"
-                  className="h-3 w-3 shrink-0 fill-amber-500 text-amber-500"
-                />
-              )}
             </div>
             <span className="font-normal text-muted-foreground text-xs">
               ${formattedPrice}
@@ -80,12 +72,6 @@ const PureContextSidebarItem = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-sm">{tool.name}</h4>
-                {isNative && (
-                  <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-[10px] text-amber-500">
-                    <Zap className="h-3 w-3 fill-amber-500" />
-                    Native
-                  </span>
-                )}
               </div>
               <div className="max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-muted-foreground text-sm leading-relaxed">
                 {tool.description || "No description provided."}

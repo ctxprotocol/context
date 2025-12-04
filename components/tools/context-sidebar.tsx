@@ -4,6 +4,7 @@ import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { Loader2Icon, ZapIcon } from "lucide-react";
 import {
   type CSSProperties,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -23,10 +24,10 @@ import {
   SidebarMenu,
 } from "@/components/ui/sidebar";
 import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
+import type { ToolListItem } from "@/hooks/use-session-tools";
 import { useSessionTools } from "@/hooks/use-session-tools";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
-import type { ToolListItem } from "@/hooks/use-session-tools";
 import { cn, formatPrice } from "@/lib/utils";
 import { CrossIcon } from "../icons";
 import { Button } from "../ui/button";
@@ -62,10 +63,13 @@ export function ContextSidebar({
     activeTools,
     totalCost,
     toggleTool,
+    addToolFromSearch,
     loadMore,
   } = useSessionTools();
   const [searchQuery, setSearchQuery] = useState("");
-  const [vectorResults, setVectorResults] = useState<ToolListItem[] | null>(null);
+  const [vectorResults, setVectorResults] = useState<ToolListItem[] | null>(
+    null
+  );
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -323,6 +327,23 @@ export function ContextSidebar({
     ? (vectorResults ?? clientFilteredTools)
     : tools;
 
+  // Wrapper for toggling tools that also stores search result tools
+  // This ensures tools found via search are available for payment even if
+  // they're not in the first page of paginated results
+  const handleToggleTool = useCallback(
+    (toolId: string) => {
+      // If we're in search mode, find the tool and store it
+      if (isSearchActive) {
+        const searchTool = displayTools.find((t) => t.id === toolId);
+        if (searchTool) {
+          addToolFromSearch(searchTool);
+        }
+      }
+      toggleTool(toolId);
+    },
+    [isSearchActive, displayTools, addToolFromSearch, toggleTool]
+  );
+
   const categories = useMemo(
     () => Array.from(new Set(tools.map((tool) => tool.category || "Other"))),
     [tools]
@@ -497,7 +518,7 @@ export function ContextSidebar({
                         <ContextSidebarItem
                           isActive={activeToolIds.includes(tool.id)}
                           key={tool.id}
-                          onToggle={toggleTool}
+                          onToggle={handleToggleTool}
                           tool={tool}
                         />
                       ))}
@@ -539,7 +560,7 @@ export function ContextSidebar({
                             <ContextSidebarItem
                               isActive={activeToolIds.includes(tool.id)}
                               key={tool.id}
-                              onToggle={toggleTool}
+                              onToggle={handleToggleTool}
                               tool={tool}
                             />
                           ))}

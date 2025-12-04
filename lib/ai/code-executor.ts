@@ -1,5 +1,4 @@
 import vm from "node:vm";
-import * as communitySkills from "@/lib/ai/skills/community";
 import * as documentSkills from "@/lib/ai/skills/document";
 import * as marketplaceSkills from "@/lib/ai/skills/marketplace";
 import * as mcpSkills from "@/lib/ai/skills/mcp";
@@ -12,8 +11,8 @@ import * as weatherSkills from "@/lib/ai/skills/weather";
 const CODE_BLOCK_REGEX = /```(?:\w+)?\s*([\s\S]*?)```/i;
 const NAMED_IMPORT_REGEX = /^import\s+{([^}]+)}\s+from\s+["']([^"']+)["'];?/gim;
 
-// 1. Built-in modules
-const BUILTIN_MODULES_MAP = {
+// Available modules for skill execution
+const AVAILABLE_MODULES = {
   "@/lib/ai/skills/document": documentSkills,
   "@/lib/ai/skills/suggestions": suggestionSkills,
   "@/lib/ai/skills/weather": weatherSkills,
@@ -24,19 +23,6 @@ const BUILTIN_MODULES_MAP = {
   // Persistent Storage (Context Volume)
   "@/lib/ai/skills/storage": storageSkills,
 } as const;
-
-// 2. Community modules (from the index barrel file)
-// We map each export from the barrel file to a module path.
-// e.g. communitySkills.uniswap -> "@/lib/ai/skills/community/uniswap"
-const COMMUNITY_MODULES_MAP: Record<string, unknown> = {};
-for (const [key, module] of Object.entries(communitySkills)) {
-  COMMUNITY_MODULES_MAP[`@/lib/ai/skills/community/${key}`] = module;
-}
-
-const AVAILABLE_MODULES = {
-  ...BUILTIN_MODULES_MAP,
-  ...COMMUNITY_MODULES_MAP,
-};
 
 export type AllowedModule = keyof typeof AVAILABLE_MODULES;
 export const REGISTERED_SKILL_MODULES = Object.keys(

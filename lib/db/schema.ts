@@ -16,6 +16,9 @@ import {
 } from "drizzle-orm/pg-core";
 import type { AppUsage } from "../usage";
 
+// Flow types for cost estimation
+export type FlowType = "manual_simple" | "manual_tools" | "auto_mode";
+
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   email: varchar("email", { length: 64 }).unique(), // Make unique, but nullable
@@ -320,17 +323,20 @@ export const toolReport = pgTable("ToolReport", {
 
 export type ToolReport = InferSelectModel<typeof toolReport>;
 
-// ============================================================================
-// MODEL COST TRACKING (Dynamic Estimation)
-// ============================================================================
+// API Keys for programmatic access to Context Protocol
+export const apiKey = pgTable("ApiKey", {
+  id: uuid("id").primaryKey().notNull().defaultRandom(),
+  keyHash: varchar("key_hash", { length: 64 }).notNull().unique(),
+  keyPrefix: varchar("key_prefix", { length: 12 }).notNull(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
 
-/**
- * Flow types for cost estimation
- * - manual_simple: Single AI call, no tools
- * - manual_tools: Manual mode with tools (planning + execution)
- * - auto_mode: Auto mode with discovery + selection + planning + execution
- */
-export type FlowType = "manual_simple" | "manual_tools" | "auto_mode";
+export type ApiKey = InferSelectModel<typeof apiKey>;
 
 /**
  * Model cost history for dynamic estimation

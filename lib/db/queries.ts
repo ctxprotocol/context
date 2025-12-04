@@ -26,7 +26,9 @@ import { ChatSDKError } from "../errors";
 import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
+  type ApiKey,
   aiTool,
+  apiKey,
   type Chat,
   chat,
   type DBMessage,
@@ -37,8 +39,8 @@ import {
   suggestion,
   toolQuery,
   type User,
-  user,
   type UserSettings,
+  user,
   userSettings,
   vote,
 } from "./schema";
@@ -68,10 +70,7 @@ export async function getUserById(id: string): Promise<User | null> {
     const users = await db.select().from(user).where(eq(user.id, id));
     return users[0] ?? null;
   } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to get user by id"
-    );
+    throw new ChatSDKError("bad_request:database", "Failed to get user by id");
   }
 }
 
@@ -709,7 +708,7 @@ export async function createAITool({
       // Ensure undefined values are converted to null for raw SQL
       const categoryVal = category ?? null;
       const iconUrlVal = iconUrl ?? null;
-      
+
       const result = await db.execute(sql`
         INSERT INTO "AITool" (
           name, description, developer_id, developer_wallet, 
@@ -1038,7 +1037,10 @@ export async function updateAITool({
           embedding,
         });
       } catch (embeddingError) {
-        console.warn("[updateAITool] Embedding refresh failed:", embeddingError);
+        console.warn(
+          "[updateAITool] Embedding refresh failed:",
+          embeddingError
+        );
         // Don't fail the update if embedding fails
       }
     }
@@ -1259,11 +1261,16 @@ export async function searchAITools({
     }
 
     // Fallback to LIKE search if no vector results
-    console.log("[searchAITools] No vector results, falling back to LIKE search");
+    console.log(
+      "[searchAITools] No vector results, falling back to LIKE search"
+    );
     const fallbackResults = await searchAIToolsFallback({ query, limit });
     return { tools: fallbackResults, searchType: "fallback" as const };
   } catch (error) {
-    console.error("[searchAITools] Vector search failed, using fallback:", error);
+    console.error(
+      "[searchAITools] Vector search failed, using fallback:",
+      error
+    );
     const fallbackResults = await searchAIToolsFallback({ query, limit });
     return { tools: fallbackResults, searchType: "fallback" as const };
   }
@@ -1318,9 +1325,9 @@ async function searchAIToolsVector({
     LIMIT ${limit}
   `);
 
-  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<
-    Record<string, unknown>
-  >;
+  const rows = (
+    Array.isArray(results) ? results : (results.rows ?? [])
+  ) as Array<Record<string, unknown>>;
 
   // Log similarity scores for debugging
   if (rows.length > 0) {
@@ -1393,9 +1400,9 @@ async function searchAIToolsFallback({
     LIMIT ${limit}
   `);
 
-  const rows = (Array.isArray(results) ? results : results.rows ?? []) as Array<
-    Record<string, unknown>
-  >;
+  const rows = (
+    Array.isArray(results) ? results : (results.rows ?? [])
+  ) as Array<Record<string, unknown>>;
 
   return rows.map((tool) => ({
     id: tool.id as string,
@@ -1547,7 +1554,9 @@ export async function upsertUserSettings(
  * Increment free queries used counter for a user.
  * Automatically resets if it's a new day.
  */
-export async function incrementFreeQueriesUsed(userId: string): Promise<number> {
+export async function incrementFreeQueriesUsed(
+  userId: string
+): Promise<number> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -1556,7 +1565,10 @@ export async function incrementFreeQueriesUsed(userId: string): Promise<number> 
     const settings = await getUserSettings(userId);
 
     // Check if we need to reset (new day)
-    if (!settings?.freeQueriesResetAt || settings.freeQueriesResetAt < todayStart) {
+    if (
+      !settings?.freeQueriesResetAt ||
+      settings.freeQueriesResetAt < todayStart
+    ) {
       await upsertUserSettings(userId, {
         freeQueriesUsedToday: 1,
         freeQueriesResetAt: now,
@@ -1587,7 +1599,10 @@ export async function getFreeQueriesUsedToday(userId: string): Promise<number> {
     const settings = await getUserSettings(userId);
 
     // Check if reset needed (new day)
-    if (!settings?.freeQueriesResetAt || settings.freeQueriesResetAt < todayStart) {
+    if (
+      !settings?.freeQueriesResetAt ||
+      settings.freeQueriesResetAt < todayStart
+    ) {
       return 0;
     }
 
@@ -1641,3 +1656,132 @@ export async function resetAccumulatedModelCost(userId: string): Promise<void> {
 // ============================================================================
 
 export type { FlowType } from "./schema";
+
+// ============================================================================
+// API KEY MANAGEMENT (Context Protocol Public API)
+// ============================================================================
+
+/**
+ * Create a new API key for a user
+ * Returns the full key (shown only once) and the database record
+ */
+export async function createApiKey({
+  userId,
+  name,
+  keyHash,
+  keyPrefix,
+}: {
+  userId: string;
+  name: string;
+  keyHash: string;
+  keyPrefix: string;
+}): Promise<ApiKey> {
+  try {
+    const [newKey] = await db
+      .insert(apiKey)
+      .values({
+        userId,
+        name,
+        keyHash,
+        keyPrefix,
+      })
+      .returning();
+    return newKey;
+  } catch (error) {
+    console.error("Failed to create API key:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to create API key");
+  }
+}
+
+/**
+ * Find an API key by its hash (for authentication)
+ * Also updates lastUsedAt timestamp
+ */
+export async function getApiKeyByHash(
+  keyHash: string
+): Promise<(ApiKey & { user: User }) | null> {
+  try {
+    const result = await db
+      .select()
+      .from(apiKey)
+      .innerJoin(user, eq(apiKey.userId, user.id))
+      .where(eq(apiKey.keyHash, keyHash))
+      .limit(1);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    const row = result[0];
+
+    // Update last used timestamp asynchronously (don't await)
+    db.update(apiKey)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiKey.id, row.ApiKey.id))
+      .execute()
+      .catch((err) => console.warn("Failed to update lastUsedAt:", err));
+
+    return {
+      ...row.ApiKey,
+      user: row.User,
+    };
+  } catch (error) {
+    console.error("Failed to get API key by hash:", error);
+    return null;
+  }
+}
+
+/**
+ * Get all API keys for a user (for settings display)
+ * Does NOT return the actual key hashes
+ */
+export async function getApiKeysByUserId(userId: string): Promise<ApiKey[]> {
+  try {
+    return await db
+      .select()
+      .from(apiKey)
+      .where(eq(apiKey.userId, userId))
+      .orderBy(desc(apiKey.createdAt));
+  } catch (error) {
+    console.error("Failed to get API keys:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get API keys");
+  }
+}
+
+/**
+ * Delete an API key by ID (must belong to user)
+ */
+export async function deleteApiKey({
+  id,
+  userId,
+}: {
+  id: string;
+  userId: string;
+}): Promise<boolean> {
+  try {
+    const result = await db
+      .delete(apiKey)
+      .where(and(eq(apiKey.id, id), eq(apiKey.userId, userId)))
+      .returning();
+    return result.length > 0;
+  } catch (error) {
+    console.error("Failed to delete API key:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to delete API key");
+  }
+}
+
+/**
+ * Count API keys for a user (for limiting)
+ */
+export async function countApiKeysByUserId(userId: string): Promise<number> {
+  try {
+    const [result] = await db
+      .select({ count: count() })
+      .from(apiKey)
+      .where(eq(apiKey.userId, userId));
+    return result?.count ?? 0;
+  } catch (error) {
+    console.error("Failed to count API keys:", error);
+    return 0;
+  }
+}

@@ -7,60 +7,27 @@ export type ContributeFormState = {
   payload?: Partial<z.infer<typeof contributeFormSchema>>;
 };
 
-export const contributeFormSchema = z
-  .object({
-    name: z.string().min(1, "Name is required").max(255),
-    description: z.string().min(1, "Description is required").max(5000),
-    category: z.string().min(1, "Category is required"),
-    kind: z.enum(["mcp", "skill"]).default("mcp"),
-    endpoint: z.string().min(1).optional(), // URL for mcp, module path for skill
-    price: z
-      .string()
-      .regex(/^\d+\.?\d{0,4}$/, "Max 4 decimal places allowed")
-      .refine((value) => Number(value) >= 0, {
-        message: "Price must be 0 or greater",
-      })
-      .refine((value) => Number(value) <= 100, {
-        message: "Price cannot exceed $100 per query",
-      }),
-    developerWallet: z
-      .string()
-      .regex(/^0x[a-fA-F0-9]{40}$/, "Wallet must be a valid EVM address"),
-  })
-  .superRefine((data, ctx) => {
-    if (data.kind === "mcp") {
-      // MCP Server validation
-      if (!data.endpoint) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "MCP endpoint URL is required",
-          path: ["endpoint"],
-        });
-      } else if (!z.string().url().safeParse(data.endpoint).success) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Must be a valid URL",
-          path: ["endpoint"],
-        });
-      }
-    } else if (data.kind === "skill") {
-      // Native skill validation
-      if (!data.endpoint) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Module path is required for Native Skills",
-          path: ["endpoint"],
-        });
-      } else if (!data.endpoint.startsWith("@/")) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Module path must start with @/ (e.g. @/lib/ai/skills/community/...)",
-          path: ["endpoint"],
-        });
-      }
-    }
-  });
+export const contributeFormSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  description: z.string().min(1, "Description is required").max(5000),
+  category: z.string().min(1, "Category is required"),
+  endpoint: z
+    .string()
+    .min(1, "MCP endpoint URL is required")
+    .url("Must be a valid URL"),
+  price: z
+    .string()
+    .regex(/^\d+\.?\d{0,4}$/, "Max 4 decimal places allowed")
+    .refine((value) => Number(value) >= 0, {
+      message: "Price must be 0 or greater",
+    })
+    .refine((value) => Number(value) <= 100, {
+      message: "Price cannot exceed $100 per query",
+    }),
+  developerWallet: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, "Wallet must be a valid EVM address"),
+});
 
 export const contributeFormInitialState: ContributeFormState = {
   status: "idle",

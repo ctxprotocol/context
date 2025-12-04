@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
-import { getActiveAIToolsFull } from "@/lib/db/queries";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -9,11 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getActiveAIToolsFull } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
 
-const ADMIN_EMAILS = ["alex.r.macleod@gmail.com", "dev+blocknative-http@context.local"];
+const ADMIN_EMAILS = [
+  "alex.r.macleod@gmail.com",
+  "dev+blocknative-http@context.local",
+];
 
 export default async function AdminToolsPage() {
   const session = await auth();
@@ -37,66 +40,78 @@ export default async function AdminToolsPage() {
           </p>
         </div>
 
-      <Card>
-          <CardHeader className="px-6 py-4 border-b">
-            <CardTitle className="text-base font-medium">Submissions</CardTitle>
-        </CardHeader>
+        <Card>
+          <CardHeader className="border-b px-6 py-4">
+            <CardTitle className="font-medium text-base">Submissions</CardTitle>
+          </CardHeader>
           <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-border/50">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/50 border-b hover:bg-transparent">
                   <TableHead className="w-[150px] pl-6">Status</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                  <TableHead className="max-w-[300px]">Endpoint / Module</TableHead>
-                <TableHead>Queries</TableHead>
-                  <TableHead className="text-right pr-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tools.map((tool) => {
-                const schema = tool.toolSchema as Record<string, unknown>;
-                const kind = schema?.kind as string | undefined;
-                const isMcp = kind === "mcp";
-                const isSkill = kind === "skill";
-                const endpoint = isMcp 
-                  ? (schema.endpoint as string) 
-                  : isSkill
-                    ? ((schema.skill as Record<string, unknown>)?.module as string)
-                    : "Unknown";
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="max-w-[300px]">
+                    Endpoint / Module
+                  </TableHead>
+                  <TableHead>Queries</TableHead>
+                  <TableHead className="pr-6 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tools.map((tool) => {
+                  const schema = tool.toolSchema as Record<string, unknown>;
+                  const endpoint = (schema?.endpoint as string) || "Unknown";
+                  const typeLabel = "MCP";
+                  const typeColor = "bg-blue-600";
 
-                const typeLabel = isMcp ? "MCP" : isSkill ? "Native" : "Unknown";
-                const typeColor = isMcp ? "bg-blue-600" : isSkill ? "bg-purple-600" : "bg-gray-600";
-
-                return (
-                    <TableRow key={tool.id} className="hover:bg-muted/50 border-b border-border/50 last:border-none">
+                  return (
+                    <TableRow
+                      className="border-border/50 border-b last:border-none hover:bg-muted/50"
+                      key={tool.id}
+                    >
                       <TableCell className="pl-6">
                         {tool.isVerified ? (
-                          <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600/90 border-transparent text-white shadow-sm">Verified</Badge>
+                          <Badge
+                            className="border-transparent bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90"
+                            variant="default"
+                          >
+                            Verified
+                          </Badge>
                         ) : (
                           <Badge variant="secondary">Pending</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium text-sm text-foreground">{tool.name}</TableCell>
-                    <TableCell>
-                        <Badge variant="outline" className={`font-mono text-[10px] uppercase tracking-wider ${typeColor} text-white border-transparent`}>
-                        {typeLabel}
-                      </Badge>
-                    </TableCell>
-                      <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground font-mono">
-                      {endpoint}
-                    </TableCell>
-                      <TableCell className="text-sm font-mono">{tool.totalQueries}</TableCell>
-                      <TableCell className="text-right pr-6">
-                      <VerifyButton toolId={tool.id} isVerified={tool.isVerified} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      <TableCell className="font-medium text-foreground text-sm">
+                        {tool.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`font-mono text-[10px] uppercase tracking-wider ${typeColor} border-transparent text-white`}
+                          variant="outline"
+                        >
+                          {typeLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[300px] truncate font-mono text-muted-foreground text-xs">
+                        {endpoint}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {tool.totalQueries}
+                      </TableCell>
+                      <TableCell className="pr-6 text-right">
+                        <VerifyButton
+                          isVerified={tool.isVerified}
+                          toolId={tool.id}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

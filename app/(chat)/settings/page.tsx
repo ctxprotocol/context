@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { ApiKeysSection } from "./api-keys";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
@@ -15,7 +16,7 @@ export default async function SettingsPage() {
   if (!session?.user) {
     return (
       <div className="flex min-h-svh items-center justify-center px-4">
-        <Card className="max-w-xl w-full">
+        <Card className="w-full max-w-xl">
           <CardHeader>
             <CardTitle>Sign in required</CardTitle>
             <CardDescription>
@@ -30,15 +31,19 @@ export default async function SettingsPage() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-start bg-background px-4 py-8">
       <div className="w-full max-w-2xl space-y-6">
-        <div className="text-center space-y-2">
+        <div className="space-y-2 text-center">
           <h1 className="font-semibold text-3xl tracking-tight">Settings</h1>
-          <p className="text-muted-foreground text-sm max-w-lg mx-auto">
-            Manage your API key and model cost preferences.
+          <p className="mx-auto max-w-lg text-muted-foreground text-sm">
+            Manage your API keys and model cost preferences.
           </p>
         </div>
 
         <Suspense fallback={<SettingsSkeleton />}>
           <SettingsForm />
+        </Suspense>
+
+        <Suspense fallback={<SettingsSkeleton />}>
+          <ApiKeysSection />
         </Suspense>
       </div>
     </div>
@@ -52,11 +57,10 @@ function SettingsSkeleton() {
         <CardTitle>Loading settings…</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="h-10 rounded-md bg-muted animate-pulse" />
-        <div className="h-10 rounded-md bg-muted animate-pulse" />
-        <div className="h-24 rounded-md bg-muted animate-pulse" />
+        <div className="h-10 animate-pulse rounded-md bg-muted" />
+        <div className="h-10 animate-pulse rounded-md bg-muted" />
+        <div className="h-24 animate-pulse rounded-md bg-muted" />
       </CardContent>
     </Card>
   );
 }
-

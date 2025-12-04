@@ -1,12 +1,18 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { ExternalLink, Github, Loader2, Package } from "lucide-react";
+import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -25,7 +31,6 @@ export function ContributeForm() {
     submitTool,
     contributeFormInitialState
   );
-  const [kind, setKind] = useState("mcp");
   const { activeWallet } = useWalletIdentity();
   const walletAddress = activeWallet?.address;
   const isConnected = !!walletAddress;
@@ -39,9 +44,7 @@ export function ContributeForm() {
 
   const connectedWallet = walletAddress || "";
 
-  // MCP Tools auto-discover skills via listTools(), so the description
-  // focuses on WHAT the tool does and WHY users should use it.
-  const mcpDescriptionPlaceholder = `What does your MCP Tool do? (Skills are auto-discovered)
+  const descriptionPlaceholder = `What does your MCP Tool do? (Skills are auto-discovered)
 
 Example:
 Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism.
@@ -55,25 +58,18 @@ Agent tips (optional):
 - Call list_chains first to get all supported chainIds
 - Gas prices returned in Gwei with confidence levels`;
 
-  const skillDescriptionPlaceholder = `Describe the exported functions and how to use them.
-
-Example:
-This module exports functions to interact with Uniswap.
-
-Exports:
-- getQuote({ tokenIn, tokenOut, amount }): Returns swap quote
-- getPoolInfo({ poolAddress }): Returns pool statistics
-- listPools({ token }): Returns pools containing a token
-
-Usage:
-The agent will import this module and call the appropriate function.
-Design workflows to minimize external API calls.`;
-
   return (
     <form action={formAction}>
-      <Card className="border shadow-sm">
-        <CardContent className="space-y-4 pt-6">
-          <div className="space-y-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Submit a Tool</CardTitle>
+          <CardDescription>
+            Publish your MCP server to the Context Marketplace. Earn USDC when
+            agents use your tools.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
             <Label htmlFor="name">Name</Label>
             <Input
               aria-invalid={nameError ? true : undefined}
@@ -88,61 +84,7 @@ Design workflows to minimize external API calls.`;
             <FieldError message={nameError} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Type</Label>
-            <RadioGroup
-              className="flex flex-col gap-3 sm:flex-row sm:gap-6"
-              defaultValue={state.payload?.kind || "mcp"}
-              name="kind"
-              onValueChange={setKind}
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem id="kind-mcp" value="mcp" />
-                <Label className="cursor-pointer" htmlFor="kind-mcp">
-                  MCP Tool
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem id="kind-skill" value="skill" />
-                <Label className="cursor-pointer" htmlFor="kind-skill">
-                  Native Tool
-                </Label>
-              </div>
-            </RadioGroup>
-            <p className="text-muted-foreground text-xs">
-              {kind === "mcp" ? (
-                <>
-                  <strong>MCP Tool (Recommended):</strong> Build a standard{" "}
-                  <a
-                    className="underline"
-                    href="https://modelcontextprotocol.io"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    Model Context Protocol
-                  </a>{" "}
-                  server and paste your SSE endpoint. Skills are auto-discovered
-                  and can be called up to 100x per paid turn.
-                </>
-              ) : (
-                <>
-                  <strong>Native Tool:</strong> High-performance TypeScript
-                  module hosted on Context. Requires a{" "}
-                  <a
-                    className="underline"
-                    href="https://github.com/ctxprotocol/context/tree/main/lib/ai/skills/community"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    Pull Request
-                  </a>
-                  .
-                </>
-              )}
-            </p>
-          </div>
-
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label htmlFor="description">Description</Label>
             <Textarea
               aria-invalid={descriptionError ? true : undefined}
@@ -154,35 +96,20 @@ Design workflows to minimize external API calls.`;
               id="description"
               maxLength={5000}
               name="description"
-              placeholder={
-                kind === "mcp"
-                  ? mcpDescriptionPlaceholder
-                  : skillDescriptionPlaceholder
-              }
-              rows={kind === "mcp" ? 9 : 13}
+              placeholder={descriptionPlaceholder}
+              rows={9}
             />
             <p className="text-muted-foreground text-xs">
-              {kind === "mcp" ? (
-                <>
-                  Explain what your MCP Tool does and why users should use it.
-                  Skills are <strong>auto-discovered</strong> from your MCP
-                  server. Use <code>outputSchema</code> and{" "}
-                  <code>structuredContent</code> for reliable AI parsing.
-                </>
-              ) : (
-                <>
-                  Shown to users in the marketplace and used by the AI to
-                  understand your Native Tool. Explain what it does, why
-                  it&apos;s valuable, and how to use the exported skill
-                  functions.
-                </>
-              )}
+              Explain what your MCP Tool does and why users should use it.
+              Skills are <strong>auto-discovered</strong> from your MCP server.
+              Use <code>outputSchema</code> and <code>structuredContent</code>{" "}
+              for reliable AI parsing.
             </p>
             <FieldError message={descriptionError} />
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="category">Category</Label>
               <Select
                 defaultValue={state.payload?.category || ""}
@@ -224,7 +151,7 @@ Design workflows to minimize external API calls.`;
               </Select>
               <FieldError message={categoryError} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label htmlFor="price">Price per query (USDC)</Label>
               <Input
                 aria-invalid={priceError ? true : undefined}
@@ -249,10 +176,8 @@ Design workflows to minimize external API calls.`;
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="endpoint">
-              {kind === "mcp" ? "MCP Endpoint" : "Module Path"}
-            </Label>
+          <div className="space-y-3">
+            <Label htmlFor="endpoint">MCP Endpoint</Label>
             <Input
               aria-invalid={endpointError ? true : undefined}
               className={cn(
@@ -262,42 +187,28 @@ Design workflows to minimize external API calls.`;
               defaultValue={state.payload?.endpoint || ""}
               id="endpoint"
               name="endpoint"
-              placeholder={
-                kind === "mcp"
-                  ? "https://your-mcp-server.com/sse or /mcp"
-                  : "@/lib/ai/skills/community/my-skill"
-              }
-              type={kind === "mcp" ? "url" : "text"}
+              placeholder="https://your-mcp-server.com/sse or /mcp"
+              type="url"
             />
             <p className="text-muted-foreground text-xs">
-              {kind === "mcp" ? (
-                <>
-                  Your MCP server endpoint. We support both{" "}
-                  <strong>HTTP Streaming</strong> (<code>/mcp</code>) and{" "}
-                  <strong>SSE</strong> (<code>/sse</code>) transports.
-                  We&apos;ll auto-discover your skills via{" "}
-                  <code>listTools()</code>. See{" "}
-                  <a
-                    className="underline"
-                    href="https://github.com/ctxprotocol/context/tree/main/examples/blocknative-contributor"
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    example server
-                  </a>
-                  .
-                </>
-              ) : (
-                <>
-                  Must match the path in your Pull Request (e.g.{" "}
-                  <code>@/lib/ai/skills/community/...</code>).
-                </>
-              )}
+              Your MCP server endpoint. We support both{" "}
+              <strong>HTTP Streaming</strong> (<code>/mcp</code>) and{" "}
+              <strong>SSE</strong> (<code>/sse</code>) transports. We&apos;ll
+              auto-discover your skills via <code>listTools()</code>. See{" "}
+              <a
+                className="underline"
+                href="https://github.com/ctxprotocol/context/tree/main/examples/blocknative-contributor"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                example server
+              </a>
+              .
             </p>
             <FieldError message={endpointError} />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label htmlFor="developerWallet">Developer Wallet</Label>
             <Input
               aria-invalid={developerWalletError ? true : undefined}
@@ -339,7 +250,7 @@ Design workflows to minimize external API calls.`;
           >
             {isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="animate-spin" />
                 Verifying...
               </>
             ) : (
@@ -359,6 +270,62 @@ Design workflows to minimize external API calls.`;
           </div>
         )}
       </Card>
+
+      {/* Developer Resources */}
+      <div className="relative my-8">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-dashed" />
+        </div>
+        <div className="relative flex justify-center">
+          <span className="bg-background px-4 text-muted-foreground text-sm">
+            Developer Resources
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <a
+          className="group relative flex items-start gap-4 rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-sm"
+          href="https://github.com/ctxprotocol/context"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors group-hover:bg-background">
+            <Github className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">ctxprotocol/context</span>
+              <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </div>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Main repository with MCP server examples, smart contracts, and
+              contribution guides.
+            </p>
+          </div>
+        </a>
+
+        <a
+          className="group relative flex items-start gap-4 rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-sm"
+          href="https://github.com/ctxprotocol/sdk"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors group-hover:bg-background">
+            <Package className="size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">@ctxprotocol/sdk</span>
+              <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </div>
+            <p className="mt-1 text-muted-foreground text-sm">
+              TypeScript SDK for building AI agents that discover and execute
+              marketplace tools.
+            </p>
+          </div>
+        </a>
+      </div>
     </form>
   );
 }

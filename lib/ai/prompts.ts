@@ -6,10 +6,9 @@ export type EnabledToolSummary = {
   name: string;
   description: string;
   price?: string | null;
-  module?: string;
   usage?: string;
-  kind: "skill" | "mcp";
-  // MCP-specific: list of tools available on this server
+  kind: "mcp";
+  // MCP tools available on this server
   mcpTools?: {
     name: string;
     description?: string;
@@ -482,13 +481,11 @@ function formatEnabledTool(tool: EnabledToolSummary, index: number) {
   const isFree = Number(tool.price || 0) === 0;
   const priceLabel = isFree ? "FREE" : `$${price}/query`;
 
-  // MCP Tools (The Standard)
-  if (tool.kind === "mcp") {
-    const mcpToolsList = tool.mcpTools?.length
-      ? tool.mcpTools.map((t) => formatMcpToolDetails(t)).join("\n")
-      : "      (No tools discovered)";
+  const mcpToolsList = tool.mcpTools?.length
+    ? tool.mcpTools.map((t) => formatMcpToolDetails(t)).join("\n")
+    : "      (No tools discovered)";
 
-    return `${index + 1}. ${tool.name} (MCP Tool • ${priceLabel})
+  return `${index + 1}. ${tool.name} (MCP Tool • ${priceLabel})
    Tool ID: ${tool.toolId}
    Import: import { callMcpSkill } from "@/lib/ai/skills/mcp";
    Available MCP Tools:
@@ -497,13 +494,6 @@ ${mcpToolsList}
      const result = await callMcpSkill({ toolId: "${tool.toolId}", toolName: "<tool_name>", args: { ... } });
      // Access result properties based on Output schema above (e.g., result.chains, result.estimates)
    ${tool.description}`;
-  }
-
-  // Native Skills
-  return `${index + 1}. ${tool.name} (Native Skill • ${priceLabel})
-   Module: ${tool.module ?? "n/a"}${tool.usage ? `\n   Usage: ${tool.usage}` : ""}
-   ${tool.description}
-   (Import the module directly and call the exported functions.)`;
 }
 
 export const codePrompt = `

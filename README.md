@@ -15,13 +15,30 @@
 
 ---
 
-## 🌟 Vision
+## 🌟 The Ecosystem
 
-We believe the future of AI is not a single "Super App," but a collaborative network of specialized agents and data sources. MCP is the open standard that makes this possible and Context is where you get paid.
+Context is not just a chatbot; it is an economic engine for the AI era. We connect three distinct groups in a decentralized marketplace:
 
-- **For Developers:** Don't build a custom API integration. Build a standard **MCP Server**. Expose your unique data (crypto, stocks, weather, sports, anything) and get paid in USDC every time an AI agent uses it.
-- **For Users:** Access a "God Mode" agent that has real-time access to the entire on-chain and off-chain world, without switching tabs. Enable "Auto Mode" to let the AI discover tools for you.
-- **For The Future:** We are currently bootstrapping the economy with our own chat interface. Once liquidity is established, we will open the **Context Protocol API**, allowing *any* AI application to query our marketplace of MCP tools.
+### 1. For Users: The "God Mode" Agent
+Stop switching tabs. Context gives you an AI agent with real-time, read/write access to the world.
+- **Auto Mode:** Ask "Find the best yield on Base," and the Agent autonomously searches the marketplace, buys the necessary data tools, analyzes the returns, and presents the answer.
+- **One Wallet:** Pay for everything—from gas data to premium stock analysis—using a single USDC balance. No subscriptions, just pay-per-query.
+
+### 2. For Tool Builders: The "App Store" for MCP
+Monetize your data without building a frontend.
+- **Build Once, Sell Everywhere:** Create a standard [MCP Server](https://modelcontextprotocol.io).
+- **Zero UI Required:** You provide the API; our Agent provides the interface.
+- **Instant Revenue:** Set a price (e.g., $0.01/query). Get paid in USDC instantly every time an Agent calls your tool.
+
+### 3. For App Developers: The "Universal Adapter" (SDK)
+Build your own agents using the Context Protocol as your infrastructure layer.
+- **Stop Integrating APIs:** Instead of integrating CoinGecko, Tavily, and Weather APIs separately, just install `@ctxprotocol/sdk`.
+- **Dynamic Discovery:** Your agent can search our marketplace at runtime: `client.discovery.search("gas prices")`.
+- **Schema Inspection:** The API exposes full Input/Output schemas, allowing your LLM to self-construct arguments and execute tools it has never seen before.
+- **Zero-Ops:** We host the connections. You just send JSON and get results.
+
+> **"Context Protocol is npm for AI capabilities."**
+> Just as `npm install` gives you code other people wrote, Context gives your Agent *capabilities* other people built.
 
 ## 🏗 Architecture
 
@@ -157,12 +174,6 @@ await server.connect(transport);
 
 See the full [Blocknative example](./examples/blocknative-contributor) for a production-ready implementation.
 
-### 🛠 Advanced: Native Skills Registry
-
-For complex logic that requires maximum performance or verified execution, you can contribute directly to the core codebase via Pull Request.
-
-**[View the Community Skills Registry](./lib/ai/skills/community/README.md)**
-
 ### 🔒 Tool Safety Limits
 
 Each tool invocation runs inside a sandboxed code-execution environment.
@@ -172,11 +183,7 @@ Each tool invocation runs inside a sandboxed code-execution environment.
   - Every `callMcpSkill({ toolId, toolName, args })` increments an internal counter
   - Once `executionCount >= 100`, the platform throws an error for that turn
   - Fresh MCP connections are created per request for reliability
-
-- **Native Tools (custom skill functions in `lib/ai/skills/community/*`)**
-  - Executed via `executeSkillCode` in `lib/ai/code-executor.ts`
-  - No per-call counter, but limited by VM timeout (default 5000ms)
-  - Underlying platform limits (Vercel function time, memory, etc.)
+  - Code execution limited by VM timeout (default 5000ms) and platform limits
 
 - **Economic Model**
   - Users pay **once per chat turn per Tool**

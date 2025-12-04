@@ -3,9 +3,9 @@ import {
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
+  type Hex,
   http,
   parseUnits,
-  type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -14,8 +14,8 @@ import { base } from "viem/chains";
  * Auto Pay Executor
  *
  * Server-side service for executing JIT (Just-In-Time) payments
- * in Auto Mode. Uses the DEPLOYER WALLET (operator) to execute payments
- * on behalf of users via the ContextRouter contract.
+ * in Auto Mode and via the Public API. Uses the DEPLOYER WALLET (operator)
+ * to execute payments on behalf of users via the ContextRouter contract.
  *
  * Flow:
  * 1. User has pre-approved ContextRouter to spend their USDC (Auto Pay setup)
@@ -27,6 +27,11 @@ import { base } from "viem/chains";
  * - DEPLOYER_KEY: Private key for the deployer/operator wallet
  * - The deployer wallet must be registered as an operator on ContextRouter
  * - User must have approved ContextRouter to spend their USDC
+ * - The deployer wallet must be funded with Base ETH for gas fees
+ *
+ * Usage:
+ * - Auto Mode (web): Called automatically during agentic tool execution
+ * - Public API: Called by /api/v1/tools/execute for headless API clients
  */
 
 // ContextRouter ABI - using executePaidQueryFor for operator-based execution
@@ -317,8 +322,7 @@ export async function executeAutoPayment(
     if (errorMessage.includes("Not an authorized operator")) {
       return {
         success: false,
-        error:
-          "Server wallet not registered as operator. Contact support.",
+        error: "Server wallet not registered as operator. Contact support.",
       };
     }
 
