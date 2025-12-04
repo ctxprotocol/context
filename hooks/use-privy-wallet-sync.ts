@@ -24,6 +24,7 @@ export function isEmbeddedWallet(wallet: ConnectedWallet | undefined) {
   }
 
   const { walletClientType, type, embedded } = wallet as WalletLike;
+  const walletType = type as string | undefined;
 
   if (
     walletClientType === "embedded" ||
@@ -34,7 +35,7 @@ export function isEmbeddedWallet(wallet: ConnectedWallet | undefined) {
     return true;
   }
 
-  if (type === "embedded" || type === "smart_wallet") {
+  if (walletType === "embedded" || walletType === "smart_wallet") {
     return true;
   }
 
