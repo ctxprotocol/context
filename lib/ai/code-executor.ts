@@ -120,7 +120,6 @@ function buildExecutionContext(
 ) {
   const allowedImportEntries = Array.from(allowedMap.entries()).map(
     ([moduleId, specifier]) => {
-      // @ts-expect-error - Dynamic module map access
       const mod = AVAILABLE_MODULES[specifier];
       return [moduleId, mod];
     }
@@ -158,7 +157,6 @@ export async function executeSkillCode({
   try {
     const allowedMap = new Map<string, AllowedModule>();
     for (const moduleId of allowedModules) {
-      // @ts-expect-error - Dynamic module map access
       if (!AVAILABLE_MODULES[moduleId]) {
         throw new Error(`Module "${moduleId}" is not registered as a skill.`);
       }
