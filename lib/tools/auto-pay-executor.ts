@@ -92,7 +92,8 @@ export type AutoPayToolPayment = {
 
 // Clients (lazy initialized)
 let privyClient: PrivyClient | null = null;
-let publicClient: ReturnType<typeof createPublicClient> | null = null;
+// biome-ignore lint/suspicious/noExplicitAny: Base chain has different block types
+let publicClient: any = null;
 let walletClient: ReturnType<typeof createWalletClient> | null = null;
 let operatorAccount: ReturnType<typeof privateKeyToAccount> | null = null;
 
@@ -237,7 +238,7 @@ export async function executeAutoPayment(
     const hasModelCost = modelCost > 0n;
 
     console.log("[auto-pay] Executing payment via operator wallet:", {
-      operator: wallet.account.address,
+      operator: wallet.account?.address,
       user: userAddress,
       toolId: payment.toolId,
       developer: payment.developerWallet,
@@ -273,7 +274,10 @@ export async function executeAutoPayment(
         });
 
     // Execute from operator wallet
+    const account = getOperatorAccount();
     const hash = await wallet.sendTransaction({
+      account,
+      chain: base,
       to: routerAddress,
       data,
       value: 0n,
@@ -370,7 +374,7 @@ export async function executeAutoBatchPayment(
     const amounts = payments.map((p) => usdToUsdcAmount(p.priceUsd));
 
     console.log("[auto-pay] Executing batch payment via operator:", {
-      operator: wallet.account.address,
+      operator: wallet.account?.address,
       user: userAddress,
       tools: payments.map((p) => p.toolId),
       totalAmount: amounts.reduce((a, b) => a + b, 0n).toString(),
@@ -384,7 +388,10 @@ export async function executeAutoBatchPayment(
     });
 
     // Execute from operator wallet
+    const account = getOperatorAccount();
     const hash = await wallet.sendTransaction({
+      account,
+      chain: base,
       to: routerAddress,
       data,
       value: 0n,

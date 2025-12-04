@@ -83,7 +83,7 @@ async function backfillEmbeddings() {
     WHERE embedding IS NULL
   `);
 
-  const rows = tools.rows || tools || [];
+  const rows = (tools as { rows?: unknown[] }).rows || tools || [];
   console.log(`Found ${rows.length} tools to embed`);
 
   if (rows.length === 0) {

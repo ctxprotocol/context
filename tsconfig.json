@@ -30,5 +30,5 @@
     ".next/types/**/*.ts",
     "next.config.js"
   ],
-  "exclude": ["node_modules", "examples", "hardhat"]
+  "exclude": ["node_modules", "examples", "hardhat", "tests", "scripts"]
 }

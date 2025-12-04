@@ -722,7 +722,7 @@ export async function createAITool({
         RETURNING *
       `);
       // Handle both array and object-with-rows formats from db.execute()
-      const rows = Array.isArray(result) ? result : (result.rows ?? []);
+      const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
       newTool = rows[0];
     } else {
       // Fallback: create without embedding
@@ -1326,7 +1326,7 @@ async function searchAIToolsVector({
   `);
 
   const rows = (
-    Array.isArray(results) ? results : (results.rows ?? [])
+    Array.isArray(results) ? results : ((results as { rows?: unknown[] }).rows ?? [])
   ) as Array<Record<string, unknown>>;
 
   // Log similarity scores for debugging
@@ -1401,7 +1401,7 @@ async function searchAIToolsFallback({
   `);
 
   const rows = (
-    Array.isArray(results) ? results : (results.rows ?? [])
+    Array.isArray(results) ? results : ((results as { rows?: unknown[] }).rows ?? [])
   ) as Array<Record<string, unknown>>;
 
   return rows.map((tool) => ({

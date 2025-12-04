@@ -614,9 +614,9 @@ export async function listMcpTools(
  * Should be called during cleanup/shutdown
  */
 export async function disconnectAllMcpClients(): Promise<void> {
-  for (const [endpoint, client] of clientCache.entries()) {
+  for (const [endpoint, cachedClient] of clientCache.entries()) {
     try {
-      await client.close();
+      await cachedClient.client.close();
     } catch (error) {
       console.warn(`Failed to close MCP client for ${endpoint}:`, error);
     }
