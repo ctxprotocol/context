@@ -18,7 +18,7 @@ function normalizeAddress(value: string | undefined) {
   return value?.toLowerCase();
 }
 
-export function isEmbeddedWallet(wallet: ConnectedWallet | undefined) {
+export function isEmbeddedWallet(wallet: ConnectedWallet | { address: string } | undefined) {
   if (!wallet) {
     return false;
   }
