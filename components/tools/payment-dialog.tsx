@@ -1,8 +1,8 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { base } from "viem/chains";
-import { CheckIcon } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -119,7 +119,7 @@ export function PaymentDialog({
             {isOnBaseMainnet ? (
               <>
                 <div className="flex size-5 items-center justify-center rounded-full bg-green-500/10">
-                  <CheckIcon className="size-3 text-green-600 dark:text-green-400" />
+                  <Check className="size-3 text-green-600 dark:text-green-400" />
                 </div>
                 <span className="font-medium text-foreground">
                   Connected to Base
