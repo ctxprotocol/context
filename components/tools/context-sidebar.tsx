@@ -608,7 +608,7 @@ export function ContextSidebar({
               <div className="flex items-center justify-between py-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help font-medium">Auto Pay</span>
+                    <span className="cursor-help">Auto Pay</span>
                   </TooltipTrigger>
                   <TooltipContent align="start" className="max-w-[220px]">
                     Pre-authorize payments up to a spending cap. No signing
