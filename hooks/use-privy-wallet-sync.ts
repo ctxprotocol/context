@@ -73,12 +73,12 @@ export function usePrivyWalletSync() {
 
     // Filter out wallets that are not linked to the user's account
     const linkedAddresses = new Set(
-      user.linkedAccounts
+      user?.linkedAccounts
         ?.filter((account) => account.type === "wallet")
         .map((account) => account.address.toLowerCase()) || []
     );
 
-    if (user.wallet) {
+    if (user?.wallet) {
       linkedAddresses.add(user.wallet.address.toLowerCase());
     }
 
