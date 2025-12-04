@@ -46,7 +46,7 @@ export function isEmbeddedWallet(wallet: ConnectedWallet | { address: string } |
   return false;
 }
 
-function toWalletKey(wallet: ConnectedWallet | undefined) {
+function toWalletKey(wallet: ConnectedWallet | { address: string } | undefined) {
   if (!wallet) {
     return undefined;
   }
