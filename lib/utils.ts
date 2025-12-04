@@ -121,6 +121,25 @@ export function formatWalletAddress(address: string): string {
 }
 
 /**
+ * Convert a UUID string to a uint256 bigint for smart contract interactions.
+ * 
+ * UUIDs are 128-bit values (32 hex chars) which fit entirely into uint256.
+ * This conversion is deterministic and collision-free since it preserves
+ * the full UUID value without truncation.
+ * 
+ * @param uuid - UUID string (with or without dashes)
+ * @returns bigint representation suitable for contract calls
+ */
+export function uuidToUint256(uuid: string): bigint {
+  // Remove dashes and convert full hex string to bigint
+  const hex = uuid.replace(/-/g, '');
+  if (hex.length !== 32) {
+    throw new Error(`Invalid UUID format: expected 32 hex chars, got ${hex.length}`);
+  }
+  return BigInt(`0x${hex}`);
+}
+
+/**
  * Format a price with smart decimal places.
  * - Shows 2 decimals for whole cents ($1.00, $0.10)
  * - Shows up to 4 decimals for micropayments ($0.001, $0.0001)

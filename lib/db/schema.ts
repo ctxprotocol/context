@@ -244,20 +244,26 @@ export const aiTool = pgTable("AITool", {
   category: varchar("category", { length: 100 }),
   iconUrl: text("icon_url"),
 
-  // Verification fields (use immediately)
+  // Verification fields
+  // NOTE: isVerified now means "Identity Verified" (GitHub/Twitter link), NOT "Code Verified"
+  // Performance trust is derived from metrics (successRate, uptimePercent, totalQueries)
   isVerified: boolean("is_verified").notNull().default(false),
   verifiedBy: uuid("verified_by").references(() => user.id),
   verifiedAt: timestamp("verified_at"),
 
-  // Analytics & reputation (start collecting from day 1)
+  // Analytics & reputation (crypto-native metrics - primary trust indicators)
   totalQueries: integer("total_queries").notNull().default(0),
   totalRevenue: numeric("total_revenue", { precision: 18, scale: 6 })
     .notNull()
     .default("0"),
+
+  // DEPRECATED: Web2-style ratings replaced by crypto-native metrics
+  // Use successRate and totalQueries instead. Will be removed in future migration.
   averageRating: numeric("average_rating", { precision: 3, scale: 2 }),
   totalReviews: integer("total_reviews").notNull().default(0),
 
-  // Reliability metrics
+  // Reliability metrics (Trust Level 2 - Proven Status)
+  // A tool is "Proven" when: totalQueries > 100 AND successRate > 95% AND uptimePercent > 98%
   uptimePercent: numeric("uptime_percent", { precision: 5, scale: 2 }).default(
     "100"
   ),
@@ -265,12 +271,26 @@ export const aiTool = pgTable("AITool", {
     "100"
   ),
 
+  // Health check tracking (Trust Level 1 - Janitor)
+  consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+  lastHealthCheck: timestamp("last_health_check"),
+
   // Moderation
   totalFlags: integer("total_flags").notNull().default(0),
 
-  // Future-proof placeholders (nullable, unused for MVP)
-  listingFee: numeric("listing_fee", { precision: 18, scale: 6 }),
+  // Staking (Trust Level 3 - Economic Security)
+  // Tools priced >= $1.00/query require staking 100x the query price
+  // This is synced from on-chain ContextRouter contract
   totalStaked: numeric("total_staked", { precision: 18, scale: 6 }).default(
+    "0"
+  ),
+
+  // Future-proof placeholders
+  listingFee: numeric("listing_fee", { precision: 18, scale: 6 }),
+
+  // Level 4 Future-Proofing: Optimistic Payments / Escrow
+  // For expensive queries ($10+), funds could be held pending validation
+  pendingBalance: numeric("pending_balance", { precision: 18, scale: 6 }).default(
     "0"
   ),
 

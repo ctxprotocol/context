@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS "UserSettings" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "AITool" ADD COLUMN "search_text" text;--> statement-breakpoint
+ALTER TABLE "AITool" ADD COLUMN IF NOT EXISTS "search_text" text;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "UserSettings" ADD CONSTRAINT "UserSettings_user_id_User_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."User"("id") ON DELETE no action ON UPDATE no action;
 EXCEPTION

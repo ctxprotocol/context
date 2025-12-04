@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { auth } from "@/app/(auth)/auth";
 import { EarningsPanel } from "@/components/tools/earnings-panel";
+import { StakePanel } from "@/components/tools/stake-panel";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getAIToolsByDeveloper } from "@/lib/db/queries";
@@ -43,6 +44,15 @@ export default async function DeveloperToolsPage() {
 
         <div className="space-y-6">
           <EarningsPanel />
+          
+          <StakePanel 
+            tools={tools.map((t) => ({
+              id: t.id,
+              name: t.name,
+              pricePerQuery: t.pricePerQuery,
+              totalStaked: t.totalStaked,
+            }))}
+          />
 
           <div className="space-y-4">
             {tools.length > 0 && (
@@ -61,7 +71,7 @@ export default async function DeveloperToolsPage() {
                 </h3>
                 <p className="mb-6 max-w-sm text-muted-foreground text-sm">
                   Start building your portfolio by creating your first AI tool.
-                  You'll earn USDC every time someone uses it.
+                  You&apos;ll earn USDC every time someone uses it.
                 </p>
                 <Link href="/contribute">
                   <Button>Create Your First Tool</Button>
@@ -83,6 +93,10 @@ export default async function DeveloperToolsPage() {
                       isActive: tool.isActive,
                       isVerified: tool.isVerified,
                       toolSchema: tool.toolSchema,
+                      // Trust metrics
+                      successRate: tool.successRate,
+                      uptimePercent: tool.uptimePercent,
+                      totalStaked: tool.totalStaked,
                     }}
                   />
                 ))}

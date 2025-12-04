@@ -19,6 +19,12 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * 
  * For Auto Mode (JIT payments), authorized operators can trigger payments
  * on behalf of users who have pre-approved this contract.
+ * 
+ * STAKING SYSTEM (Trust Level 3):
+ * High-value tools ($1.00+/query) require developers to stake collateral.
+ * This provides economic security against scams - if a tool is fraudulent,
+ * the stake can be slashed by the admin to compensate affected users.
+ * Required stake = 100x the query price (e.g., $1.50/query = $150 stake)
  */
 contract ContextRouter is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -27,12 +33,29 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
     uint256 public constant PLATFORM_FEE_PERCENT = 10;
     
+    // Staking constants (USDC has 6 decimals)
+    // Tools priced >= $1.00 require staking
+    uint256 public constant STAKING_THRESHOLD = 1_000_000; // $1.00 in USDC (6 decimals)
+    // Required stake = 100x the query price
+    uint256 public constant STAKE_MULTIPLIER = 100;
+    
     // Tracking
     mapping(address => uint256) public developerBalances;
     uint256 public platformBalance;
     
     // Operators (servers authorized to trigger payments on behalf of users)
     mapping(address => bool) public operators;
+    
+    // ============================================================
+    // STAKING STATE (Trust Level 3)
+    // ============================================================
+    
+    // Tool staking: toolId => staked USDC amount
+    mapping(uint256 => uint256) public toolStakes;
+    // Tool ownership: toolId => developer wallet (set on first stake)
+    mapping(uint256 => address) public toolDevelopers;
+    // Slashed balance available for claims (goes to platform for redistribution)
+    uint256 public slashedBalance;
     
     // Events
     event QueryPaid(
@@ -48,6 +71,11 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     event OperatorRemoved(address indexed operator);
     // Model cost event for Convenience tier (100% to platform)
     event ModelCostPaid(address indexed user, uint256 amount);
+    
+    // Staking events
+    event StakeDeposited(uint256 indexed toolId, address indexed developer, uint256 amount);
+    event StakeWithdrawn(uint256 indexed toolId, address indexed developer, uint256 amount);
+    event StakeSlashed(uint256 indexed toolId, address indexed developer, uint256 amount, string reason);
 
     // Modifiers
     modifier onlyOperator() {
@@ -470,6 +498,145 @@ contract ContextRouter is Ownable, ReentrancyGuard {
      */
     function getPlatformBalance() external view returns (uint256) {
         return platformBalance;
+    }
+
+    // ============================================================
+    // STAKING FUNCTIONS (Trust Level 3 - Economic Security)
+    // ============================================================
+
+    /**
+     * @notice Calculate the minimum stake required for a tool based on its query price
+     * @param pricePerQuery The tool's price per query in USDC (6 decimals)
+     * @return The minimum stake required (0 if below threshold, otherwise 100x price)
+     */
+    function getMinimumStake(uint256 pricePerQuery) public pure returns (uint256) {
+        if (pricePerQuery < STAKING_THRESHOLD) {
+            return 0; // Tools under $1.00 don't require staking
+        }
+        return pricePerQuery * STAKE_MULTIPLIER;
+    }
+
+    /**
+     * @notice Check if a tool requires staking based on its price
+     * @param pricePerQuery The tool's price per query in USDC (6 decimals)
+     * @return True if the tool requires staking
+     */
+    function requiresStaking(uint256 pricePerQuery) public pure returns (bool) {
+        return pricePerQuery >= STAKING_THRESHOLD;
+    }
+
+    /**
+     * @notice Developer deposits stake for a high-value tool
+     * @dev Developer must approve this contract to spend USDC first
+     * @param toolId The ID of the tool to stake for
+     * @param amount The amount of USDC to stake
+     */
+    function depositStake(uint256 toolId, uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        
+        // If tool already has a developer assigned, only they can add stake
+        address existingDev = toolDevelopers[toolId];
+        if (existingDev != address(0)) {
+            require(existingDev == msg.sender, "Only tool owner can add stake");
+        } else {
+            // First stake registers ownership
+            toolDevelopers[toolId] = msg.sender;
+        }
+
+        // Transfer USDC from developer to this contract
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+
+        // Update stake balance
+        toolStakes[toolId] += amount;
+
+        emit StakeDeposited(toolId, msg.sender, amount);
+    }
+
+    /**
+     * @notice Developer withdraws stake from a tool
+     * @dev Can only withdraw stake for tools you own
+     * @param toolId The ID of the tool to withdraw stake from
+     * @param amount The amount of USDC to withdraw
+     */
+    function withdrawStake(uint256 toolId, uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(toolDevelopers[toolId] == msg.sender, "Not tool owner");
+        require(toolStakes[toolId] >= amount, "Insufficient stake");
+
+        // Update stake balance
+        toolStakes[toolId] -= amount;
+
+        // Transfer USDC back to developer
+        usdc.safeTransfer(msg.sender, amount);
+
+        emit StakeWithdrawn(toolId, msg.sender, amount);
+    }
+
+    /**
+     * @notice Admin slashes stake from a fraudulent tool
+     * @dev Only callable by contract owner. Used to penalize scam tools.
+     * @param toolId The ID of the tool to slash
+     * @param amount The amount of USDC to slash
+     * @param reason Human-readable reason for the slash (stored in event)
+     */
+    function slash(uint256 toolId, uint256 amount, string calldata reason) external onlyOwner nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(toolStakes[toolId] >= amount, "Insufficient stake to slash");
+        
+        address developer = toolDevelopers[toolId];
+        require(developer != address(0), "Tool has no stake");
+
+        // Reduce tool stake
+        toolStakes[toolId] -= amount;
+
+        // Add to slashed balance (admin can claim and redistribute to affected users)
+        slashedBalance += amount;
+
+        emit StakeSlashed(toolId, developer, amount, reason);
+    }
+
+    /**
+     * @notice Admin claims slashed funds for redistribution to affected users
+     * @dev Only callable by contract owner
+     */
+    function claimSlashedFunds() external onlyOwner nonReentrant {
+        uint256 balance = slashedBalance;
+        require(balance > 0, "No slashed funds to claim");
+
+        slashedBalance = 0;
+        usdc.safeTransfer(owner(), balance);
+    }
+
+    /**
+     * @notice Get the current stake for a tool
+     * @param toolId The ID of the tool
+     * @return The staked amount in USDC
+     */
+    function getStake(uint256 toolId) external view returns (uint256) {
+        return toolStakes[toolId];
+    }
+
+    /**
+     * @notice Get the developer wallet for a staked tool
+     * @param toolId The ID of the tool
+     * @return The developer's wallet address (address(0) if not staked)
+     */
+    function getToolDeveloper(uint256 toolId) external view returns (address) {
+        return toolDevelopers[toolId];
+    }
+
+    /**
+     * @notice Check if a tool has sufficient stake for its price
+     * @param toolId The ID of the tool
+     * @param pricePerQuery The tool's current price per query
+     * @return True if the tool has sufficient stake (or doesn't require staking)
+     */
+    function hasRequiredStake(uint256 toolId, uint256 pricePerQuery) external view returns (bool) {
+        uint256 required = getMinimumStake(pricePerQuery);
+        if (required == 0) {
+            return true; // Tool doesn't require staking
+        }
+        return toolStakes[toolId] >= required;
     }
 }
 

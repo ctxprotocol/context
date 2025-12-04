@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, RefreshCw } from "lucide-react";
+import { Activity, Loader2, Pencil, RefreshCw, Shield, TrendingUp } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { CrossIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,14 @@ import {
   type EditToolState,
 } from "./actions";
 
+// Trust thresholds for "Proven" status
+const PROVEN_QUERY_THRESHOLD = 100;
+const PROVEN_SUCCESS_RATE_THRESHOLD = 95;
+const PROVEN_UPTIME_THRESHOLD = 98;
+// Staking threshold: $1.00 per query requires collateral
+const STAKING_THRESHOLD = 1.0;
+const STAKE_MULTIPLIER = 100;
+
 type Tool = {
   id: string;
   name: string;
@@ -42,7 +50,29 @@ type Tool = {
   isActive: boolean;
   isVerified: boolean;
   toolSchema: unknown;
+  // Trust metrics
+  successRate?: string | null;
+  uptimePercent?: string | null;
+  totalStaked?: string | null;
 };
+
+/**
+ * Determine if a tool qualifies for "Proven" status based on trust metrics
+ */
+function isToolProven(
+  totalQueries: number,
+  successRate: string | null | undefined,
+  uptimePercent: string | null | undefined
+): boolean {
+  const success = Number.parseFloat(successRate ?? "0");
+  const uptime = Number.parseFloat(uptimePercent ?? "0");
+  
+  return (
+    totalQueries >= PROVEN_QUERY_THRESHOLD &&
+    success >= PROVEN_SUCCESS_RATE_THRESHOLD &&
+    uptime >= PROVEN_UPTIME_THRESHOLD
+  );
+}
 
 const initialEditState: EditToolState = { status: "idle" };
 
@@ -58,6 +88,18 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const schema = tool.toolSchema as { kind?: string; tools?: unknown[] } | null;
   const isMCP = schema?.kind === "mcp";
   const skillCount = isMCP ? (schema?.tools?.length ?? 0) : 0;
+
+  // Trust metrics
+  const successRate = Number.parseFloat(tool.successRate ?? "100");
+  const uptimePercent = Number.parseFloat(tool.uptimePercent ?? "100");
+  const totalStaked = Number.parseFloat(tool.totalStaked ?? "0");
+  const priceValue = Number.parseFloat(tool.pricePerQuery) || 0;
+  const isProven = isToolProven(tool.totalQueries, tool.successRate, tool.uptimePercent);
+  
+  // Staking requirements
+  const requiresStaking = priceValue >= STAKING_THRESHOLD;
+  const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
+  const hasRequiredStake = !requiresStaking || totalStaked >= requiredStake;
 
   const handleRefresh = () => {
     setRefreshMessage(null);
@@ -122,7 +164,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
               ${tool.pricePerQuery} per query
             </span>
             <span className="text-muted-foreground text-xs">
-              {tool.totalQueries} queries
+              {tool.totalQueries.toLocaleString()} queries
             </span>
           </div>
           <div className="flex flex-col items-end gap-1">
@@ -133,11 +175,91 @@ export function ToolCard({ tool }: { tool: Tool }) {
           </div>
         </div>
 
-        {/* Verified Badge */}
-        {tool.isVerified && (
-          <Badge className="w-fit" variant="outline">
-            ✓ Verified
-          </Badge>
+        {/* Trust Metrics (Crypto-Native) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Proven Badge - data-driven replacement for Verified */}
+          {isProven && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20" variant="outline">
+                  <TrendingUp className="size-3" />
+                  Proven
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                100+ queries, {successRate.toFixed(0)}% success, {uptimePercent.toFixed(0)}% uptime
+              </TooltipContent>
+            </Tooltip>
+          )}
+          
+          {/* Success Rate */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge 
+                className={cn(
+                  "gap-1",
+                  successRate >= 95 
+                    ? "bg-emerald-500/10 text-emerald-600" 
+                    : successRate >= 80 
+                      ? "bg-amber-500/10 text-amber-600"
+                      : "bg-destructive/10 text-destructive"
+                )} 
+                variant="outline"
+              >
+                <Activity className="size-3" />
+                {successRate.toFixed(0)}%
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>Success Rate</TooltipContent>
+          </Tooltip>
+          
+          {/* Staking Status (for high-value tools) */}
+          {requiresStaking && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge 
+                  className={cn(
+                    "gap-1",
+                    hasRequiredStake 
+                      ? "bg-blue-500/10 text-blue-600" 
+                      : "bg-amber-500/10 text-amber-600"
+                  )} 
+                  variant="outline"
+                >
+                  <Shield className="size-3" />
+                  ${totalStaked.toFixed(0)} staked
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                {hasRequiredStake 
+                  ? `Staked $${totalStaked.toFixed(2)} (required: $${requiredStake.toFixed(2)})`
+                  : `Need $${requiredStake.toFixed(2)} stake (have $${totalStaked.toFixed(2)})`}
+              </TooltipContent>
+            </Tooltip>
+          )}
+          
+          {/* Legacy Verified badge (identity verified, not performance) */}
+          {tool.isVerified && !isProven && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="w-fit" variant="outline">
+                  ID Verified
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>Identity verified (GitHub/Twitter linked)</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+        
+        {/* Staking Warning */}
+        {requiresStaking && !hasRequiredStake && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <p className="text-amber-600/90 text-xs leading-relaxed">
+              This tool requires <strong>${requiredStake.toFixed(2)}</strong> stake.
+              Users may avoid high-price tools without collateral.
+            </p>
+          </div>
         )}
 
         {/* Refresh Message */}

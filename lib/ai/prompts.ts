@@ -52,8 +52,34 @@ User Turn 3: "Which performed better?" → BTC and ETH prices ARE in conversatio
 1. **Understand** what the user is asking for - what information/data/capabilities are needed?
 2. **Search** the marketplace for relevant tools
 3. **Analyze** each tool's capabilities (name, description, mcpTools methods)
-4. **Reason** about which tools can provide which parts of the answer
-5. **Select** all tools needed to fully answer the query
+4. **Apply the Trust Rubric** to prioritize reliable tools
+5. **Reason** about which tools can provide which parts of the answer
+6. **Select** all tools needed to fully answer the query
+
+## Trust & Safety Rubric
+
+Each tool in search results includes trust metrics. Use these to make informed selections:
+
+### Trust Metrics Available
+- \`totalQueries\`: How many times this tool has been used (Lindy Effect - high usage = proven utility)
+- \`successRate\`: Percentage of successful executions (reliability indicator)
+- \`uptimePercent\`: Percentage of time the tool was responsive (health indicator)
+- \`totalStaked\`: USDC collateral locked by developer (economic security for expensive tools)
+- \`isProven\`: True if totalQueries > 100 AND successRate > 95% AND uptime > 98%
+
+### Selection Priority
+1. **Proven Tools (PREFER)**: Look for \`isProven: true\`. These tools have demonstrated reliability.
+2. **Staked Tools**: For expensive queries ($1+), prefer tools with \`totalStaked > 0\` (developer has skin in the game).
+3. **High Success Rate**: Prioritize \`successRate > 95%\` even for non-Proven tools.
+
+### The Underdog Rule (Cost Optimization)
+If a NEW tool (low totalQueries) claims to do exactly what the user needs AND is significantly CHEAPER than a Proven tool:
+- **TRY THE NEW TOOL** to save the user money
+- Include in your selectionReasoning: "Trying newer, cheaper tool [name] to optimize cost"
+- Example: A new tool at $0.001/query vs Proven tool at $0.05/query for the same capability
+
+### Risk Communication
+When selecting unproven or new tools, note this in your selectionReasoning so the user is informed.
 
 ## Required Response Format
 
@@ -69,12 +95,14 @@ export async function main() {
   }
   
   // Analyze each tool and decide which ones are needed
-  // tools array contains: [{ id, name, description, price, kind, isVerified, mcpTools }]
-  // mcpTools shows what methods/capabilities each tool has
+  // tools array contains: [{ id, name, description, price, kind, isVerified, mcpTools,
+  //   totalQueries, successRate, uptimePercent, totalStaked, isProven }]
+  // Use trust metrics to prioritize reliable tools (see Trust Rubric above)
   
   var selectedTools = [];
   
   // For each capability needed, find the best tool
+  // Apply Trust Rubric: prefer Proven tools, but consider cheaper alternatives
   // Add your reasoning as comments and in the 'reason' field
   
   return {
@@ -566,9 +594,25 @@ You will be shown the ACTUAL tools available and must choose which ones to use.
 
 1. **Understand the user's intent** - What data or capability do they actually need?
 2. **Read each tool's description** - Understand what each tool ACTUALLY provides
-3. **Match capabilities to needs** - Don't just keyword match; understand semantic meaning
-4. **Avoid confusions** - Similar names may serve completely different purposes
+3. **Apply Trust Rubric** - Prioritize Proven tools with high reliability
+4. **Match capabilities to needs** - Don't just keyword match; understand semantic meaning
 5. **Check conversation history** - If data was already fetched, no new tools needed
+
+## Trust & Safety Rubric
+
+Each tool shows trust metrics. Use these to make safe selections:
+
+### Prefer Proven Tools
+- **Proven** badge means: 100+ queries, >95% success rate, >98% uptime
+- These tools have demonstrated reliability in production
+
+### Trust Indicators (shown per tool)
+- **Success Rate**: Higher = more reliable
+- **Queries**: More queries = more battle-tested
+- **Staked**: For $1+ tools, staked collateral provides economic security
+
+### The Underdog Rule
+If a NEW tool (few queries) is significantly CHEAPER than a Proven tool for the same capability, consider trying it to save the user money. Note this in your reasoning.
 
 ## Key Principles
 
@@ -576,6 +620,7 @@ You will be shown the ACTUAL tools available and must choose which ones to use.
 - Follow-up questions often need the same tool type as the original question
 - If the user asks about something new, you likely need to fetch new data
 - Multiple tools may be needed if the user asks for different types of data
+- **Trust the data, not the marketing** - rely on success_rate and query counts
 
 ## Response Format
 
@@ -615,6 +660,7 @@ Think through your selection, then output a JSON code block:
 
 /**
  * Tool search result from marketplace (for formatting in selection prompt)
+ * Includes trust metrics for informed selection
  */
 export type MarketplaceToolResult = {
   id: string;
@@ -622,11 +668,18 @@ export type MarketplaceToolResult = {
   description: string;
   price: string;
   mcpTools?: Array<{ name: string; description?: string }>;
+  // Trust metrics
+  totalQueries?: number;
+  successRate?: string;
+  uptimePercent?: string;
+  totalStaked?: string;
+  isProven?: boolean;
 };
 
 /**
  * Build the full selection prompt with actual search results
  * This is used in Step 2 of Two-Step Discovery
+ * Includes trust metrics for each tool to enable informed selection
  */
 export function buildToolSelectionPrompt(
   userMessage: string,
@@ -641,8 +694,16 @@ export function buildToolSelectionPrompt(
             .join("\n")
         : "    (No methods listed)";
 
-      return `### ${index + 1}. ${tool.name} (ID: ${tool.id})
+      // Format trust metrics
+      const provenBadge = tool.isProven ? " [PROVEN]" : "";
+      const successRate = tool.successRate ? `${tool.successRate}%` : "N/A";
+      const queries = tool.totalQueries ?? 0;
+      const staked = Number(tool.totalStaked || 0);
+      const stakedDisplay = staked > 0 ? `$${staked.toFixed(2)}` : "None";
+
+      return `### ${index + 1}. ${tool.name}${provenBadge} (ID: ${tool.id})
 **Price:** $${Number(tool.price || 0).toFixed(4)}/query
+**Trust:** Success ${successRate} | ${queries} queries | Staked: ${stakedDisplay}
 **Description:** ${tool.description}
 **Available Methods:**
 ${mcpToolsList}`;

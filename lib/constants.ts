@@ -23,3 +23,39 @@ export const APP_URL =
 export const guestRegex = /^guest-\d+$/;
 
 export const DUMMY_PASSWORD = generateDummyPassword();
+
+// Vercel Cron Job Configuration
+//
+// IMPORTANT: These values must be manually synced to vercel.json
+// (Vercel doesn't support dynamic cron schedules from code)
+//
+// Current Plan: Hobby
+// - Max 2 cron jobs per project
+// - Each job: once per day max
+// - Execution can occur anytime within the specified hour
+// - Max duration: 60 seconds
+//
+// When upgrading to Pro plan, update these schedules and vercel.json:
+// - Pro allows: 40 cron jobs, every 1 minute frequency
+//
+// Cron format: "minute hour day month weekday"
+// Examples:
+//   "0 0 * * *"    = daily at midnight UTC
+//   "0 * * * *"    = hourly (Pro only)
+//   "0 0,6,12,18 * * *" = every 6 hours (Pro only)
+export const CRON_CONFIG = {
+  // Health check cron - validates tool endpoints are online
+  // Hobby: Daily at 6 AM UTC
+  // Pro recommendation: Hourly "0 * * * *"
+  VALIDATE_TOOLS_SCHEDULE: "0 6 * * *",
+
+  // Stake sync cron - syncs on-chain stake amounts to database
+  // Hobby: Daily at 6 PM UTC (12 hours offset from health check)
+  // Pro recommendation: Every 6 hours "0 0,6,12,18 * * *"
+  SYNC_STAKES_SCHEDULE: "0 18 * * *",
+
+  // Vercel plan limits reference
+  PLAN: "hobby" as "hobby" | "pro",
+  MAX_CRON_JOBS: 2,
+  MIN_FREQUENCY_HOURS: 24, // Hobby = 24h, Pro = 0.0167h (1 min)
+} as const;

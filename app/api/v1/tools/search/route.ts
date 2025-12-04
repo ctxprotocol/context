@@ -53,7 +53,7 @@ export async function GET(request: Request) {
       resultCount: tools.length,
     });
 
-    // Transform to public API format
+    // Transform to public API format with trust metrics
     const publicTools = tools.map((tool) => ({
       id: tool.id,
       name: tool.name,
@@ -61,9 +61,15 @@ export async function GET(request: Request) {
       price: tool.price,
       category: tool.category,
       isVerified: tool.isVerified,
-      kind: tool.kind,
+      kind: "mcp", // All marketplace tools are MCP
       // Include MCP tools info for execution
       mcpTools: tool.mcpTools,
+      // Trust metrics (Level 2 - Reputation Ledger)
+      totalQueries: tool.totalQueries,
+      successRate: tool.successRate,
+      uptimePercent: tool.uptimePercent,
+      totalStaked: tool.totalStaked,
+      isProven: tool.isProven,
     }));
 
     return NextResponse.json({

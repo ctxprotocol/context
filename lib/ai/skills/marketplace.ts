@@ -22,6 +22,16 @@ type McpToolInfo = {
   outputSchema?: unknown;
 };
 
+/**
+ * Marketplace search result with trust metrics
+ *
+ * Trust System (Crypto-Native):
+ * - totalQueries: Lindy Effect - high usage implies survival and utility
+ * - successRate: Objective reality - did the code run successfully?
+ * - uptimePercent: Reliability metric from automated health checks
+ * - totalStaked: Economic security - developer has skin in the game
+ * - isProven: Derived status when tool exceeds trust thresholds
+ */
 type MarketplaceSearchResult = {
   id: string;
   name: string;
@@ -32,11 +42,45 @@ type MarketplaceSearchResult = {
   // The available methods/tools on the MCP server
   // The AI needs this to know what toolName to pass to callMcpSkill
   mcpTools?: McpToolInfo[];
+  // Trust metrics (Level 2 - Reputation Ledger)
+  totalQueries: number;
+  successRate: string;
+  uptimePercent: string;
+  totalStaked: string;
+  // Computed: true if totalQueries > 100 AND successRate > 95% AND uptimePercent > 98%
+  isProven: boolean;
 };
+
+// Trust thresholds for "Proven" status
+const PROVEN_QUERY_THRESHOLD = 100;
+const PROVEN_SUCCESS_RATE_THRESHOLD = 95;
+const PROVEN_UPTIME_THRESHOLD = 98;
+
+/**
+ * Determine if a tool qualifies for "Proven" status based on trust metrics
+ */
+function isToolProven(
+  totalQueries: number,
+  successRate: string | null,
+  uptimePercent: string | null
+): boolean {
+  const success = Number.parseFloat(successRate ?? "0");
+  const uptime = Number.parseFloat(uptimePercent ?? "0");
+
+  return (
+    totalQueries >= PROVEN_QUERY_THRESHOLD &&
+    success >= PROVEN_SUCCESS_RATE_THRESHOLD &&
+    uptime >= PROVEN_UPTIME_THRESHOLD
+  );
+}
 
 // Create a separate connection for marketplace queries
 // This avoids importing from lib/db/queries which has "server-only" directive
-const client = postgres(process.env.POSTGRES_URL!);
+const connectionString = process.env.POSTGRES_URL;
+if (!connectionString) {
+  throw new Error("POSTGRES_URL environment variable is not set");
+}
+const client = postgres(connectionString);
 const db = drizzle(client);
 
 /**
@@ -105,6 +149,10 @@ export async function searchMarketplace(
 
 /**
  * Semantic vector search using pgvector
+ *
+ * Results are ordered by:
+ * 1. Semantic similarity (primary)
+ * 2. Trust metrics are returned for AI decision-making
  */
 async function searchMarketplaceVector(
   query: string,
@@ -117,6 +165,7 @@ async function searchMarketplaceVector(
   // Search by cosine similarity using pgvector
   // The <=> operator computes cosine distance (1 - cosine_similarity)
   // Lower distance = more similar
+  // Include trust metrics for AI decision-making
   const results = await db.execute(sql`
     SELECT 
       id,
@@ -126,6 +175,10 @@ async function searchMarketplaceVector(
       tool_schema as "toolSchema",
       category,
       is_verified as "isVerified",
+      total_queries as "totalQueries",
+      success_rate as "successRate",
+      uptime_percent as "uptimePercent",
+      total_staked as "totalStaked",
       1 - (embedding <=> ${embeddingStr}::vector) as similarity
     FROM "AITool"
     WHERE is_active = true
@@ -135,12 +188,20 @@ async function searchMarketplaceVector(
   `);
 
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
+  const rawResults = results as unknown;
   const rows = (
-    Array.isArray(results) ? results : (results.rows ?? [])
-  ) as Array<Record<string, unknown>>;
+    Array.isArray(rawResults)
+      ? rawResults
+      : ((rawResults as { rows?: unknown[] }).rows ?? [])
+  ) as Record<string, unknown>[];
 
   return rows.map((tool) => {
     const schema = tool.toolSchema as Record<string, unknown> | null;
+    const totalQueries = (tool.totalQueries as number) ?? 0;
+    const successRate = (tool.successRate as string) ?? "100";
+    const uptimePercent = (tool.uptimePercent as string) ?? "100";
+    const totalStaked = (tool.totalStaked as string) ?? "0";
+
     return {
       id: tool.id as string,
       name: tool.name as string,
@@ -149,12 +210,19 @@ async function searchMarketplaceVector(
       category: tool.category as string | null,
       isVerified: tool.isVerified as boolean,
       mcpTools: getMcpTools(schema),
+      // Trust metrics
+      totalQueries,
+      successRate,
+      uptimePercent,
+      totalStaked,
+      isProven: isToolProven(totalQueries, successRate, uptimePercent),
     };
   });
 }
 
 /**
  * Fallback LIKE search (used when vector search is unavailable)
+ * Includes trust metrics for AI decision-making
  */
 async function searchMarketplaceFallback(
   query: string,
@@ -170,7 +238,11 @@ async function searchMarketplaceFallback(
       price_per_query as "pricePerQuery",
       tool_schema as "toolSchema",
       category,
-      is_verified as "isVerified"
+      is_verified as "isVerified",
+      total_queries as "totalQueries",
+      success_rate as "successRate",
+      uptime_percent as "uptimePercent",
+      total_staked as "totalStaked"
     FROM "AITool"
     WHERE is_active = true
       AND (
@@ -178,16 +250,25 @@ async function searchMarketplaceFallback(
         OR LOWER(description) LIKE ${searchTerm}
         OR LOWER(category) LIKE ${searchTerm}
       )
+    ORDER BY total_queries DESC
     LIMIT ${limit}
   `);
 
   // drizzle-orm/postgres-js returns rows directly as array or in .rows
+  const rawResults = results as unknown;
   const rows = (
-    Array.isArray(results) ? results : (results.rows ?? [])
-  ) as Array<Record<string, unknown>>;
+    Array.isArray(rawResults)
+      ? rawResults
+      : ((rawResults as { rows?: unknown[] }).rows ?? [])
+  ) as Record<string, unknown>[];
 
   return rows.map((tool) => {
     const schema = tool.toolSchema as Record<string, unknown> | null;
+    const totalQueries = (tool.totalQueries as number) ?? 0;
+    const successRate = (tool.successRate as string) ?? "100";
+    const uptimePercent = (tool.uptimePercent as string) ?? "100";
+    const totalStaked = (tool.totalStaked as string) ?? "0";
+
     return {
       id: tool.id as string,
       name: tool.name as string,
@@ -196,6 +277,12 @@ async function searchMarketplaceFallback(
       category: tool.category as string | null,
       isVerified: tool.isVerified as boolean,
       mcpTools: getMcpTools(schema),
+      // Trust metrics
+      totalQueries,
+      successRate,
+      uptimePercent,
+      totalStaked,
+      isProven: isToolProven(totalQueries, successRate, uptimePercent),
     };
   });
 }
@@ -203,6 +290,8 @@ async function searchMarketplaceFallback(
 /**
  * Get featured/popular tools from the marketplace
  * Useful for showing suggestions when no specific query is provided
+ *
+ * Featured tools are "Proven" tools with high usage and reliability
  *
  * @param limit - Maximum number of results to return (default: 5)
  */
@@ -219,6 +308,10 @@ export async function getFeaturedTools(
         toolSchema: aiTool.toolSchema,
         category: aiTool.category,
         isVerified: aiTool.isVerified,
+        totalQueries: aiTool.totalQueries,
+        successRate: aiTool.successRate,
+        uptimePercent: aiTool.uptimePercent,
+        totalStaked: aiTool.totalStaked,
       })
       .from(aiTool)
       .where(and(eq(aiTool.isActive, true), eq(aiTool.isVerified, true)))
@@ -227,6 +320,11 @@ export async function getFeaturedTools(
 
     return results.map((tool) => {
       const schema = tool.toolSchema as Record<string, unknown> | null;
+      const totalQueries = tool.totalQueries ?? 0;
+      const successRate = tool.successRate ?? "100";
+      const uptimePercent = tool.uptimePercent ?? "100";
+      const totalStaked = tool.totalStaked ?? "0";
+
       return {
         id: tool.id,
         name: tool.name,
@@ -235,6 +333,12 @@ export async function getFeaturedTools(
         category: tool.category,
         isVerified: tool.isVerified,
         mcpTools: getMcpTools(schema),
+        // Trust metrics
+        totalQueries,
+        successRate,
+        uptimePercent,
+        totalStaked,
+        isProven: isToolProven(totalQueries, successRate, uptimePercent),
       };
     });
   } catch (error) {
@@ -245,6 +349,7 @@ export async function getFeaturedTools(
 
 /**
  * Get tools by category
+ * Includes trust metrics for informed selection
  *
  * @param category - Category to filter by
  * @param limit - Maximum number of results to return (default: 10)
@@ -263,6 +368,10 @@ export async function getToolsByCategory(
         toolSchema: aiTool.toolSchema,
         category: aiTool.category,
         isVerified: aiTool.isVerified,
+        totalQueries: aiTool.totalQueries,
+        successRate: aiTool.successRate,
+        uptimePercent: aiTool.uptimePercent,
+        totalStaked: aiTool.totalStaked,
       })
       .from(aiTool)
       .where(and(eq(aiTool.isActive, true), eq(aiTool.category, category)))
@@ -271,6 +380,11 @@ export async function getToolsByCategory(
 
     return results.map((tool) => {
       const schema = tool.toolSchema as Record<string, unknown> | null;
+      const totalQueries = tool.totalQueries ?? 0;
+      const successRate = tool.successRate ?? "100";
+      const uptimePercent = tool.uptimePercent ?? "100";
+      const totalStaked = tool.totalStaked ?? "0";
+
       return {
         id: tool.id,
         name: tool.name,
@@ -279,6 +393,12 @@ export async function getToolsByCategory(
         category: tool.category,
         isVerified: tool.isVerified,
         mcpTools: getMcpTools(schema),
+        // Trust metrics
+        totalQueries,
+        successRate,
+        uptimePercent,
+        totalStaked,
+        isProven: isToolProven(totalQueries, successRate, uptimePercent),
       };
     });
   } catch (error) {

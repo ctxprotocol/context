@@ -1,7 +1,8 @@
 "use client";
 
-import { ExternalLink, Github, Loader2, Package } from "lucide-react";
-import { useActionState } from "react";
+import { ExternalLink, Github, Loader2, Package, Shield } from "lucide-react";
+import Link from "next/link";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,6 +27,11 @@ import { cn } from "@/lib/utils";
 import { submitTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
+// Staking threshold: $1.00 per query requires collateral
+const STAKING_THRESHOLD = 1.0;
+// Required stake = 100x the query price
+const STAKE_MULTIPLIER = 100;
+
 export function ContributeForm() {
   const [state, formAction, isPending] = useActionState(
     submitTool,
@@ -34,6 +40,12 @@ export function ContributeForm() {
   const { activeWallet } = useWalletIdentity();
   const walletAddress = activeWallet?.address;
   const isConnected = !!walletAddress;
+
+  // Track price for staking requirement display
+  const [price, setPrice] = useState(state.payload?.price || "0.00");
+  const priceValue = Number.parseFloat(price) || 0;
+  const requiresStaking = priceValue >= STAKING_THRESHOLD;
+  const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -164,6 +176,7 @@ Agent tips (optional):
                 max="100"
                 min="0"
                 name="price"
+                onChange={(e) => setPrice(e.target.value)}
                 step="0.0001"
                 type="number"
               />
@@ -172,6 +185,32 @@ Agent tips (optional):
                 query (up to 4 decimals, e.g. $0.001). Users pay{" "}
                 <strong>once per chat turn</strong>.
               </p>
+
+              {/* Staking Requirement Notice */}
+              {requiresStaking && (
+                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                  <Shield className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <div className="space-y-1">
+                    <p className="font-medium text-amber-700 text-xs">
+                      Staking Required
+                    </p>
+                    <p className="text-amber-600/90 text-xs leading-relaxed">
+                      Tools priced $1.00+ require collateral to protect users.
+                      You&apos;ll need to stake{" "}
+                      <strong>${requiredStake.toFixed(2)} USDC</strong> (100x
+                      query price) after submission.
+                    </p>
+                    <Link
+                      className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"
+                      href="/developer/tools"
+                    >
+                      Manage stakes in Developer Tools
+                      <ExternalLink className="size-3" />
+                    </Link>
+                  </div>
+                </div>
+              )}
+
               <FieldError message={priceError} />
             </div>
           </div>
