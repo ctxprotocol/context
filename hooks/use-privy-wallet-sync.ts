@@ -92,8 +92,9 @@ export function usePrivyWalletSync() {
 
     const smartWallet = linkedConnectedWallets.find((wallet) => {
       const walletLike = wallet as WalletLike;
+      const walletType = walletLike.type as string | undefined;
       return (
-        walletLike.type === "smart_wallet" ||
+        walletType === "smart_wallet" ||
         walletLike.walletClientType === "smart_wallet" ||
         walletLike.walletClientType === "coinbase_smart_wallet"
       );
