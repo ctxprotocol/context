@@ -160,7 +160,7 @@ export function usePrivyWalletSync() {
 
     lastWalletKeyRef.current = walletKey;
 
-    void setActiveWallet(preferredWallet).catch(() => {
+    void setActiveWallet(preferredWallet as ConnectedWallet).catch(() => {
       lastWalletKeyRef.current = undefined;
     });
   }, [preferredWallet, setActiveWallet]);
