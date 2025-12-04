@@ -1495,7 +1495,6 @@ The user asked: "${message.parts
                     autoModeAllowedTools.set(selectedTool.toolId, {
                       tool: dbTool,
                       transactionHash: autoModePayment.transactionHash,
-                      kind: "mcp",
                       executionCount: 0,
                     });
                   }
