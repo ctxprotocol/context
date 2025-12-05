@@ -18,3 +18,4 @@ CREATE INDEX IF NOT EXISTS idx_aitool_health_check ON "AITool"(is_active, last_h
 CREATE INDEX IF NOT EXISTS idx_aitool_failures ON "AITool"(consecutive_failures) WHERE is_active = true;
 
 
+
