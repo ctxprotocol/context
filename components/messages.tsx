@@ -11,6 +11,7 @@ import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
 import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
+import { OnboardingHero } from "./onboarding-hero";
 
 type MessagesProps = {
   chatId: string;
@@ -49,8 +50,6 @@ function PureMessages({
   });
 
   const { stage, reset, setStage } = usePaymentStatus();
-
-  const { dataStream } = useDataStream();
 
   useEffect(() => {
     if (status === "submitted") {
@@ -132,7 +131,9 @@ function PureMessages({
     >
       <Conversation className="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 md:gap-6">
         <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
-          {messages.length === 0 && stage === "idle" && <Greeting />}
+          {messages.length === 0 &&
+            stage === "idle" &&
+            (isReadonly ? <OnboardingHero /> : <Greeting />)}
 
           {messages.map((message, index) => {
             // FIX: Ghost Bubble & Double-Icon Prevention
@@ -142,9 +143,7 @@ function PureMessages({
             // the PreviewMessage appears seamlessly in its place.
             const isLast = index === messages.length - 1;
             const isGhost =
-              isLast &&
-              message.role === "assistant" &&
-              shouldShowThinking;
+              isLast && message.role === "assistant" && shouldShowThinking;
 
             const hasOnlyDataParts =
               message.role === "assistant" &&
@@ -184,15 +183,15 @@ function PureMessages({
                 message={message}
                 regenerate={regenerate}
                 requiresScrollPadding={
-                    // Don't apply scroll padding if ThinkingMessage is showing below,
-                    // as that would create extra whitespace between the last message
-                    // and the thinking indicator.
-                    // Also don't apply during streaming - wait until fully idle to prevent
-                    // jarring shifts when ThinkingMessage is exiting.
-                    hasSentMessage && 
-                    index === messages.length - 1 && 
-                    !shouldShowThinking &&
-                    status !== "streaming"
+                  // Don't apply scroll padding if ThinkingMessage is showing below,
+                  // as that would create extra whitespace between the last message
+                  // and the thinking indicator.
+                  // Also don't apply during streaming - wait until fully idle to prevent
+                  // jarring shifts when ThinkingMessage is exiting.
+                  hasSentMessage &&
+                  index === messages.length - 1 &&
+                  !shouldShowThinking &&
+                  status !== "streaming"
                 }
                 setMessages={setMessages}
                 vote={
