@@ -17,3 +17,4 @@ CREATE INDEX IF NOT EXISTS idx_aitool_health_check ON "AITool"(is_active, last_h
 -- Add index for consecutive failures (for finding tools to deactivate)
 CREATE INDEX IF NOT EXISTS idx_aitool_failures ON "AITool"(consecutive_failures) WHERE is_active = true;
 
+
