@@ -1,10 +1,16 @@
 "use client";
 
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Loader2, Shield } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Shield,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { parseUnits } from "viem";
 import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
-import { toast } from "sonner";
+import { LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import {
@@ -45,7 +55,7 @@ type StakePanelProps = {
 
 /**
  * StakePanel - Manage stakes for high-value tools
- * 
+ *
  * Tools priced >= $1.00/query require developers to stake 100x the query price
  * as collateral. This provides economic security for users against scams.
  */
@@ -62,7 +72,7 @@ export function StakePanel({ tools }: StakePanelProps) {
   // Calculate total required vs total staked
   const totalRequired = toolsRequiringStake.reduce((sum, tool) => {
     const price = Number.parseFloat(tool.pricePerQuery) || 0;
-    return sum + (price * STAKE_MULTIPLIER);
+    return sum + price * STAKE_MULTIPLIER;
   }, 0);
 
   const totalStaked = toolsRequiringStake.reduce((sum, tool) => {
@@ -96,7 +106,10 @@ export function StakePanel({ tools }: StakePanelProps) {
             </p>
           </div>
           {hasUnderstakedTools && (
-            <Badge variant="outline" className="gap-1 bg-amber-500/10 text-amber-600">
+            <Badge
+              className="gap-1 bg-amber-500/10 text-amber-600"
+              variant="outline"
+            >
               <AlertTriangle className="size-3" />
               Action Required
             </Badge>
@@ -111,10 +124,14 @@ export function StakePanel({ tools }: StakePanelProps) {
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Total Required</p>
-            <p className={cn(
-              "font-bold text-lg",
-              totalStaked < totalRequired ? "text-amber-600" : "text-emerald-600"
-            )}>
+            <p
+              className={cn(
+                "font-bold text-lg",
+                totalStaked < totalRequired
+                  ? "text-amber-600"
+                  : "text-emerald-600"
+              )}
+            >
               ${formatPrice(totalRequired)}
             </p>
           </div>
@@ -128,8 +145,8 @@ export function StakePanel({ tools }: StakePanelProps) {
           <div className="space-y-2">
             {toolsRequiringStake.map((tool) => (
               <StakeToolRow
-                key={tool.id}
                 isConnected={isConnected}
+                key={tool.id}
                 tool={tool}
                 walletAddress={activeWallet?.address}
               />
@@ -152,7 +169,12 @@ function StakeToolRow({
   isConnected,
   walletAddress,
 }: {
-  tool: { id: string; name: string; pricePerQuery: string; totalStaked: string | null };
+  tool: {
+    id: string;
+    name: string;
+    pricePerQuery: string;
+    totalStaked: string | null;
+  };
   isConnected: boolean;
   walletAddress?: string;
 }) {
@@ -160,40 +182,56 @@ function StakeToolRow({
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [approvalStatus, setApprovalStatus] = useState<"idle" | "approving" | "depositing">("idle");
+  const [approvalStatus, setApprovalStatus] = useState<
+    "idle" | "approving" | "depositing"
+  >("idle");
 
   // Contract addresses
-  const routerAddress = process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
+  const routerAddress = process.env
+    .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 
   // Contract hooks for staking
-  const { writeContractAsync: depositStakeAsync, isPending: isDepositing, data: depositTxHash } = 
-    useWriteContextRouterDepositStake();
-  const { writeContract: withdrawStake, isPending: isWithdrawing, data: withdrawTxHash } = 
-    useWriteContextRouterWithdrawStake();
-  
+  const {
+    writeContractAsync: depositStakeAsync,
+    isPending: isDepositing,
+    data: depositTxHash,
+  } = useWriteContextRouterDepositStake();
+  const {
+    writeContract: withdrawStake,
+    isPending: isWithdrawing,
+    data: withdrawTxHash,
+  } = useWriteContextRouterWithdrawStake();
+
   // USDC approval hook
-  const { writeContractAsync: approveUsdcAsync, isPending: isApproving, data: approveTxHash } = 
-    useWriteErc20Approve();
-  
+  const {
+    writeContractAsync: approveUsdcAsync,
+    isPending: isApproving,
+    data: approveTxHash,
+  } = useWriteErc20Approve();
+
   // Wait for transaction confirmations
-  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } = 
+  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } =
     useWaitForTransactionReceipt({ hash: approveTxHash });
-  const { isLoading: isDepositConfirming, isSuccess: isDepositSuccess } = 
+  const { isLoading: isDepositConfirming, isSuccess: isDepositSuccess } =
     useWaitForTransactionReceipt({ hash: depositTxHash });
-  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } = 
+  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } =
     useWaitForTransactionReceipt({ hash: withdrawTxHash });
 
   // Check current USDC allowance for the router
-  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
-    address: usdcAddress,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: walletAddress ? [walletAddress as `0x${string}`, routerAddress] : undefined,
-    query: {
-      enabled: Boolean(walletAddress && routerAddress && usdcAddress),
-    },
-  });
+  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract(
+    {
+      address: usdcAddress,
+      abi: ERC20_ABI,
+      functionName: "allowance",
+      args: walletAddress
+        ? [walletAddress as `0x${string}`, routerAddress]
+        : undefined,
+      query: {
+        enabled: Boolean(walletAddress && routerAddress && usdcAddress),
+      },
+    }
+  );
 
   const price = Number.parseFloat(tool.pricePerQuery) || 0;
   const staked = Number.parseFloat(tool.totalStaked ?? "0") || 0;
@@ -219,25 +257,27 @@ function StakeToolRow({
     try {
       const amountInUsdc = parseUnits(depositAmount, 6); // USDC has 6 decimals
       const toolIdBigInt = uuidToUint256(tool.id);
-      
+
       // Check if we need approval first
-      const currentAllowanceNum = currentAllowance ? BigInt(currentAllowance.toString()) : BigInt(0);
-      
+      const currentAllowanceNum = currentAllowance
+        ? BigInt(currentAllowance.toString())
+        : BigInt(0);
+
       if (currentAllowanceNum < amountInUsdc) {
         // Need to approve first
         setApprovalStatus("approving");
         toast.info("Approving USDC spend...");
-        
+
         await approveUsdcAsync({
           address: usdcAddress,
           args: [routerAddress, amountInUsdc],
         });
-        
+
         // Wait for approval to be confirmed
         toast.success("USDC approved! Now depositing stake...");
         await refetchAllowance();
       }
-      
+
       // Now deposit
       setApprovalStatus("depositing");
       await depositStakeAsync({
@@ -246,8 +286,12 @@ function StakeToolRow({
       toast.success("Deposit transaction submitted!");
     } catch (error) {
       console.error("Deposit failed:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to deposit stake";
-      if (errorMessage.includes("User rejected") || errorMessage.includes("user rejected")) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to deposit stake";
+      if (
+        errorMessage.includes("User rejected") ||
+        errorMessage.includes("user rejected")
+      ) {
         toast.error("Transaction cancelled");
       } else {
         toast.error(errorMessage);
@@ -277,14 +321,16 @@ function StakeToolRow({
     try {
       const amountInUsdc = parseUnits(withdrawAmount, 6); // USDC has 6 decimals
       const toolIdBigInt = uuidToUint256(tool.id);
-      
+
       withdrawStake({
         args: [toolIdBigInt, amountInUsdc],
       });
       toast.success("Withdrawal transaction submitted!");
     } catch (error) {
       console.error("Withdrawal failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to withdraw stake");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to withdraw stake"
+      );
     }
   };
 
@@ -305,7 +351,12 @@ function StakeToolRow({
     }
   }, [isWithdrawSuccess, isWithdrawOpen]);
 
-  const isDepositBusy = isDepositing || isDepositConfirming || isApproving || isApproveConfirming || approvalStatus !== "idle";
+  const isDepositBusy =
+    isDepositing ||
+    isDepositConfirming ||
+    isApproving ||
+    isApproveConfirming ||
+    approvalStatus !== "idle";
   const isWithdrawBusy = isWithdrawing || isWithdrawConfirming;
 
   return (
@@ -316,7 +367,10 @@ function StakeToolRow({
           {hasEnough ? (
             <Tooltip>
               <TooltipTrigger>
-                <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-600">
+                <Badge
+                  className="gap-1 bg-emerald-500/10 text-emerald-600"
+                  variant="outline"
+                >
                   <Shield className="size-3" />
                 </Badge>
               </TooltipTrigger>
@@ -325,11 +379,16 @@ function StakeToolRow({
           ) : (
             <Tooltip>
               <TooltipTrigger>
-                <Badge variant="outline" className="gap-1 bg-amber-500/10 text-amber-600">
+                <Badge
+                  className="gap-1 bg-amber-500/10 text-amber-600"
+                  variant="outline"
+                >
                   <AlertTriangle className="size-3" />
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent>Need ${formatPrice(shortfall)} more</TooltipContent>
+              <TooltipContent>
+                Need ${formatPrice(shortfall)} more
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -340,9 +399,9 @@ function StakeToolRow({
 
       <div className="flex items-center gap-2">
         {/* Deposit Dialog */}
-        <Dialog open={isDepositOpen} onOpenChange={setIsDepositOpen}>
+        <Dialog onOpenChange={setIsDepositOpen} open={isDepositOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button className="gap-1" size="sm" variant="outline">
               <ArrowDownToLine className="size-3.5" />
               Deposit
             </Button>
@@ -351,7 +410,8 @@ function StakeToolRow({
             <DialogHeader>
               <DialogTitle>Deposit Stake</DialogTitle>
               <DialogDescription>
-                Add USDC collateral for {tool.name}. Required: ${formatPrice(required)}
+                Add USDC collateral for {tool.name}. Required: $
+                {formatPrice(required)}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4">
@@ -373,11 +433,19 @@ function StakeToolRow({
               </div>
             </div>
             <DialogFooter>
-              <Button disabled={isDepositBusy} onClick={handleDeposit} type="button">
+              <Button
+                disabled={isDepositBusy}
+                onClick={handleDeposit}
+                type="button"
+              >
                 {isDepositBusy ? (
                   <>
-                    <Loader2 className="animate-spin" />
-                    {approvalStatus === "approving" || isApproving || isApproveConfirming
+                    <span className="animate-spin">
+                      <LoaderIcon size={16} />
+                    </span>
+                    {approvalStatus === "approving" ||
+                    isApproving ||
+                    isApproveConfirming
                       ? "Approving USDC..."
                       : isDepositConfirming
                         ? "Confirming..."
@@ -392,13 +460,13 @@ function StakeToolRow({
         </Dialog>
 
         {/* Withdraw Dialog */}
-        <Dialog open={isWithdrawOpen} onOpenChange={setIsWithdrawOpen}>
+        <Dialog onOpenChange={setIsWithdrawOpen} open={isWithdrawOpen}>
           <DialogTrigger asChild>
             <Button
+              className="gap-1"
               disabled={staked === 0}
               size="sm"
               variant="ghost"
-              className="gap-1"
             >
               <ArrowUpFromLine className="size-3.5" />
               Withdraw
@@ -408,7 +476,8 @@ function StakeToolRow({
             <DialogHeader>
               <DialogTitle>Withdraw Stake</DialogTitle>
               <DialogDescription>
-                Remove USDC collateral from {tool.name}. Current stake: ${formatPrice(staked)}
+                Remove USDC collateral from {tool.name}. Current stake: $
+                {formatPrice(staked)}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4">
@@ -431,10 +500,17 @@ function StakeToolRow({
               </div>
             </div>
             <DialogFooter>
-              <Button disabled={isWithdrawBusy} onClick={handleWithdraw} type="button" variant="outline">
+              <Button
+                disabled={isWithdrawBusy}
+                onClick={handleWithdraw}
+                type="button"
+                variant="outline"
+              >
                 {isWithdrawBusy ? (
                   <>
-                    <Loader2 className="animate-spin" />
+                    <span className="animate-spin">
+                      <LoaderIcon size={16} />
+                    </span>
                     {isWithdrawConfirming ? "Confirming..." : "Withdrawing..."}
                   </>
                 ) : (
@@ -448,4 +524,3 @@ function StakeToolRow({
     </div>
   );
 }
-

@@ -1,8 +1,8 @@
 "use client";
 
-import { Activity, Loader2, Pencil, RefreshCw, Shield, TrendingUp } from "lucide-react";
+import { Activity, Pencil, RefreshCw, Shield, TrendingUp } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { CrossIcon } from "@/components/icons";
+import { CrossIcon, LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,13 +22,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn, formatPrice } from "@/lib/utils";
 import {
+  type EditToolState,
   editTool,
   refreshMCPSkills,
   toggleToolStatus,
-  type EditToolState,
 } from "./actions";
 
 // Trust thresholds for "Proven" status
@@ -66,7 +70,7 @@ function isToolProven(
 ): boolean {
   const success = Number.parseFloat(successRate ?? "0");
   const uptime = Number.parseFloat(uptimePercent ?? "0");
-  
+
   return (
     totalQueries >= PROVEN_QUERY_THRESHOLD &&
     success >= PROVEN_SUCCESS_RATE_THRESHOLD &&
@@ -83,7 +87,10 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [closeTooltipOpen, setCloseTooltipOpen] = useState(false);
 
-  const [editState, editAction, isEditing] = useActionState(editTool, initialEditState);
+  const [editState, editAction, isEditing] = useActionState(
+    editTool,
+    initialEditState
+  );
 
   const schema = tool.toolSchema as { kind?: string; tools?: unknown[] } | null;
   const isMCP = schema?.kind === "mcp";
@@ -94,8 +101,12 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const uptimePercent = Number.parseFloat(tool.uptimePercent ?? "100");
   const totalStaked = Number.parseFloat(tool.totalStaked ?? "0");
   const priceValue = Number.parseFloat(tool.pricePerQuery) || 0;
-  const isProven = isToolProven(tool.totalQueries, tool.successRate, tool.uptimePercent);
-  
+  const isProven = isToolProven(
+    tool.totalQueries,
+    tool.successRate,
+    tool.uptimePercent
+  );
+
   // Staking requirements
   const requiresStaking = priceValue >= STAKING_THRESHOLD;
   const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
@@ -140,7 +151,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">{tool.name}</h3>
             {isMCP && (
-              <Badge variant="outline" className="text-xs">
+              <Badge className="text-xs" variant="outline">
                 {skillCount} {skillCount === 1 ? "skill" : "skills"}
               </Badge>
             )}
@@ -181,29 +192,33 @@ export function ToolCard({ tool }: { tool: Tool }) {
           {isProven && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20" variant="outline">
+                <Badge
+                  className="gap-1 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                  variant="outline"
+                >
                   <TrendingUp className="size-3" />
                   Proven
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                100+ queries, {successRate.toFixed(0)}% success, {uptimePercent.toFixed(0)}% uptime
+                100+ queries, {successRate.toFixed(0)}% success,{" "}
+                {uptimePercent.toFixed(0)}% uptime
               </TooltipContent>
             </Tooltip>
           )}
-          
+
           {/* Success Rate */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge 
+              <Badge
                 className={cn(
                   "gap-1",
-                  successRate >= 95 
-                    ? "bg-emerald-500/10 text-emerald-600" 
-                    : successRate >= 80 
+                  successRate >= 95
+                    ? "bg-emerald-500/10 text-emerald-600"
+                    : successRate >= 80
                       ? "bg-amber-500/10 text-amber-600"
                       : "bg-destructive/10 text-destructive"
-                )} 
+                )}
                 variant="outline"
               >
                 <Activity className="size-3" />
@@ -212,32 +227,31 @@ export function ToolCard({ tool }: { tool: Tool }) {
             </TooltipTrigger>
             <TooltipContent>Success Rate</TooltipContent>
           </Tooltip>
-          
+
           {/* Staking Status (for high-value tools) */}
           {requiresStaking && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Badge 
+                <Badge
                   className={cn(
                     "gap-1",
-                    hasRequiredStake 
-                      ? "bg-blue-500/10 text-blue-600" 
+                    hasRequiredStake
+                      ? "bg-blue-500/10 text-blue-600"
                       : "bg-amber-500/10 text-amber-600"
-                  )} 
+                  )}
                   variant="outline"
                 >
-                  <Shield className="size-3" />
-                  ${totalStaked.toFixed(0)} staked
+                  <Shield className="size-3" />${totalStaked.toFixed(0)} staked
                 </Badge>
               </TooltipTrigger>
               <TooltipContent>
-                {hasRequiredStake 
+                {hasRequiredStake
                   ? `Staked $${totalStaked.toFixed(2)} (required: $${requiredStake.toFixed(2)})`
                   : `Need $${requiredStake.toFixed(2)} stake (have $${totalStaked.toFixed(2)})`}
               </TooltipContent>
             </Tooltip>
           )}
-          
+
           {/* Legacy Verified badge (identity verified, not performance) */}
           {tool.isVerified && !isProven && (
             <Tooltip>
@@ -246,18 +260,20 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   ID Verified
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent>Identity verified (GitHub/Twitter linked)</TooltipContent>
+              <TooltipContent>
+                Identity verified (GitHub/Twitter linked)
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
-        
+
         {/* Staking Warning */}
         {requiresStaking && !hasRequiredStake && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
             <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <p className="text-amber-600/90 text-xs leading-relaxed">
-              This tool requires <strong>${requiredStake.toFixed(2)}</strong> stake.
-              Users may avoid high-price tools without collateral.
+              This tool requires <strong>${requiredStake.toFixed(2)}</strong>{" "}
+              stake. Users may avoid high-price tools without collateral.
             </p>
           </div>
         )}
@@ -267,7 +283,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
           <p
             className={cn(
               "text-sm",
-              refreshMessage.includes("Refreshed") ? "text-emerald-600" : "text-destructive"
+              refreshMessage.includes("Refreshed")
+                ? "text-emerald-600"
+                : "text-destructive"
             )}
           >
             {refreshMessage}
@@ -277,27 +295,28 @@ export function ToolCard({ tool }: { tool: Tool }) {
         {/* Actions */}
         <div className="flex items-center gap-2 border-t pt-4">
           {/* Edit Sheet */}
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <Sheet onOpenChange={setIsSheetOpen} open={isSheetOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button className="gap-1.5" size="sm" variant="outline">
                 <Pencil className="h-3.5 w-3.5" />
                 Edit
               </Button>
             </SheetTrigger>
-            <SheetContent 
-              side="right" 
+            <SheetContent
               className="flex w-full flex-col overflow-y-auto border-l-0 bg-sidebar p-0 text-sidebar-foreground sm:max-w-md"
               hideCloseButton
+              side="right"
             >
               <form action={editAction} className="flex flex-1 flex-col">
                 {/* Header */}
-                <div className="flex items-start justify-between border-b border-sidebar-border px-4 py-3">
+                <div className="flex items-start justify-between border-sidebar-border border-b px-4 py-3">
                   <div className="flex flex-col gap-1.5">
                     <h2 className="font-semibold text-lg text-sidebar-foreground">
                       Edit Tool
                     </h2>
                     <p className="text-sidebar-foreground/60 text-xs">
-                      Update your tool's details. Changes are reflected immediately.
+                      Update your tool's details. Changes are reflected
+                      immediately.
                     </p>
                   </div>
                   <Tooltip open={closeTooltipOpen}>
@@ -322,27 +341,29 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   </Tooltip>
                 </div>
 
-                <input type="hidden" name="toolId" value={tool.id} />
+                <input name="toolId" type="hidden" value={tool.id} />
 
                 {/* Form Fields */}
                 <div className="flex-1 space-y-4 px-4 py-4">
                   {/* Name */}
                   <div className="space-y-1.5">
-                    <Label 
-                      htmlFor="edit-name" 
-                      className="text-sidebar-foreground/60 text-xs font-medium"
+                    <Label
+                      className="font-medium text-sidebar-foreground/60 text-xs"
+                      htmlFor="edit-name"
                     >
                       Name
                     </Label>
                     <Input
-                      id="edit-name"
-                      name="name"
-                      defaultValue={tool.name}
-                      aria-invalid={editState.fieldErrors?.name ? true : undefined}
+                      aria-invalid={
+                        editState.fieldErrors?.name ? true : undefined
+                      }
                       className={cn(
                         "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
                         editState.fieldErrors?.name && "border-destructive"
                       )}
+                      defaultValue={tool.name}
+                      id="edit-name"
+                      name="name"
                     />
                     {editState.fieldErrors?.name && (
                       <p className="text-destructive text-xs">
@@ -353,53 +374,68 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
                   {/* Description */}
                   <div className="space-y-1.5">
-                    <Label 
+                    <Label
+                      className="font-medium text-sidebar-foreground/60 text-xs"
                       htmlFor="edit-description"
-                      className="text-sidebar-foreground/60 text-xs font-medium"
                     >
                       Description
                     </Label>
                     <Textarea
+                      aria-invalid={
+                        editState.fieldErrors?.description ? true : undefined
+                      }
+                      className={cn(
+                        "resize-none border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
+                        editState.fieldErrors?.description &&
+                          "border-destructive"
+                      )}
+                      defaultValue={tool.description}
                       id="edit-description"
                       name="description"
-                      defaultValue={tool.description}
                       rows={5}
-                      aria-invalid={editState.fieldErrors?.description ? true : undefined}
-                      className={cn(
-                        "border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring resize-none",
-                        editState.fieldErrors?.description && "border-destructive"
-                      )}
                     />
                     {editState.fieldErrors?.description && (
                       <p className="text-destructive text-xs">
                         {editState.fieldErrors.description}
                       </p>
                     )}
-                    <p className="text-sidebar-foreground/50 text-[10px] leading-tight">
-                      Shown in the marketplace and used for semantic search. 
+                    <p className="text-[10px] text-sidebar-foreground/50 leading-tight">
+                      Shown in the marketplace and used for semantic search.
                       Updating regenerates the search embedding.
                     </p>
                   </div>
 
                   {/* Category */}
                   <div className="space-y-1.5">
-                    <Label 
+                    <Label
+                      className="font-medium text-sidebar-foreground/60 text-xs"
                       htmlFor="edit-category"
-                      className="text-sidebar-foreground/60 text-xs font-medium"
                     >
                       Category
                     </Label>
-                    <Select name="category" defaultValue={tool.category ?? ""}>
+                    <Select defaultValue={tool.category ?? ""} name="category">
                       <SelectTrigger className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground focus:ring-ring">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Network">Network (Gas, RPC, Nodes)</SelectItem>
-                        <SelectItem value="Actions">Actions (Swaps, Lending, Execution)</SelectItem>
-                        <SelectItem value="Market Data">Market Data (Crypto, Stocks, Forex)</SelectItem>
-                        <SelectItem value="Real World">Real World (Weather, Sports, News)</SelectItem>
-                        <SelectItem value="Social">Social (Identity, Governance)</SelectItem>
-                        <SelectItem value="Utility">Utility (Search, Compute)</SelectItem>
+                        <SelectItem value="Network">
+                          Network (Gas, RPC, Nodes)
+                        </SelectItem>
+                        <SelectItem value="Actions">
+                          Actions (Swaps, Lending, Execution)
+                        </SelectItem>
+                        <SelectItem value="Market Data">
+                          Market Data (Crypto, Stocks, Forex)
+                        </SelectItem>
+                        <SelectItem value="Real World">
+                          Real World (Weather, Sports, News)
+                        </SelectItem>
+                        <SelectItem value="Social">
+                          Social (Identity, Governance)
+                        </SelectItem>
+                        <SelectItem value="Utility">
+                          Utility (Search, Compute)
+                        </SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
@@ -407,25 +443,28 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
                   {/* Price */}
                   <div className="space-y-1.5">
-                    <Label 
+                    <Label
+                      className="font-medium text-sidebar-foreground/60 text-xs"
                       htmlFor="edit-price"
-                      className="text-sidebar-foreground/60 text-xs font-medium"
                     >
                       Price per query (USDC)
                     </Label>
                     <Input
-                      id="edit-price"
-                      name="pricePerQuery"
-                      type="number"
-                      step="0.0001"
-                      min="0"
-                      max="100"
-                      defaultValue={tool.pricePerQuery}
-                      aria-invalid={editState.fieldErrors?.pricePerQuery ? true : undefined}
+                      aria-invalid={
+                        editState.fieldErrors?.pricePerQuery ? true : undefined
+                      }
                       className={cn(
-                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring font-mono",
-                        editState.fieldErrors?.pricePerQuery && "border-destructive"
+                        "h-9 border-sidebar-border bg-sidebar-accent font-mono text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
+                        editState.fieldErrors?.pricePerQuery &&
+                          "border-destructive"
                       )}
+                      defaultValue={tool.pricePerQuery}
+                      id="edit-price"
+                      max="100"
+                      min="0"
+                      name="pricePerQuery"
+                      step="0.0001"
+                      type="number"
                     />
                     {editState.fieldErrors?.pricePerQuery && (
                       <p className="text-destructive text-xs">
@@ -437,22 +476,26 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   {/* Error message */}
                   {editState.status === "error" && editState.message && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2">
-                      <p className="text-destructive text-xs">{editState.message}</p>
+                      <p className="text-destructive text-xs">
+                        {editState.message}
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Footer */}
-                <div className="border-t border-sidebar-border px-4 py-3">
-                  <Button 
-                    type="submit" 
-                    disabled={isEditing} 
+                <div className="border-sidebar-border border-t px-4 py-3">
+                  <Button
                     className="w-full"
+                    disabled={isEditing}
                     size="sm"
+                    type="submit"
                   >
                     {isEditing ? (
                       <>
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        <span className="mr-2 animate-spin">
+                          <LoaderIcon size={14} />
+                        </span>
                         Saving...
                       </>
                     ) : (
@@ -467,14 +510,16 @@ export function ToolCard({ tool }: { tool: Tool }) {
           {/* Refresh Skills (MCP only) */}
           {isMCP && (
             <Button
-              variant="outline"
-              size="sm"
               className="gap-1.5"
               disabled={isRefreshing}
               onClick={handleRefresh}
+              size="sm"
               type="button"
+              variant="outline"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")}
+              />
               {isRefreshing ? "Refreshing..." : "Refresh Skills"}
             </Button>
           )}
@@ -488,8 +533,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 </span>
               </TooltipTrigger>
               <TooltipContent>
-                {tool.isActive 
-                  ? "Tool is visible in the marketplace" 
+                {tool.isActive
+                  ? "Tool is visible in the marketplace"
                   : "Tool is hidden from the marketplace"}
               </TooltipContent>
             </Tooltip>

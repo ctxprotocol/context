@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   Key,
-  Loader2,
   Moon,
   Sparkles,
   Trash2,
@@ -15,6 +14,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { mutate } from "swr";
+import { LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -282,11 +282,75 @@ export function SettingsForm() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Current Tier Card Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-10 animate-pulse rounded-lg bg-muted" />
+                <div className="space-y-2">
+                  <div className="h-5 w-24 animate-pulse rounded-md bg-muted" />
+                  <div className="h-4 w-48 animate-pulse rounded-md bg-muted" />
+                </div>
+              </div>
+              <div className="h-5 w-16 animate-pulse rounded-full bg-muted" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-32 animate-pulse rounded-md bg-muted" />
+                <div className="h-4 w-16 animate-pulse rounded-md bg-muted" />
+              </div>
+              <div className="h-2 w-full animate-pulse rounded-full bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* BYOK Providers Card Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="size-10 animate-pulse rounded-lg bg-muted" />
+              <div className="space-y-2">
+                <div className="h-5 w-40 animate-pulse rounded-md bg-muted" />
+                <div className="h-4 w-64 animate-pulse rounded-md bg-muted" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div className="rounded-lg border p-4" key={i}>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 animate-pulse rounded-lg bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-28 animate-pulse rounded-md bg-muted" />
+                    <div className="h-3 w-48 animate-pulse rounded-md bg-muted" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Convenience Tier Card Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="size-10 animate-pulse rounded-lg bg-muted" />
+              <div className="space-y-2">
+                <div className="h-5 w-36 animate-pulse rounded-md bg-muted" />
+                <div className="h-4 w-56 animate-pulse rounded-md bg-muted" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
+            <div className="mt-2 h-4 w-3/4 animate-pulse rounded-md bg-muted" />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -325,7 +389,9 @@ export function SettingsForm() {
           {settings.tier === "free" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Queries used today</span>
+                <span className="text-muted-foreground">
+                  Queries used today
+                </span>
                 <span className="font-medium">
                   {settings.freeQueriesUsedToday} /{" "}
                   {settings.freeQueriesDailyLimit}
@@ -339,8 +405,9 @@ export function SettingsForm() {
                   }}
                 />
               </div>
-              {settings.freeQueriesUsedToday >= settings.freeQueriesDailyLimit && (
-                <p className="text-sm text-destructive">
+              {settings.freeQueriesUsedToday >=
+                settings.freeQueriesDailyLimit && (
+                <p className="text-destructive text-sm">
                   Daily limit reached. Add your own API key below to continue.
                 </p>
               )}
@@ -349,13 +416,14 @@ export function SettingsForm() {
 
           {settings.tier === "byok" && settings.byokProvider && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <CheckCircle2 className="size-4 text-green-500" />
                 <span>Unlimited queries with your own API key</span>
               </div>
               <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
                 {(() => {
-                  const ProviderIcon = PROVIDER_CONFIG[settings.byokProvider].icon;
+                  const ProviderIcon =
+                    PROVIDER_CONFIG[settings.byokProvider].icon;
                   return <ProviderIcon className="size-5" />;
                 })()}
                 <span className="font-medium">
@@ -378,7 +446,7 @@ export function SettingsForm() {
                   ${Number(settings.accumulatedModelCost).toFixed(4)}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Model costs are paid per query and go to the platform to cover
                 API expenses.
               </p>
@@ -422,19 +490,20 @@ export function SettingsForm() {
           {(["kimi", "gemini", "anthropic"] as BYOKProvider[]).map(
             (provider) => {
               const config = PROVIDER_CONFIG[provider];
-              const isConfigured = settings.configuredProviders.includes(provider);
+              const isConfigured =
+                settings.configuredProviders.includes(provider);
               const isActive = settings.byokProvider === provider;
               const isExpanded = expandedProvider === provider;
               const ProviderIcon = config.icon;
 
               return (
                 <div
-                  key={provider}
                   className={cn(
                     "rounded-lg border transition-all",
                     isActive && "border-primary bg-primary/5",
                     isExpanded && "ring-2 ring-primary/20"
                   )}
+                  key={provider}
                 >
                   {/* Provider Header */}
                   <div
@@ -455,14 +524,12 @@ export function SettingsForm() {
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{config.name}</span>
                         {isConfigured && (
-                          <Badge
-                            variant={isActive ? "default" : "secondary"}
-                          >
+                          <Badge variant={isActive ? "default" : "secondary"}>
                             {isActive ? "Active" : "Configured"}
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-muted-foreground text-sm">
                         {config.description}
                       </p>
                     </div>
@@ -483,12 +550,12 @@ export function SettingsForm() {
 
                   {/* Expanded Content */}
                   {isExpanded && (
-                    <div className="border-t px-4 pb-4 pt-3 space-y-4">
+                    <div className="space-y-4 border-t px-4 pt-3 pb-4">
                       {isConfigured ? (
                         <div className="space-y-3">
                           <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
                             <Key className="size-4 text-muted-foreground" />
-                            <span className="flex-1 font-mono text-sm text-muted-foreground">
+                            <span className="flex-1 font-mono text-muted-foreground text-sm">
                               {config.placeholder.slice(0, 6)}••••••••••••
                             </span>
                             <Badge variant="secondary">Configured</Badge>
@@ -535,7 +602,7 @@ export function SettingsForm() {
                                 value={apiKeys[provider]}
                               />
                               <Button
-                                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                                className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
                                 onClick={() =>
                                   setShowKeys((prev) => ({
                                     ...prev,
@@ -553,7 +620,7 @@ export function SettingsForm() {
                                 )}
                               </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-muted-foreground text-xs">
                               {config.helpText}:{" "}
                               <a
                                 className="text-primary hover:underline"
@@ -571,7 +638,9 @@ export function SettingsForm() {
                             onClick={() => handleSaveApiKey(provider)}
                           >
                             {saving ? (
-                              <Loader2 className="mr-2 size-4 animate-spin" />
+                              <span className="mr-2 animate-spin">
+                                <LoaderIcon size={16} />
+                              </span>
                             ) : null}
                             Save & Activate
                           </Button>
@@ -626,7 +695,7 @@ export function SettingsForm() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Pay actual model costs as a pass-through, without needing to manage
             your own API key. Model costs are estimated upfront and tracked per
             query. Works with both Manual Mode (selected tools) and Auto Mode
@@ -644,7 +713,7 @@ export function SettingsForm() {
                   ${Number(settings.accumulatedModelCost).toFixed(4)}
                 </span>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-2 text-muted-foreground text-xs">
                 Model costs are estimated upfront and paid to the platform. In
                 agentic flows, multiple AI calls may occur per response.
               </p>
@@ -659,7 +728,11 @@ export function SettingsForm() {
               onClick={handleSwitchToConvenienceTier}
               variant="outline"
             >
-              {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+              {saving && (
+                <span className="mr-2 animate-spin">
+                  <LoaderIcon size={16} />
+                </span>
+              )}
               Switch to Convenience Tier
             </Button>
           )}
@@ -669,8 +742,8 @@ export function SettingsForm() {
       {/* Info Section */}
       <div className="rounded-lg border border-dashed p-4">
         <div>
-          <h3 className="font-medium text-sm mb-2">About API Key Security</h3>
-          <ul className="space-y-1 text-xs text-muted-foreground">
+          <h3 className="mb-2 font-medium text-sm">About API Key Security</h3>
+          <ul className="space-y-1 text-muted-foreground text-xs">
             <li>• Your API keys are encrypted at rest using AES-256-GCM</li>
             <li>• Keys are never logged or exposed in our systems</li>
             <li>• You can remove your keys at any time</li>

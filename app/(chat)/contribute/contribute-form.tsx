@@ -1,8 +1,9 @@
 "use client";
 
-import { ExternalLink, Github, Loader2, Package, Shield } from "lucide-react";
+import { ExternalLink, Github, Package, Shield } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { LoaderIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -289,7 +290,9 @@ Agent tips (optional):
           >
             {isPending ? (
               <>
-                <Loader2 className="animate-spin" />
+                <span className="animate-spin">
+                  <LoaderIcon size={16} />
+                </span>
                 Verifying...
               </>
             ) : (

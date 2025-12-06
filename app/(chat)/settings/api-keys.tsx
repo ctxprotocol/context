@@ -1,16 +1,9 @@
 "use client";
 
-import {
-  AlertCircle,
-  Check,
-  Copy,
-  Key,
-  Loader2,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, Check, Copy, Key, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { LoaderIcon } from "@/components/icons";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,7 +83,9 @@ export function ApiKeysSection() {
         setNewlyCreatedKey(data.key);
         setNewKeyName("");
         await fetchKeys();
-        toast.success("API key created! Copy it now - it won't be shown again.");
+        toast.success(
+          "API key created! Copy it now - it won't be shown again."
+        );
       } else {
         toast.error(data.error || "Failed to create API key");
       }
@@ -160,8 +155,44 @@ export function ApiKeysSection() {
   if (loading) {
     return (
       <Card>
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="size-10 animate-pulse rounded-lg bg-muted" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 w-24 animate-pulse rounded-md bg-muted" />
+              <div className="h-4 w-64 animate-pulse rounded-md bg-muted" />
+            </div>
+            <div className="h-9 w-24 animate-pulse rounded-md bg-muted" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* API Key list skeleton */}
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <div
+                className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3"
+                key={i}
+              >
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-28 animate-pulse rounded-md bg-muted" />
+                    <div className="h-5 w-20 animate-pulse rounded-md bg-muted" />
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="h-3 w-32 animate-pulse rounded-md bg-muted" />
+                    <div className="h-3 w-28 animate-pulse rounded-md bg-muted" />
+                  </div>
+                </div>
+                <div className="size-9 animate-pulse rounded-md bg-muted" />
+              </div>
+            ))}
+          </div>
+          {/* Usage section skeleton */}
+          <div className="rounded-lg border border-dashed p-4">
+            <div className="h-4 w-16 animate-pulse rounded-md bg-muted" />
+            <div className="mt-2 h-3 w-72 animate-pulse rounded-md bg-muted" />
+            <div className="mt-3 h-20 w-full animate-pulse rounded-md bg-muted" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -180,7 +211,7 @@ export function ApiKeysSection() {
               Manage API keys for programmatic access to the Context Protocol
             </CardDescription>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+          <Dialog onOpenChange={handleDialogOpenChange} open={dialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="size-4" />
@@ -201,21 +232,22 @@ export function ApiKeysSection() {
                     <AlertCircle className="size-4" />
                     <AlertTitle>Save your API key now!</AlertTitle>
                     <AlertDescription>
-                      This is the only time you'll see this key. Copy it and store it securely.
+                      This is the only time you'll see this key. Copy it and
+                      store it securely.
                     </AlertDescription>
                   </Alert>
                   <div className="space-y-3">
                     <Label>Your new API key</Label>
                     <div className="flex gap-2">
                       <Input
+                        className="font-mono text-sm"
                         readOnly
                         value={newlyCreatedKey}
-                        className="font-mono text-sm"
                       />
                       <Button
-                        variant="outline"
-                        size="icon"
                         onClick={handleCopy}
+                        size="icon"
+                        variant="outline"
                       >
                         {copied ? (
                           <Check className="size-4 text-green-500" />
@@ -237,16 +269,16 @@ export function ApiKeysSection() {
                     <Label htmlFor="keyName">Key Name</Label>
                     <Input
                       id="keyName"
-                      placeholder="e.g., Development, Production"
-                      value={newKeyName}
                       onChange={(e) => setNewKeyName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           handleCreate();
                         }
                       }}
+                      placeholder="e.g., Development, Production"
+                      value={newKeyName}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       A friendly name to help you identify this key
                     </p>
                   </div>
@@ -254,8 +286,12 @@ export function ApiKeysSection() {
                     <DialogClose asChild>
                       <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={handleCreate} disabled={creating}>
-                      {creating && <Loader2 className="size-4 animate-spin" />}
+                    <Button disabled={creating} onClick={handleCreate}>
+                      {creating && (
+                        <span className="animate-spin">
+                          <LoaderIcon size={16} />
+                        </span>
+                      )}
                       Create Key
                     </Button>
                   </DialogFooter>
@@ -269,7 +305,7 @@ export function ApiKeysSection() {
         {keys.length === 0 ? (
           <div className="rounded-lg border border-dashed py-8 text-center">
             <Key className="mx-auto size-8 text-muted-foreground/50" />
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="mt-2 text-muted-foreground text-sm">
               No API keys yet. Create one to get started.
             </p>
           </div>
@@ -277,29 +313,31 @@ export function ApiKeysSection() {
           <div className="space-y-3">
             {keys.map((key) => (
               <div
-                key={key.id}
                 className="flex items-center justify-between rounded-lg border bg-muted/50 px-4 py-3"
+                key={key.id}
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{key.name}</span>
-                    <Badge variant="outline" className="font-mono text-xs">
+                    <Badge className="font-mono text-xs" variant="outline">
                       {key.keyPrefix}...
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4 text-muted-foreground text-xs">
                     <span>Created {formatDate(key.createdAt)}</span>
                     <span>Last used: {formatDate(key.lastUsedAt)}</span>
                   </div>
                 </div>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(key.id)}
                   disabled={deletingId === key.id}
+                  onClick={() => handleDelete(key.id)}
+                  size="icon"
+                  variant="ghost"
                 >
                   {deletingId === key.id ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <span className="animate-spin">
+                      <LoaderIcon size={16} />
+                    </span>
                   ) : (
                     <Trash2 className="size-4 text-destructive" />
                   )}
@@ -310,11 +348,12 @@ export function ApiKeysSection() {
         )}
 
         <div className="rounded-lg border border-dashed p-4">
-          <h4 className="font-medium text-sm mb-2">Usage</h4>
-          <p className="text-xs text-muted-foreground mb-3">
-            Use your API key to authenticate requests to the Context Protocol API:
+          <h4 className="mb-2 font-medium text-sm">Usage</h4>
+          <p className="mb-3 text-muted-foreground text-xs">
+            Use your API key to authenticate requests to the Context Protocol
+            API:
           </p>
-          <pre className="rounded-md bg-muted p-3 text-xs overflow-x-auto">
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
             <code>{`curl -X POST ${process.env.NEXT_PUBLIC_APP_URL || "https://ctxprotocol.com"}/api/v1/tools/execute \\
   -H "Authorization: Bearer sk_live_..." \\
   -H "Content-Type: application/json" \\
@@ -325,4 +364,3 @@ export function ApiKeysSection() {
     </Card>
   );
 }
-

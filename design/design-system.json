@@ -333,6 +333,28 @@
       "title": "text-lg font-semibold text-foreground mb-2",
       "description": "text-sm text-muted-foreground max-w-sm mb-6"
     },
+    "Spinner": {
+      "component": "LoaderIcon from @/components/icons",
+      "note": "ALWAYS use the custom LoaderIcon component, NOT Loader2 or Loader2Icon from lucide-react. The custom spinner has opacity variations for a polished spinning effect.",
+      "usage": {
+        "wrapper": "Wrap LoaderIcon in a container with 'animate-spin' class",
+        "sizes": {
+          "sm": "LoaderIcon size={14}",
+          "default": "LoaderIcon size={16}",
+          "lg": "LoaderIcon size={24}"
+        },
+        "examples": {
+          "inline": "<span className=\"animate-spin\"><LoaderIcon size={16} /></span>",
+          "withText": "<div className=\"flex items-center gap-2\"><span className=\"animate-spin\"><LoaderIcon /></span>Loading...</div>",
+          "button": "<Button disabled>{isLoading && <span className=\"animate-spin\"><LoaderIcon /></span>}Submit</Button>"
+        }
+      },
+      "doNot": [
+        "Do NOT use Loader2 or Loader2Icon from lucide-react",
+        "Do NOT use spinner classes directly on the icon - use a wrapper",
+        "Do NOT import spinners from other libraries"
+      ]
+    },
     "Dialog": {
       "content": {
         "base": "rounded-xl",
@@ -352,7 +374,7 @@
   },
   "patterns": {
     "emptyStates": "Always provide a clear call to action in empty states. Use a muted icon, a clear heading, and a helpful description.",
-    "loading": "Use Skeletons for content loading. Use Spinners (Loader2 with animate-spin) for action states. Buttons must show a spinner when submitting. Never block the UI without feedback.",
+    "loading": "Use Skeletons for content loading. Use LoaderIcon from @/components/icons (NOT Loader2 from lucide-react) wrapped with animate-spin for action states. Buttons must show a spinner when submitting. Never block the UI without feedback.",
     "error": "Use destructuve color sparingly. Error messages should be helpful, not alarming. Use Alert or Toast components.",
     "mobile": "Always verify layouts on mobile. Use 'flex-col' on mobile and 'flex-row' on desktop for forms and lists."
   },

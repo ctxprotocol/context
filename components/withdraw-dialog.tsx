@@ -1,10 +1,11 @@
 "use client";
 
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { encodeFunctionData, parseUnits } from "viem";
 import { useReadContract } from "wagmi";
+import { LoaderIcon } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -18,7 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
-import { toast } from "sonner";
 
 type WithdrawDialogProps = {
   onOpenChange: (open: boolean) => void;
@@ -33,7 +33,9 @@ export function WithdrawDialog({
   signerAddress,
   smartWalletAddress,
 }: WithdrawDialogProps) {
-  const [destinationAddress, setDestinationAddress] = useState(signerAddress ?? "");
+  const [destinationAddress, setDestinationAddress] = useState(
+    signerAddress ?? ""
+  );
   const [amount, setAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -45,7 +47,9 @@ export function WithdrawDialog({
     address: usdcAddress,
     abi: ERC20_ABI,
     functionName: "balanceOf",
-    args: smartWalletAddress ? [smartWalletAddress as `0x${string}`] : undefined,
+    args: smartWalletAddress
+      ? [smartWalletAddress as `0x${string}`]
+      : undefined,
     query: {
       enabled: Boolean(smartWalletAddress && usdcAddress),
     },
@@ -126,7 +130,9 @@ export function WithdrawDialog({
 
       console.log("[withdraw] Transaction sent:", txHash);
 
-      toast.success(`Successfully withdrew ${amount} USDC to ${formatWalletAddress(destinationAddress)}`);
+      toast.success(
+        `Successfully withdrew ${amount} USDC to ${formatWalletAddress(destinationAddress)}`
+      );
 
       // Refresh balance
       await refetchBalance();
@@ -135,7 +141,11 @@ export function WithdrawDialog({
       onOpenChange(false);
     } catch (error) {
       console.error("[withdraw] Error:", error);
-      toast.error(error instanceof Error ? error.message : "Withdrawal failed. Please try again.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Withdrawal failed. Please try again."
+      );
     } finally {
       setIsWithdrawing(false);
     }
@@ -154,7 +164,9 @@ export function WithdrawDialog({
         <div className="flex flex-col gap-4">
           {/* Balance display */}
           <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
-            <span className="text-muted-foreground text-sm">Available balance</span>
+            <span className="text-muted-foreground text-sm">
+              Available balance
+            </span>
             <span className="font-medium">${formattedBalance} USDC</span>
           </div>
 
@@ -217,13 +229,20 @@ export function WithdrawDialog({
           </Button>
           <Button
             className="min-w-28"
-            disabled={isWithdrawing || !amount || !destinationAddress || balanceNumber === 0}
+            disabled={
+              isWithdrawing ||
+              !amount ||
+              !destinationAddress ||
+              balanceNumber === 0
+            }
             onClick={handleWithdraw}
             type="button"
           >
             {isWithdrawing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <span className="mr-2 animate-spin">
+                  <LoaderIcon size={16} />
+                </span>
                 Sending…
               </>
             ) : (
@@ -235,4 +254,3 @@ export function WithdrawDialog({
     </AlertDialog>
   );
 }
-

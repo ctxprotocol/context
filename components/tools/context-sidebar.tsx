@@ -1,7 +1,7 @@
 "use client";
 
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
-import { Loader2Icon, ZapIcon } from "lucide-react";
+import { ZapIcon } from "lucide-react";
 import {
   type CSSProperties,
   useCallback,
@@ -29,7 +29,7 @@ import { useSessionTools } from "@/hooks/use-session-tools";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { cn, formatPrice } from "@/lib/utils";
-import { CrossIcon } from "../icons";
+import { CrossIcon, LoaderIcon } from "../icons";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { AutoPayApprovalDialog } from "./auto-pay-approval-dialog";
@@ -435,8 +435,8 @@ export function ContextSidebar({
                   value={searchQuery}
                 />
                 {isSearching && (
-                  <div className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-2">
-                    <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                  <div className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-2 animate-spin text-muted-foreground">
+                    <LoaderIcon size={16} />
                   </div>
                 )}
               </div>
@@ -582,7 +582,9 @@ export function ContextSidebar({
                     >
                       {loadingMore ? (
                         <>
-                          <Loader2Icon className="mr-2 size-4 animate-spin" />
+                          <span className="mr-2 animate-spin">
+                            <LoaderIcon size={16} />
+                          </span>
                           Loading...
                         </>
                       ) : (
@@ -781,7 +783,9 @@ export function ContextSidebar({
                 </div>
                 {loading ? (
                   <div className="flex items-center gap-2 text-sidebar-foreground/50">
-                    <Loader2Icon className="size-3.5 animate-spin" />
+                    <span className="animate-spin">
+                      <LoaderIcon size={14} />
+                    </span>
                     <span>Calculating...</span>
                   </div>
                 ) : (
