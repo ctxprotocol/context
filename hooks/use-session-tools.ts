@@ -20,6 +20,8 @@ export type ToolListItem = Pick<
 
 const PAGE_SIZE = 30;
 
+const LOG_PREFIX = "[useSessionTools]";
+
 export function useSessionTools() {
   const [activeToolIds, setActiveToolIds] = useLocalStorage<string[]>(
     "context-active-tools",
@@ -33,43 +35,95 @@ export function useSessionTools() {
   const offsetRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Track whether initial fetch has completed (distinguishes "loading" from "empty")
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Track component instance for debugging
+  const instanceIdRef = useRef(Math.random().toString(36).slice(2, 8));
+
   // Extra tools found via search that aren't in the main paginated list
   // This ensures tools toggled from search results are available for payment
   const [extraTools, setExtraTools] = useState<ToolListItem[]>([]);
 
+  // Debug: Log state on every render
+  console.log(LOG_PREFIX, `[${instanceIdRef.current}] render:`, {
+    loading,
+    isInitialized,
+    toolsCount: tools.length,
+  });
+
   // Fetch initial page of tools
   useEffect(() => {
+    console.log(
+      LOG_PREFIX,
+      `[${instanceIdRef.current}] useEffect MOUNT - starting fetch`
+    );
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     setLoading(true);
+    setIsInitialized(false);
+    console.log(
+      LOG_PREFIX,
+      `[${instanceIdRef.current}] set loading=true, isInitialized=false`
+    );
+
     fetch(`/api/tools?limit=${PAGE_SIZE}&offset=0&count=true`, {
       signal: controller.signal,
     })
       .then((res) => res.json())
       .then((data) => {
+        // Don't update state if aborted (component unmounted)
+        if (controller.signal.aborted) {
+          console.log(
+            LOG_PREFIX,
+            `[${instanceIdRef.current}] fetch SUCCESS but ABORTED, skipping state update`
+          );
+          return;
+        }
+        console.log(
+          LOG_PREFIX,
+          `[${instanceIdRef.current}] fetch SUCCESS, tools:`,
+          data.tools?.length ?? 0
+        );
         setTools(data.tools || []);
         setTotal(data.total ?? null);
         setHasMore(data.hasMore ?? false);
         offsetRef.current = data.tools?.length ?? 0;
+        // Only mark as initialized after successful data load
+        setLoading(false);
+        setIsInitialized(true);
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
-          console.error("Failed to fetch tools:", error);
+          console.error(
+            LOG_PREFIX,
+            `[${instanceIdRef.current}] fetch ERROR:`,
+            error
+          );
+          // On error (not abort), still mark as initialized so we show empty state
+          setLoading(false);
+          setIsInitialized(true);
+        } else {
+          console.log(LOG_PREFIX, `[${instanceIdRef.current}] fetch ABORTED`);
+          // Don't update state on abort - component is unmounting
         }
-      })
-      .finally(() => {
-        setLoading(false);
       });
 
     return () => {
+      console.log(
+        LOG_PREFIX,
+        `[${instanceIdRef.current}] useEffect CLEANUP - aborting`
+      );
       controller.abort();
     };
   }, []);
 
   // Load more tools (for infinite scroll / pagination)
   const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore) {
+      return;
+    }
 
     setLoadingMore(true);
     try {
@@ -144,6 +198,7 @@ export function useSessionTools() {
   return {
     tools,
     loading,
+    isInitialized,
     loadingMore,
     hasMore,
     total,

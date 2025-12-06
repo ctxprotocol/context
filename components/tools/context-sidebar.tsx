@@ -37,6 +37,7 @@ import { ContextSidebarItem } from "./context-sidebar-item";
 
 const DEBOUNCE_MS = 300;
 const LOG_PREFIX = "[tool-search]";
+const SIDEBAR_LOG = "[context-sidebar]";
 
 type ContextSidebarProps = {
   isOpen: boolean;
@@ -56,6 +57,7 @@ export function ContextSidebar({
   const {
     tools,
     loading,
+    isInitialized,
     loadingMore,
     hasMore,
     total,
@@ -327,6 +329,24 @@ export function ContextSidebar({
     ? (vectorResults ?? clientFilteredTools)
     : tools;
 
+  // Debug: Log which render path will be taken
+  const showSkeleton = loading || !isInitialized;
+  const showNoTools =
+    !showSkeleton && !isSearchActive && displayTools.length === 0;
+  const showCategories =
+    !showSkeleton && !isSearchActive && displayTools.length > 0;
+
+  console.log(SIDEBAR_LOG, "render decision:", {
+    loading,
+    isInitialized,
+    toolsCount: tools.length,
+    displayToolsCount: displayTools.length,
+    isSearchActive,
+    showSkeleton,
+    showNoTools,
+    showCategories,
+  });
+
   // Wrapper for toggling tools that also stores search result tools
   // This ensures tools found via search are available for payment even if
   // they're not in the first page of paginated results
@@ -443,7 +463,7 @@ export function ContextSidebar({
             </SidebarMenu>
           </SidebarHeader>
           <SidebarContent>
-            {loading ? (
+            {loading || !isInitialized ? (
               <SidebarGroup>
                 <SidebarGroupLabel className="text-sidebar-foreground/50">
                   Tools
@@ -502,13 +522,7 @@ export function ContextSidebar({
                     </div>
                   ) : displayTools.length === 0 ? (
                     // No results
-                    <div
-                      className={cn(
-                        "flex flex-row items-center justify-center gap-2 px-2 py-4 text-sm",
-                        "w-full",
-                        "text-sidebar-foreground/60"
-                      )}
-                    >
+                    <div className="px-2 py-4 text-sidebar-foreground/60 text-sm">
                       No tools found.
                     </div>
                   ) : (
@@ -530,13 +544,7 @@ export function ContextSidebar({
               // No tools at all
               <SidebarGroup>
                 <SidebarGroupContent>
-                  <div
-                    className={cn(
-                      "flex flex-row items-center justify-center gap-2 px-2 text-sm",
-                      "w-full",
-                      "text-sidebar-foreground/60"
-                    )}
-                  >
+                  <div className="px-2 text-sidebar-foreground/60 text-sm">
                     No tools available yet.
                   </div>
                 </SidebarGroupContent>
