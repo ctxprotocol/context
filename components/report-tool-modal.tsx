@@ -93,13 +93,15 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface ReportToolModalProps {
   chatId: string;
+  messageId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalProps) {
+export function ReportToolModal({ chatId, messageId, open, onOpenChange }: ReportToolModalProps) {
+  // Pass messageId to filter tools to just this message's turn
   const { data, isLoading, error } = useSWR<ToolsResponse>(
-    open ? `/api/chat/${chatId}/tools` : null,
+    open ? `/api/chat/${chatId}/tools?messageId=${messageId}` : null,
     fetcher
   );
 
@@ -208,17 +210,18 @@ export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalP
         <div className="py-4">
           {/* Loading State */}
           {isLoading && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col gap-2 rounded-lg border p-4">
-                  <div className="flex items-center justify-between">
-                    <Skeleton className="h-5 w-32" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                  <Skeleton className="h-4 w-48" />
-                  <div className="flex items-center gap-2 pt-2">
-                    <Skeleton className="h-3 w-24" />
-                    <Skeleton className="h-3 w-3" />
+                <div key={i} className="flex w-full flex-col gap-2 rounded-lg border p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-5 w-1/3" />
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-8 w-8 rounded-full" />
                   </div>
                 </div>
               ))}

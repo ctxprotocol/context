@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt, gte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { auth } from "@/app/(auth)/auth";
-import { aiTool, chat, toolQuery } from "@/lib/db/schema";
+import { aiTool, chat, message, toolQuery } from "@/lib/db/schema";
 
 // biome-ignore lint/style/noNonNullAssertion: env validation happens at startup
 const client = postgres(process.env.POSTGRES_URL!);
@@ -12,10 +12,13 @@ const db = drizzle(client);
 /**
  * GET /api/chat/[id]/tools
  *
- * Fetches all tools used in a chat session, including:
+ * Fetches tools used in a chat session, filtered by message if provided.
  * - Tool details (name, price)
  * - Transaction hash (for dispute filing)
  * - Query output (for schema validation context)
+ *
+ * Query params:
+ * - messageId: Filter to tools executed for this specific message's turn
  *
  * This endpoint is used by the Report Tool modal to show users
  * which tools were used and allow them to file disputes.
@@ -31,6 +34,8 @@ export async function GET(
   }
 
   const { id: chatId } = await params;
+  const url = new URL(request.url);
+  const messageId = url.searchParams.get("messageId");
 
   // Verify the chat belongs to the user
   const [chatRecord] = await db
@@ -45,7 +50,52 @@ export async function GET(
     );
   }
 
-  // Fetch all tool queries for this chat
+  // Build the query conditions
+  let queryConditions = eq(toolQuery.chatId, chatId);
+
+  // If messageId is provided, filter to tools executed for that message's turn
+  // We use timestamp-based filtering since ToolQuery doesn't have messageId yet
+  if (messageId) {
+    // Get the target message and the previous assistant message
+    const messages = await db
+      .select({ id: message.id, createdAt: message.createdAt, role: message.role })
+      .from(message)
+      .where(eq(message.chatId, chatId))
+      .orderBy(message.createdAt);
+
+    const targetIndex = messages.findIndex((m) => m.id === messageId);
+
+    if (targetIndex !== -1) {
+      const targetMessage = messages[targetIndex];
+
+      // Find the previous assistant message (start of this turn)
+      let previousAssistantTime: Date | null = null;
+      for (let i = targetIndex - 1; i >= 0; i--) {
+        if (messages[i].role === "assistant") {
+          previousAssistantTime = messages[i].createdAt;
+          break;
+        }
+      }
+
+      // Filter tools executed between previous assistant message and this message
+      const endTime = new Date(targetMessage.createdAt.getTime() + 60000); // +1 min buffer
+      if (previousAssistantTime) {
+        queryConditions = and(
+          eq(toolQuery.chatId, chatId),
+          gte(toolQuery.executedAt, previousAssistantTime),
+          lt(toolQuery.executedAt, endTime)
+        )!;
+      } else {
+        // First turn - filter tools before this message
+        queryConditions = and(
+          eq(toolQuery.chatId, chatId),
+          lt(toolQuery.executedAt, endTime)
+        )!;
+      }
+    }
+  }
+
+  // Fetch tool queries with the appropriate filter
   const toolQueries = await db
     .select({
       id: toolQuery.id,
@@ -62,7 +112,7 @@ export async function GET(
     })
     .from(toolQuery)
     .innerJoin(aiTool, eq(toolQuery.toolId, aiTool.id))
-    .where(eq(toolQuery.chatId, chatId))
+    .where(queryConditions)
     .orderBy(desc(toolQuery.executedAt));
 
   // Group by transaction hash (since multiple tools share one tx)

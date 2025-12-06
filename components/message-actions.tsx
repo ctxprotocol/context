@@ -205,6 +205,7 @@ export function PureMessageActions({
         <Suspense fallback={null}>
           <ReportToolModal
             chatId={chatId}
+            messageId={message.id}
             onOpenChange={setReportModalOpen}
             open={reportModalOpen}
           />
