@@ -7,16 +7,17 @@ import { encodeFunctionData, parseUnits } from "viem";
 import { useReadContract } from "wagmi";
 import { LoaderIcon } from "@/components/icons";
 import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
 
@@ -43,7 +44,11 @@ export function WithdrawDialog({
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 
   // Read USDC balance of smart wallet
-  const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
+  const { 
+    data: usdcBalance, 
+    refetch: refetchBalance,
+    isLoading: isBalanceLoading 
+  } = useReadContract({
     address: usdcAddress,
     abi: ERC20_ABI,
     functionName: "balanceOf",
@@ -152,22 +157,26 @@ export function WithdrawDialog({
   };
 
   return (
-    <AlertDialog onOpenChange={handleOpenChange} open={open}>
-      <AlertDialogContent className="max-w-sm rounded-xl">
-        <AlertDialogHeader>
-          <AlertDialogTitle>Withdraw USDC</AlertDialogTitle>
-          <AlertDialogDescription>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-sm rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Withdraw USDC</DialogTitle>
+          <DialogDescription>
             Transfer USDC from your smart wallet to any address.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 py-2">
           {/* Balance display */}
-          <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
             <span className="text-muted-foreground text-sm">
               Available balance
             </span>
-            <span className="font-medium">${formattedBalance} USDC</span>
+            {isBalanceLoading ? (
+               <Skeleton className="h-5 w-24" />
+            ) : (
+               <span className="font-medium font-mono">${formattedBalance} USDC</span>
+            )}
           </div>
 
           {/* Destination address */}
@@ -178,6 +187,7 @@ export function WithdrawDialog({
               onChange={(e) => setDestinationAddress(e.target.value)}
               placeholder="0x..."
               value={destinationAddress}
+              className="font-mono"
             />
             {signerAddress && destinationAddress === signerAddress && (
               <p className="text-muted-foreground text-xs">
@@ -208,6 +218,7 @@ export function WithdrawDialog({
               step="0.01"
               type="number"
               value={amount}
+              className="font-mono"
             />
           </div>
 
@@ -218,7 +229,7 @@ export function WithdrawDialog({
           </p>
         </div>
 
-        <AlertDialogFooter className="mt-4">
+        <DialogFooter className="mt-2">
           <Button
             disabled={isWithdrawing}
             onClick={() => onOpenChange(false)}
@@ -249,8 +260,8 @@ export function WithdrawDialog({
               "Withdraw"
             )}
           </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1274,10 +1274,12 @@ export const FlagIcon = ({ size = 16 }: { size?: number }) => (
     width={size}
   >
     <path
-      clipRule="evenodd"
-      d="M2.5 2C2.22386 2 2 2.22386 2 2.5V14.5C2 14.7761 2.22386 15 2.5 15H3.5C3.77614 15 4 14.7761 4 14.5V9H14.5L12 5.5L14.5 2H4V2.5C4 2.22386 3.77614 2 3.5 2H2.5Z"
-      fill="currentColor"
-      fillRule="evenodd"
+      d="M2.75 8.25H13.75L11.25 4.5L13.75 0.75H2.75V15.25"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.5"
     />
   </svg>
 );
