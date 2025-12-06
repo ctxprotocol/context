@@ -19,3 +19,4 @@ CREATE INDEX IF NOT EXISTS idx_aitool_failures ON "AITool"(consecutive_failures)
 
 
 
+

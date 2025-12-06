@@ -29,8 +29,8 @@ export function OnboardingHero() {
         </h1>
 
         <p className="mx-auto mb-12 max-w-xl text-lg text-muted-foreground">
-          Access a decentralized network of data tools. Use one wallet to pay
-          developers instantly for every query.
+          Agents write code to buy the data LLMs lack. Users pay per query.
+          Developers monetize every run.
         </p>
 
         {/* The 3-Step Flow Cards */}
