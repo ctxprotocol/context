@@ -20,10 +20,10 @@ function PureSuggestedActions({
   isReadonly,
 }: SuggestedActionsProps) {
   const suggestedActions = [
-    "What are the advantages of using Next.js?",
-    "Write code to demonstrate Dijkstra's algorithm",
-    "Help me write an essay about Silicon Valley",
-    "What is the weather in San Francisco?",
+    "What's the current price of ETH and BTC?",
+    "What are the gas prices on Ethereum right now?",
+    "Find the best DeFi yield opportunities on Base",
+    "Compare funding rates for BTC across exchanges",
   ];
 
   return (
