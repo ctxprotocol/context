@@ -301,22 +301,22 @@ export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalP
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Reporting:</span>
                   <span className="font-medium text-sm">{selectedTool.toolName}</span>
-                </div>
+              </div>
               </div>
               
               <div className="grid gap-3">
                 {REASON_OPTIONS.map((option) => {
                   const Icon = option.icon;
                   return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setReason(option.value)}
-                      className={cn(
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setReason(option.value)}
+                    className={cn(
                         "flex w-full items-center gap-4 rounded-lg border bg-card p-4 text-left transition-all",
                         "hover:border-primary hover:bg-accent/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      )}
-                    >
+                    )}
+                  >
                       <div className={cn(
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border bg-background",
                         "group-hover:border-primary group-hover:text-primary"
@@ -326,10 +326,10 @@ export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalP
                       <div className="space-y-1">
                         <span className="font-medium leading-none">{option.label}</span>
                         <p className="text-xs text-muted-foreground">
-                          {option.description}
+                      {option.description}
                         </p>
                       </div>
-                    </button>
+                  </button>
                   );
                 })}
               </div>
@@ -352,11 +352,11 @@ export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalP
 
               <div className="space-y-2">
                 <Label htmlFor="details">Additional Details</Label>
-                <Textarea
+              <Textarea
                   id="details"
                   placeholder="Please describe what happened..."
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
                   className="min-h-[100px] resize-none"
                 />
               </div>
@@ -382,22 +382,22 @@ export function ReportToolModal({ chatId, open, onOpenChange }: ReportToolModalP
           ) : (
             <div className="flex w-full justify-between gap-2 sm:justify-end">
                <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              {selectedTool && reason && (
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
+            Cancel
+          </Button>
+          {selectedTool && reason && (
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
                       <span className="mr-2 animate-spin">
-                        <LoaderIcon size={16} />
-                      </span>
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Report"
-                  )}
-                </Button>
+                    <LoaderIcon size={16} />
+                  </span>
+                  Submitting...
+                </>
+              ) : (
+                "Submit Report"
               )}
+            </Button>
+          )}
             </div>
           )}
         </DialogFooter>
