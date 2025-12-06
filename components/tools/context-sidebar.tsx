@@ -12,6 +12,7 @@ import {
 } from "react";
 import { useReadContract } from "wagmi";
 // No router needed here; navigation handled elsewhere if needed
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sidebar,
   SidebarContent,
@@ -785,20 +786,22 @@ export function ContextSidebar({
 
               {/* Tool Count & Cost Summary */}
               <div className="border-sidebar-border border-t pt-1.5">
-                <div>
-                  {activeTools.length}{" "}
-                  {activeTools.length === 1 ? "tool" : "tools"} active
-                </div>
                 {loading ? (
-                  <div className="flex items-center gap-2 text-sidebar-foreground/50">
-                    <span className="animate-spin">
-                      <LoaderIcon size={14} />
-                    </span>
-                    <span>Calculating...</span>
+                  <div className="flex flex-row items-center justify-between text-sidebar-foreground/50 h-8">
+                    <Skeleton className="h-7 w-32" />
+                    <div className="animate-spin">
+                      <LoaderIcon size={16} />
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-sidebar-foreground/50">
-                    ${formatPrice(totalCost)}/query
+                  <div className="flex flex-col justify-center h-8">
+                    <div>
+                      {activeTools.length}{" "}
+                      {activeTools.length === 1 ? "tool" : "tools"} active
+                    </div>
+                    <div className="text-sidebar-foreground/50">
+                      ${formatPrice(totalCost)}/query
+                    </div>
                   </div>
                 )}
               </div>
