@@ -122,7 +122,11 @@ These additions enable answering questions about:
 
 ## 📊 Output Schema
 
-All tools return `structuredContent` for reliable AI parsing. Example:
+All tools return `structuredContent` for reliable AI parsing.
+
+> ⚠️ **Schema Accuracy Matters**: Your `outputSchema` is used for automated dispute resolution. If your actual output doesn't match your declared schema, users can file disputes that are auto-adjudicated against you. Ensure your `structuredContent` always matches the types declared in `outputSchema`.
+
+Example:
 
 ```json
 {

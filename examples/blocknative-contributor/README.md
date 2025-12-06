@@ -34,3 +34,13 @@ curl http://localhost:4001/context/blocknative \
 - Context will call this endpoint via the generic HTTP skill once the tool is
   registered in the marketplace.
 
+### ⚠️ Schema Accuracy & Disputes
+
+Your `outputSchema` is used for automated dispute resolution. If your tool's actual output doesn't match your declared schema, users can file disputes that are auto-adjudicated against you via our "Robot Judge" (JSON schema validation).
+
+- Ensure your response structure matches your `outputSchema` exactly
+- Types matter: `"72"` (string) ≠ `72` (number)
+- Repeated schema violations (5+ flags) lead to tool deactivation
+
+See the [main README](../../README.md#%EF%B8%8F-schema-accuracy--dispute-resolution) for details.
+

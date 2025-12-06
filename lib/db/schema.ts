@@ -326,6 +326,31 @@ export const toolQuery = pgTable("ToolQuery", {
 
 export type ToolQuery = InferSelectModel<typeof toolQuery>;
 
+// Dispute reason categories (objective, not subjective)
+export type DisputeReason =
+  | "schema_mismatch" // Output doesn't match declared outputSchema
+  | "execution_error" // Tool threw an error or timed out
+  | "malicious_content" // Tool returned harmful/scam content
+  | "data_fabrication"; // Tool returned obviously fake data
+
+// Dispute verdict from automated/manual adjudication
+export type DisputeVerdict =
+  | "pending" // Awaiting adjudication
+  | "guilty" // Tool found at fault
+  | "innocent" // Dispute dismissed
+  | "manual_review"; // Requires human review
+
+/**
+ * ToolDispute (formerly ToolReport) - Web3 Dispute Resolution Protocol
+ *
+ * Key difference from Web2 reviews:
+ * - Requires `transactionHash` as proof of payment (Sybil-resistant)
+ * - Objective `reason` categories, not subjective ratings
+ * - Automated `verdict` via schema validation
+ *
+ * This provides the Data Availability Layer for future slashing:
+ * You can't slash based on "vibes" - you need specific fraud proofs.
+ */
 export const toolReport = pgTable("ToolReport", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   toolId: uuid("tool_id")
@@ -334,14 +359,35 @@ export const toolReport = pgTable("ToolReport", {
   reporterId: uuid("reporter_id")
     .notNull()
     .references(() => user.id),
-  reason: text("reason").notNull(),
-  status: varchar("status", { enum: ["pending", "resolved"] })
-    .notNull()
-    .default("pending"),
+
+  // THE FRAUD PROOF: Transaction hash proving disputant paid for query
+  // This is what makes it Sybil-resistant - attackers must fund the developer
+  transactionHash: varchar("transaction_hash", { length: 66 }),
+
+  // Link to the actual query for validation
+  queryId: uuid("query_id").references(() => toolQuery.id),
+
+  // Structured reason (objective categories, not "vibe was off")
+  reason: varchar("reason", { length: 50 }).notNull(),
+
+  // User-provided details about the dispute
+  details: text("details"),
+
+  // Automated adjudication verdict
+  verdict: varchar("verdict", { length: 20 }).default("pending"),
+
+  // Schema validation errors (if reason is schema_mismatch)
+  schemaErrors: jsonb("schema_errors"),
+
+  // Status for workflow tracking
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export type ToolReport = InferSelectModel<typeof toolReport>;
+export type ToolDispute = InferSelectModel<typeof toolReport>;
+// Keep old type for backward compatibility
+export type ToolReport = ToolDispute;
 
 // API Keys for programmatic access to Context Protocol
 export const apiKey = pgTable("ApiKey", {

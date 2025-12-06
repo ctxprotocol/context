@@ -1265,6 +1265,23 @@ export const WrenchIcon = ({ size = 16 }: { size?: number }) => {
   );
 };
 
+export const FlagIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    height={size}
+    strokeLinejoin="round"
+    style={{ color: "currentcolor" }}
+    viewBox="0 0 16 16"
+    width={size}
+  >
+    <path
+      clipRule="evenodd"
+      d="M2.5 2C2.22386 2 2 2.22386 2 2.5V14.5C2 14.7761 2.22386 15 2.5 15H3.5C3.77614 15 4 14.7761 4 14.5V9H14.5L12 5.5L14.5 2H4V2.5C4 2.22386 3.77614 2 3.5 2H2.5Z"
+      fill="currentColor"
+      fillRule="evenodd"
+    />
+  </svg>
+);
+
 export const LayersIcon = ({ size = 16 }: { size?: number }) => {
   return (
     <svg

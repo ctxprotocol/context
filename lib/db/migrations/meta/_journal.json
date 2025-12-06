@@ -120,6 +120,13 @@
       "when": 1764700000000,
       "tag": "0016_trust_system_health_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1764800000000,
+      "tag": "0017_dispute_resolution_protocol",
+      "breakpoints": true
     }
   ]
 }

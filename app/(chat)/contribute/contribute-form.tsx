@@ -64,8 +64,11 @@ Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and 
 
 Best practices for your MCP server:
 - Use outputSchema in tools/list to define response structure
-- Return data in structuredContent for reliable AI parsing
+- Return data in structuredContent matching your outputSchema exactly
 - Example response: { content: [...], structuredContent: { price: 72.5, chain: "ethereum" } }
+
+⚠️ Schema Accuracy Matters:
+Your outputSchema is used for automated dispute resolution. If your tool's actual output doesn't match your declared schema, users can file disputes that are auto-adjudicated against you.
 
 Agent tips (optional):
 - Call list_chains first to get all supported chainIds
@@ -116,7 +119,11 @@ Agent tips (optional):
               Explain what your MCP Tool does and why users should use it.
               Skills are <strong>auto-discovered</strong> from your MCP server.
               Use <code>outputSchema</code> and <code>structuredContent</code>{" "}
-              for reliable AI parsing.
+              for reliable AI parsing.{" "}
+              <strong className="text-amber-600">
+                Your outputSchema is used for automated dispute resolution
+              </strong>
+              —ensure your actual output matches your declared schema.
             </p>
             <FieldError message={descriptionError} />
           </div>

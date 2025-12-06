@@ -174,6 +174,27 @@ await server.connect(transport);
 
 See the full [Blocknative example](./examples/blocknative-contributor) for a production-ready implementation.
 
+#### ⚠️ Schema Accuracy & Dispute Resolution
+
+Your `outputSchema` isn't just documentation—it's a **contract**. Context uses automated schema validation as part of our crypto-native dispute resolution system:
+
+1. **Users can dispute** tool outputs by providing their `transaction_hash` (proof of payment)
+2. **Robot judge auto-adjudicates** by validating your actual output against your declared `outputSchema`
+3. **If schema mismatches**, the dispute is resolved against you automatically
+4. **Repeated violations** (5+ flags) lead to tool deactivation
+
+```typescript
+// ❌ BAD: Schema says number, but you return string
+outputSchema: { temperature: { type: "number" } }
+structuredContent: { temperature: "72" }  // GUILTY - schema mismatch!
+
+// ✅ GOOD: Output matches schema exactly
+outputSchema: { temperature: { type: "number" } }
+structuredContent: { temperature: 72 }  // Valid
+```
+
+**Why this matters:** Unlike Web2 "star ratings" that can be gamed by bots, Context disputes require economic proof (you paid for the query). This protects honest developers from spam while ensuring bad actors face consequences.
+
 ### 🔒 Tool Safety Limits
 
 Each tool invocation runs inside a sandboxed code-execution environment.

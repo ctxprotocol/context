@@ -1,13 +1,26 @@
 import equal from "fast-deep-equal";
-import { memo } from "react";
+import { lazy, memo, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { Action, Actions } from "./elements/actions";
-import { CopyIcon, PencilEditIcon, ThumbDownIcon, ThumbUpIcon } from "./icons";
+import {
+  CopyIcon,
+  FlagIcon,
+  PencilEditIcon,
+  ThumbDownIcon,
+  ThumbUpIcon,
+} from "./icons";
 import { parseToolContext } from "./tool-context";
+
+// Lazy load modal - only loads when user clicks flag button
+const ReportToolModal = lazy(() =>
+  import("./report-tool-modal").then((mod) => ({
+    default: mod.ReportToolModal,
+  }))
+);
 
 export function PureMessageActions({
   chatId,
@@ -24,6 +37,7 @@ export function PureMessageActions({
 }) {
   const { mutate } = useSWRConfig();
   const [_, copyToClipboard] = useCopyToClipboard();
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   if (isLoading) {
     return null;
@@ -177,6 +191,25 @@ export function PureMessageActions({
       >
         <ThumbDownIcon />
       </Action>
+
+      <Action
+        data-testid="message-report"
+        onClick={() => setReportModalOpen(true)}
+        tooltip="Report Tool Issue"
+      >
+        <FlagIcon />
+      </Action>
+
+      {/* Lazy render: Modal only mounts when opened, avoiding bundle load on every message */}
+      {reportModalOpen && (
+        <Suspense fallback={null}>
+          <ReportToolModal
+            chatId={chatId}
+            onOpenChange={setReportModalOpen}
+            open={reportModalOpen}
+          />
+        </Suspense>
+      )}
     </Actions>
   );
 }
