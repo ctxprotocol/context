@@ -3,8 +3,32 @@
 import { motion } from "framer-motion";
 import { ArrowRight, Coins, Terminal, Wallet, Zap } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
+import { useSidebar } from "@/components/ui/sidebar";
+import { useContextSidebar } from "@/hooks/use-context-sidebar";
 
 export function OnboardingHero() {
+  const { setOpen: setAppSidebarOpen } = useSidebar();
+  const { open: openContextSidebar } = useContextSidebar();
+  const hasOpenedSidebars = useRef(false);
+
+  // Open both sidebars on mount for new/logged out users
+  // This helps them discover the connect wallet button and available tools
+  useEffect(() => {
+    if (hasOpenedSidebars.current) {
+      return;
+    }
+    hasOpenedSidebars.current = true;
+
+    // Small delay to let the intro animation start first
+    const timer = setTimeout(() => {
+      setAppSidebarOpen(true);
+      openContextSidebar();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [setAppSidebarOpen, openContextSidebar]);
+
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col justify-center px-4 md:px-8">
       <motion.div
