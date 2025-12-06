@@ -53,7 +53,7 @@ export function OnboardingHero() {
         </h1>
 
         <p className="mx-auto mb-12 max-w-xl text-lg text-muted-foreground">
-          Agents write code to buy the data LLMs lack. Users pay per query.
+          Agents write code to buy the data LLMs lack. Users pay per response.
           Developers monetize every run.
         </p>
 
