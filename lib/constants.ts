@@ -28,19 +28,21 @@ export const DUMMY_PASSWORD = generateDummyPassword();
 // STAKING CONSTANTS
 // ============================================================
 // All tools require a minimum stake to prevent spam and ensure quality.
-// This creates accountability even for free tools.
+// This creates accountability even for free tools, similar to Apple's
+// $99/year developer fee but fully refundable with 7-day withdrawal delay.
 //
 // Formula: requiredStake = MAX(MINIMUM_STAKE_USDC, pricePerQuery * STAKE_MULTIPLIER)
 //
 // Examples:
-//   Free tool ($0.00/query)   → $1.00 stake (minimum applies)
-//   $0.005/query tool         → $1.00 stake (100x = $0.50, minimum applies)
-//   $0.01/query tool          → $1.00 stake (100x = $1.00, equals minimum)
-//   $0.10/query tool          → $10.00 stake (100x applies)
+//   Free tool ($0.00/query)   → $10.00 stake (minimum applies)
+//   $0.005/query tool         → $10.00 stake (minimum applies)
+//   $0.01/query tool          → $10.00 stake (minimum applies)
+//   $0.10/query tool          → $10.00 stake (100x = minimum)
+//   $0.50/query tool          → $50.00 stake (100x applies)
 //   $1.00/query tool          → $100.00 stake (100x applies)
 
-/** Minimum stake required for ANY tool (including free tools) - $1.00 USDC */
-export const MINIMUM_STAKE_USDC = 1.0;
+/** Minimum stake required for ANY tool (including free tools) - $10.00 USDC */
+export const MINIMUM_STAKE_USDC = 10.0;
 
 /** Stake multiplier for paid tools - 100x the query price */
 export const STAKE_MULTIPLIER = 100;

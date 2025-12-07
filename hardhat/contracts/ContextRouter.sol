@@ -39,11 +39,13 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     // Formula: requiredStake = MAX(MINIMUM_STAKE, pricePerQuery * STAKE_MULTIPLIER)
     //
     // Examples:
-    //   Free tool ($0.00/query)   → $1.00 stake (minimum applies)
-    //   $0.01/query tool          → $1.00 stake (100x = $1.00)
-    //   $0.10/query tool          → $10.00 stake (100x applies)
+    //   Free tool ($0.00/query)   → $10.00 stake (minimum applies)
+    //   $0.01/query tool          → $10.00 stake (minimum applies)
+    //   $0.10/query tool          → $10.00 stake (100x = minimum)
+    //   $0.50/query tool          → $50.00 stake (100x applies)
+    //   $1.00/query tool          → $100.00 stake (100x applies)
     uint256 public constant STAKE_MULTIPLIER = 100;
-    uint256 public constant MINIMUM_STAKE = 1_000_000; // $1.00 USDC (6 decimals)
+    uint256 public constant MINIMUM_STAKE = 10_000_000; // $10.00 USDC (6 decimals)
     
     // Tracking
     mapping(address => uint256) public developerBalances;
