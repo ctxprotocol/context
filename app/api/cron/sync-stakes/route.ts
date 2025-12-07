@@ -23,8 +23,8 @@ import { uuidToUint256 } from "@/lib/utils";
 
 const LOG_PREFIX = "[cron/sync-stakes]";
 
-// Staking threshold: $1.00 (6 decimals for USDC)
-const STAKING_THRESHOLD = "1.000000";
+// All paid tools require staking - sync any tool with price > 0
+const MIN_PRICE_FOR_STAKING = "0.000001"; // Anything above $0
 
 // Create database connection
 const client = postgres(process.env.POSTGRES_URL!);
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       transport: http(process.env.BASE_RPC_URL || chain.rpcUrls.default.http[0]),
     });
 
-    // Fetch all tools that require staking (price >= $1.00)
+    // Fetch all paid tools that require staking (price > 0)
     const toolsToSync = await db
       .select({
         id: aiTool.id,
@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         currentStaked: aiTool.totalStaked,
       })
       .from(aiTool)
-      .where(gte(aiTool.pricePerQuery, STAKING_THRESHOLD));
+      .where(gte(aiTool.pricePerQuery, MIN_PRICE_FOR_STAKING));
 
     console.log(LOG_PREFIX, `Found ${toolsToSync.length} tools requiring stake sync`);
 

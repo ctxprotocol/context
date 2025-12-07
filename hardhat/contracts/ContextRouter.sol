@@ -21,10 +21,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * on behalf of users who have pre-approved this contract.
  * 
  * STAKING SYSTEM (Trust Level 3):
- * High-value tools ($1.00+/query) require developers to stake collateral.
+ * ALL paid tools require developers to stake collateral (100x query price).
  * This provides economic security against scams - if a tool is fraudulent,
  * the stake can be slashed by the admin to compensate affected users.
- * Required stake = 100x the query price (e.g., $1.50/query = $150 stake)
+ * Free tools ($0) require no stake. Paid tools stake proportionally.
+ * Example: $0.50/query = $50 stake, $1.00/query = $100 stake
  */
 contract ContextRouter is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -34,9 +35,8 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     uint256 public constant PLATFORM_FEE_PERCENT = 10;
     
     // Staking constants (USDC has 6 decimals)
-    // Tools priced >= $1.00 require staking
-    uint256 public constant STAKING_THRESHOLD = 1_000_000; // $1.00 in USDC (6 decimals)
-    // Required stake = 100x the query price
+    // ALL paid tools require staking (price > 0). Free tools ($0) = no stake.
+    // Required stake = 100x the query price (e.g., $0.50/query = $50 stake)
     uint256 public constant STAKE_MULTIPLIER = 100;
     
     // Tracking
@@ -57,6 +57,12 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     // Slashed balance available for claims (goes to platform for redistribution)
     uint256 public slashedBalance;
     
+    // Withdrawal timelock: toolId => timestamp when withdrawal was requested
+    // Prevents front-running slashes - must wait WITHDRAWAL_DELAY after requesting
+    mapping(uint256 => uint256) public withdrawalRequestTime;
+    // 7-day delay between requesting withdrawal and executing it
+    uint256 public constant WITHDRAWAL_DELAY = 7 days;
+    
     // Events
     event QueryPaid(
         uint256 indexed toolId,
@@ -74,6 +80,7 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     
     // Staking events
     event StakeDeposited(uint256 indexed toolId, address indexed developer, uint256 amount);
+    event WithdrawalRequested(uint256 indexed toolId, address indexed developer, uint256 availableAt);
     event StakeWithdrawn(uint256 indexed toolId, address indexed developer, uint256 amount);
     event StakeSlashed(uint256 indexed toolId, address indexed developer, uint256 amount, string reason);
 
@@ -507,11 +514,11 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Calculate the minimum stake required for a tool based on its query price
      * @param pricePerQuery The tool's price per query in USDC (6 decimals)
-     * @return The minimum stake required (0 if below threshold, otherwise 100x price)
+     * @return The minimum stake required (0 for free tools, 100x price for paid tools)
      */
     function getMinimumStake(uint256 pricePerQuery) public pure returns (uint256) {
-        if (pricePerQuery < STAKING_THRESHOLD) {
-            return 0; // Tools under $1.00 don't require staking
+        if (pricePerQuery == 0) {
+            return 0; // Free tools don't require staking
         }
         return pricePerQuery * STAKE_MULTIPLIER;
     }
@@ -519,14 +526,14 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Check if a tool requires staking based on its price
      * @param pricePerQuery The tool's price per query in USDC (6 decimals)
-     * @return True if the tool requires staking
+     * @return True if the tool requires staking (any paid tool)
      */
     function requiresStaking(uint256 pricePerQuery) public pure returns (bool) {
-        return pricePerQuery >= STAKING_THRESHOLD;
+        return pricePerQuery > 0;
     }
 
     /**
-     * @notice Developer deposits stake for a high-value tool
+     * @notice Developer deposits stake for a paid tool
      * @dev Developer must approve this contract to spend USDC first
      * @param toolId The ID of the tool to stake for
      * @param amount The amount of USDC to stake
@@ -553,8 +560,36 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Developer withdraws stake from a tool
-     * @dev Can only withdraw stake for tools you own
+     * @notice Request withdrawal of stake (starts 7-day timelock)
+     * @dev Must be called before withdrawStake. Prevents front-running slashes.
+     * @param toolId The ID of the tool to request withdrawal for
+     */
+    function requestWithdrawal(uint256 toolId) external {
+        require(toolDevelopers[toolId] == msg.sender, "Not tool owner");
+        require(toolStakes[toolId] > 0, "No stake to withdraw");
+        
+        // Start the withdrawal timer
+        uint256 availableAt = block.timestamp + WITHDRAWAL_DELAY;
+        withdrawalRequestTime[toolId] = block.timestamp;
+        
+        emit WithdrawalRequested(toolId, msg.sender, availableAt);
+    }
+
+    /**
+     * @notice Cancel a pending withdrawal request
+     * @dev Allows developer to cancel if they change their mind
+     * @param toolId The ID of the tool to cancel withdrawal for
+     */
+    function cancelWithdrawal(uint256 toolId) external {
+        require(toolDevelopers[toolId] == msg.sender, "Not tool owner");
+        require(withdrawalRequestTime[toolId] > 0, "No pending withdrawal");
+        
+        withdrawalRequestTime[toolId] = 0;
+    }
+
+    /**
+     * @notice Developer withdraws stake from a tool (after 7-day delay)
+     * @dev Must call requestWithdrawal first and wait WITHDRAWAL_DELAY
      * @param toolId The ID of the tool to withdraw stake from
      * @param amount The amount of USDC to withdraw
      */
@@ -562,9 +597,19 @@ contract ContextRouter is Ownable, ReentrancyGuard {
         require(amount > 0, "Amount must be greater than 0");
         require(toolDevelopers[toolId] == msg.sender, "Not tool owner");
         require(toolStakes[toolId] >= amount, "Insufficient stake");
+        
+        // Timelock check: must have requested withdrawal and waited 7 days
+        uint256 requestTime = withdrawalRequestTime[toolId];
+        require(requestTime > 0, "Must request withdrawal first");
+        require(block.timestamp >= requestTime + WITHDRAWAL_DELAY, "Withdrawal delay not met");
 
         // Update stake balance
         toolStakes[toolId] -= amount;
+        
+        // Clear withdrawal request if fully withdrawn
+        if (toolStakes[toolId] == 0) {
+            withdrawalRequestTime[toolId] = 0;
+        }
 
         // Transfer USDC back to developer
         usdc.safeTransfer(msg.sender, amount);
@@ -575,6 +620,7 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Admin slashes stake from a fraudulent tool
      * @dev Only callable by contract owner. Used to penalize scam tools.
+     *      Also resets any pending withdrawal request to prevent escape.
      * @param toolId The ID of the tool to slash
      * @param amount The amount of USDC to slash
      * @param reason Human-readable reason for the slash (stored in event)
@@ -585,6 +631,11 @@ contract ContextRouter is Ownable, ReentrancyGuard {
         
         address developer = toolDevelopers[toolId];
         require(developer != address(0), "Tool has no stake");
+
+        // Reset any pending withdrawal request (prevent front-running)
+        if (withdrawalRequestTime[toolId] > 0) {
+            withdrawalRequestTime[toolId] = 0;
+        }
 
         // Reduce tool stake
         toolStakes[toolId] -= amount;
@@ -637,6 +688,25 @@ contract ContextRouter is Ownable, ReentrancyGuard {
             return true; // Tool doesn't require staking
         }
         return toolStakes[toolId] >= required;
+    }
+
+    /**
+     * @notice Get withdrawal request status for a tool
+     * @param toolId The ID of the tool
+     * @return requestTime When withdrawal was requested (0 if not requested)
+     * @return availableAt When withdrawal can be executed (0 if not requested)
+     * @return canWithdraw Whether the delay has passed and withdrawal is ready
+     */
+    function getWithdrawalStatus(uint256 toolId) external view returns (
+        uint256 requestTime,
+        uint256 availableAt,
+        bool canWithdraw
+    ) {
+        requestTime = withdrawalRequestTime[toolId];
+        if (requestTime > 0) {
+            availableAt = requestTime + WITHDRAWAL_DELAY;
+            canWithdraw = block.timestamp >= availableAt;
+        }
     }
 }
 

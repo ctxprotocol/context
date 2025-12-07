@@ -255,6 +255,31 @@ export const contextRouterAbi = [
     name: 'StakeWithdrawn',
   },
   {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'toolId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'developer',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'availableAt',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'WithdrawalRequested',
+  },
+  {
     type: 'function',
     inputs: [],
     name: 'PLATFORM_FEE_PERCENT',
@@ -271,7 +296,7 @@ export const contextRouterAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'STAKING_THRESHOLD',
+    name: 'WITHDRAWAL_DELAY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -279,6 +304,13 @@ export const contextRouterAbi = [
     type: 'function',
     inputs: [{ name: 'operator', internalType: 'address', type: 'address' }],
     name: 'addOperator',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'toolId', internalType: 'uint256', type: 'uint256' }],
+    name: 'cancelWithdrawal',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -471,6 +503,17 @@ export const contextRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [{ name: 'toolId', internalType: 'uint256', type: 'uint256' }],
+    name: 'getWithdrawalStatus',
+    outputs: [
+      { name: 'requestTime', internalType: 'uint256', type: 'uint256' },
+      { name: 'availableAt', internalType: 'uint256', type: 'uint256' },
+      { name: 'canWithdraw', internalType: 'bool', type: 'bool' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [
       { name: 'toolId', internalType: 'uint256', type: 'uint256' },
       { name: 'pricePerQuery', internalType: 'uint256', type: 'uint256' },
@@ -518,6 +561,13 @@ export const contextRouterAbi = [
     type: 'function',
     inputs: [],
     name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'toolId', internalType: 'uint256', type: 'uint256' }],
+    name: 'requestWithdrawal',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -585,6 +635,13 @@ export const contextRouterAbi = [
     name: 'withdrawStake',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'withdrawalRequestTime',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
 ] as const
 
@@ -1639,16 +1696,16 @@ export const useReadContextRouterStakeMultiplier =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"STAKING_THRESHOLD"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"WITHDRAWAL_DELAY"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
  */
-export const useReadContextRouterStakingThreshold =
+export const useReadContextRouterWithdrawalDelay =
   /*#__PURE__*/ createUseReadContract({
     abi: contextRouterAbi,
     address: contextRouterAddress,
-    functionName: 'STAKING_THRESHOLD',
+    functionName: 'WITHDRAWAL_DELAY',
   })
 
 /**
@@ -1728,6 +1785,19 @@ export const useReadContextRouterGetUnclaimedBalance =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'getUnclaimedBalance',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getWithdrawalStatus"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useReadContextRouterGetWithdrawalStatus =
+  /*#__PURE__*/ createUseReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'getWithdrawalStatus',
   })
 
 /**
@@ -1859,6 +1929,19 @@ export const useReadContextRouterUsdc = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"withdrawalRequestTime"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useReadContextRouterWithdrawalRequestTime =
+  /*#__PURE__*/ createUseReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'withdrawalRequestTime',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -1880,6 +1963,19 @@ export const useWriteContextRouterAddOperator =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'addOperator',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"cancelWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useWriteContextRouterCancelWithdrawal =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'cancelWithdrawal',
   })
 
 /**
@@ -2065,6 +2161,19 @@ export const useWriteContextRouterRenounceOwnership =
   })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"requestWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useWriteContextRouterRequestWithdrawal =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'requestWithdrawal',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -2123,6 +2232,19 @@ export const useSimulateContextRouterAddOperator =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'addOperator',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"cancelWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useSimulateContextRouterCancelWithdrawal =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'cancelWithdrawal',
   })
 
 /**
@@ -2308,6 +2430,19 @@ export const useSimulateContextRouterRenounceOwnership =
   })
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"requestWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useSimulateContextRouterRequestWithdrawal =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'requestWithdrawal',
+  })
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -2486,6 +2621,19 @@ export const useWatchContextRouterStakeWithdrawnEvent =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     eventName: 'StakeWithdrawn',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"WithdrawalRequested"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const useWatchContextRouterWithdrawalRequestedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'WithdrawalRequested',
   })
 
 /**
@@ -3384,16 +3532,16 @@ export const readContextRouterStakeMultiplier =
   })
 
 /**
- * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"STAKING_THRESHOLD"`
+ * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"WITHDRAWAL_DELAY"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
  */
-export const readContextRouterStakingThreshold =
+export const readContextRouterWithdrawalDelay =
   /*#__PURE__*/ createReadContract({
     abi: contextRouterAbi,
     address: contextRouterAddress,
-    functionName: 'STAKING_THRESHOLD',
+    functionName: 'WITHDRAWAL_DELAY',
   })
 
 /**
@@ -3471,6 +3619,19 @@ export const readContextRouterGetUnclaimedBalance =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'getUnclaimedBalance',
+  })
+
+/**
+ * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"getWithdrawalStatus"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const readContextRouterGetWithdrawalStatus =
+  /*#__PURE__*/ createReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'getWithdrawalStatus',
   })
 
 /**
@@ -3601,6 +3762,19 @@ export const readContextRouterUsdc = /*#__PURE__*/ createReadContract({
 })
 
 /**
+ * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"withdrawalRequestTime"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const readContextRouterWithdrawalRequestTime =
+  /*#__PURE__*/ createReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'withdrawalRequestTime',
+  })
+
+/**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -3622,6 +3796,19 @@ export const writeContextRouterAddOperator = /*#__PURE__*/ createWriteContract({
   address: contextRouterAddress,
   functionName: 'addOperator',
 })
+
+/**
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"cancelWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const writeContextRouterCancelWithdrawal =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'cancelWithdrawal',
+  })
 
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimEarnings"`
@@ -3807,6 +3994,19 @@ export const writeContextRouterRenounceOwnership =
   })
 
 /**
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"requestWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const writeContextRouterRequestWithdrawal =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'requestWithdrawal',
+  })
+
+/**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -3866,6 +4066,19 @@ export const simulateContextRouterAddOperator =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'addOperator',
+  })
+
+/**
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"cancelWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const simulateContextRouterCancelWithdrawal =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'cancelWithdrawal',
   })
 
 /**
@@ -4051,6 +4264,19 @@ export const simulateContextRouterRenounceOwnership =
   })
 
 /**
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"requestWithdrawal"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const simulateContextRouterRequestWithdrawal =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'requestWithdrawal',
+  })
+
+/**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
@@ -4227,6 +4453,19 @@ export const watchContextRouterStakeWithdrawnEvent =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     eventName: 'StakeWithdrawn',
+  })
+
+/**
+ * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"WithdrawalRequested"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x60975870b20f7eBf01F1825D5825545236a5ff80)
+ */
+export const watchContextRouterWithdrawalRequestedEvent =
+  /*#__PURE__*/ createWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'WithdrawalRequested',
   })
 
 /**

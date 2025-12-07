@@ -2,7 +2,8 @@
 
 import { ExternalLink, Github, Package, Shield } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useState } from "react";
 import { LoaderIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,12 +29,12 @@ import { cn } from "@/lib/utils";
 import { submitTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
 
-// Staking threshold: $1.00 per query requires collateral
-const STAKING_THRESHOLD = 1.0;
-// Required stake = 100x the query price
+// All paid tools require staking (100x query price)
+// Free tools ($0) = no stake. This creates skin-in-the-game like Apple's $99/year dev fee.
 const STAKE_MULTIPLIER = 100;
 
 export function ContributeForm() {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(
     submitTool,
     contributeFormInitialState
@@ -42,10 +43,20 @@ export function ContributeForm() {
   const walletAddress = activeWallet?.address;
   const isConnected = !!walletAddress;
 
+  // Redirect to developer tools after showing success message
+  useEffect(() => {
+    if (state.status === "success") {
+      const timer = setTimeout(() => {
+        router.push("/developer/tools");
+      }, 2000); // Show message for 2 seconds then redirect
+      return () => clearTimeout(timer);
+    }
+  }, [state.status, router]);
+
   // Track price for staking requirement display
   const [price, setPrice] = useState(state.payload?.price || "0.00");
   const priceValue = Number.parseFloat(price) || 0;
-  const requiresStaking = priceValue >= STAKING_THRESHOLD;
+  const requiresStaking = priceValue > 0; // All paid tools require staking
   const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
 
   const nameError = state.fieldErrors?.name;
@@ -200,13 +211,16 @@ Agent tips (optional):
                   <Shield className="mt-0.5 size-4 shrink-0 text-amber-600" />
                   <div className="space-y-1">
                     <p className="font-medium text-amber-700 text-xs">
-                      Staking Required
+                      Staking Required for Paid Tools
                     </p>
                     <p className="text-amber-600/90 text-xs leading-relaxed">
-                      Tools priced $1.00+ require collateral to protect users.
-                      You&apos;ll need to stake{" "}
-                      <strong>${requiredStake.toFixed(2)} USDC</strong> (100x
-                      query price) after submission.
+                      Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
+                      (100× query price) from your smart wallet after
+                      submission. Fully refundable with 7-day withdrawal delay.
+                      Set price to $0.00 for no stake.
+                    </p>
+                    <p className="text-amber-600/70 text-xs">
+                      💡 Add funds to your smart wallet first via the sidebar.
                     </p>
                     <Link
                       className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"

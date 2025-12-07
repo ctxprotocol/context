@@ -246,9 +246,19 @@ export async function submitTool(
 
   const skillCount = mcpTools.length;
   const skillWord = skillCount === 1 ? "skill" : "skills";
+  const priceValue = Number.parseFloat(parsed.data.price) || 0;
+
+  // Return success message - client will handle redirect after showing message
+  if (priceValue > 0) {
+    const stakeRequired = priceValue * 100;
+    return {
+      status: "success",
+      message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Deposit $${stakeRequired.toFixed(2)} USDC stake to activate.`,
+    };
+  }
 
   return {
     status: "success",
-    message: `Tool submitted! Discovered ${skillCount} ${skillWord} from your MCP server.`,
+    message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Your free tool is now active.`,
   };
 }

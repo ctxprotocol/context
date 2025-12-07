@@ -4,7 +4,9 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
+  Clock,
   Shield,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -33,15 +35,17 @@ import {
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import {
+  useReadContextRouterGetWithdrawalStatus,
+  useWriteContextRouterCancelWithdrawal,
   useWriteContextRouterDepositStake,
+  useWriteContextRouterRequestWithdrawal,
   useWriteContextRouterWithdrawStake,
   useWriteErc20Approve,
 } from "@/lib/generated";
 import { cn, formatPrice, uuidToUint256 } from "@/lib/utils";
 
-// Staking threshold: $1.00 per query requires collateral
-const STAKING_THRESHOLD = 1.0;
-// Required stake = 100x the query price
+// All paid tools require staking (100x query price)
+// Free tools ($0) = no stake requirement
 const STAKE_MULTIPLIER = 100;
 
 type StakePanelProps = {
@@ -54,19 +58,20 @@ type StakePanelProps = {
 };
 
 /**
- * StakePanel - Manage stakes for high-value tools
+ * StakePanel - Manage stakes for paid tools
  *
- * Tools priced >= $1.00/query require developers to stake 100x the query price
- * as collateral. This provides economic security for users against scams.
+ * All paid tools require developers to stake 100x the query price as collateral.
+ * This provides economic security for users against scams (like Apple's $99/yr fee,
+ * but refundable). Free tools ($0) require no stake.
  */
 export function StakePanel({ tools }: StakePanelProps) {
   const { activeWallet } = useWalletIdentity();
   const isConnected = !!activeWallet?.address;
 
-  // Filter to tools that require staking (price >= $1.00)
+  // Filter to paid tools (price > 0) - all paid tools require staking
   const toolsRequiringStake = tools.filter((tool) => {
     const price = Number.parseFloat(tool.pricePerQuery) || 0;
-    return price >= STAKING_THRESHOLD;
+    return price > 0;
   });
 
   // Calculate total required vs total staked
@@ -102,7 +107,7 @@ export function StakePanel({ tools }: StakePanelProps) {
               <h3 className="font-semibold">Stake Management</h3>
             </div>
             <p className="text-muted-foreground text-sm">
-              High-value tools (${STAKING_THRESHOLD}+/query) require collateral
+              100× query price • Refundable with 7-day withdrawal delay
             </p>
           </div>
           {hasUnderstakedTools && (
@@ -202,6 +207,17 @@ function StakeToolRow({
     isPending: isWithdrawing,
     data: withdrawTxHash,
   } = useWriteContextRouterWithdrawStake();
+  
+  // Withdrawal timelock hooks (7-day delay)
+  const {
+    writeContractAsync: requestWithdrawalAsync,
+    isPending: isRequestingWithdrawal,
+    data: requestWithdrawalTxHash,
+  } = useWriteContextRouterRequestWithdrawal();
+  const {
+    writeContractAsync: cancelWithdrawalAsync,
+    isPending: isCancellingWithdrawal,
+  } = useWriteContextRouterCancelWithdrawal();
 
   // USDC approval hook
   const {
@@ -217,6 +233,8 @@ function StakeToolRow({
     useWaitForTransactionReceipt({ hash: depositTxHash });
   const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } =
     useWaitForTransactionReceipt({ hash: withdrawTxHash });
+  const { isLoading: isRequestWithdrawalConfirming, isSuccess: isRequestWithdrawalSuccess } =
+    useWaitForTransactionReceipt({ hash: requestWithdrawalTxHash });
 
   // Check current USDC allowance for the router
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract(
@@ -239,8 +257,35 @@ function StakeToolRow({
   const hasEnough = staked >= required;
   const shortfall = Math.max(0, required - staked);
 
-  // Tool ID conversion using full UUID (collision-free)
-  // See lib/utils.ts uuidToUint256 for implementation details
+  // Tool ID for contract calls (collision-free UUID conversion)
+  const toolIdBigInt = uuidToUint256(tool.id);
+
+  // Read withdrawal timelock status from contract (7-day delay)
+  const { data: withdrawalStatus, refetch: refetchWithdrawalStatus } = useReadContextRouterGetWithdrawalStatus({
+    args: [toolIdBigInt],
+    query: {
+      enabled: Boolean(routerAddress && staked > 0),
+    },
+  });
+  
+  // Parse withdrawal status (requestTime, availableAt, canWithdraw)
+  const withdrawalRequestTime = withdrawalStatus?.[0] ? Number(withdrawalStatus[0]) : 0;
+  const withdrawalAvailableAt = withdrawalStatus?.[1] ? Number(withdrawalStatus[1]) : 0;
+  const canWithdrawNow = withdrawalStatus?.[2] ?? false;
+  const hasPendingWithdrawal = withdrawalRequestTime > 0;
+  
+  // Calculate time remaining for pending withdrawal
+  const getTimeRemaining = () => {
+    if (!hasPendingWithdrawal || canWithdrawNow) return null;
+    const now = Math.floor(Date.now() / 1000);
+    const remaining = withdrawalAvailableAt - now;
+    if (remaining <= 0) return null;
+    const days = Math.floor(remaining / 86400);
+    const hours = Math.floor((remaining % 86400) / 3600);
+    if (days > 0) return `${days}d ${hours}h`;
+    const minutes = Math.floor((remaining % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
 
   const handleDeposit = async () => {
     if (!isConnected) {
@@ -301,9 +346,53 @@ function StakeToolRow({
     }
   };
 
+  // Request withdrawal (starts 7-day timer)
+  const handleRequestWithdrawal = async () => {
+    if (!isConnected) {
+      toast.error("Connect your wallet to request withdrawal");
+      return;
+    }
+
+    try {
+      await requestWithdrawalAsync({
+        args: [toolIdBigInt],
+      });
+      toast.success("Withdrawal requested! 7-day timer started.");
+    } catch (error) {
+      console.error("Request withdrawal failed:", error);
+      const msg = error instanceof Error ? error.message : "Failed to request withdrawal";
+      if (msg.includes("User rejected") || msg.includes("user rejected")) {
+        toast.error("Transaction cancelled");
+      } else {
+        toast.error(msg);
+      }
+    }
+  };
+
+  // Cancel pending withdrawal
+  const handleCancelWithdrawal = async () => {
+    if (!isConnected) return;
+
+    try {
+      await cancelWithdrawalAsync({
+        args: [toolIdBigInt],
+      });
+      toast.success("Withdrawal request cancelled");
+    } catch (error) {
+      console.error("Cancel withdrawal failed:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to cancel withdrawal");
+    }
+  };
+
+  // Execute withdrawal (only after 7-day delay)
   const handleWithdraw = async () => {
     if (!isConnected) {
       toast.error("Connect your wallet to withdraw stake");
+      return;
+    }
+
+    if (!canWithdrawNow) {
+      toast.error("Must wait for 7-day withdrawal delay");
       return;
     }
 
@@ -320,7 +409,6 @@ function StakeToolRow({
 
     try {
       const amountInUsdc = parseUnits(withdrawAmount, 6); // USDC has 6 decimals
-      const toolIdBigInt = uuidToUint256(tool.id);
 
       withdrawStake({
         args: [toolIdBigInt, amountInUsdc],
@@ -348,8 +436,16 @@ function StakeToolRow({
       setIsWithdrawOpen(false);
       setWithdrawAmount("");
       toast.success("Stake withdrawn successfully!");
+      refetchWithdrawalStatus();
     }
-  }, [isWithdrawSuccess, isWithdrawOpen]);
+  }, [isWithdrawSuccess, isWithdrawOpen, refetchWithdrawalStatus]);
+
+  // Refetch withdrawal status after requesting/cancelling
+  useEffect(() => {
+    if (isRequestWithdrawalSuccess) {
+      refetchWithdrawalStatus();
+    }
+  }, [isRequestWithdrawalSuccess, refetchWithdrawalStatus]);
 
   const isDepositBusy =
     isDepositing ||
@@ -358,6 +454,7 @@ function StakeToolRow({
     isApproveConfirming ||
     approvalStatus !== "idle";
   const isWithdrawBusy = isWithdrawing || isWithdrawConfirming;
+  const isRequestBusy = isRequestingWithdrawal || isRequestWithdrawalConfirming || isCancellingWithdrawal;
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
@@ -481,43 +578,124 @@ function StakeToolRow({
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 py-4">
-              <div className="space-y-3">
-                <Label htmlFor="withdraw-amount">Amount (USDC)</Label>
-                <Input
-                  disabled={isWithdrawBusy}
-                  id="withdraw-amount"
-                  max={staked}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  placeholder="0.00"
-                  type="number"
-                  value={withdrawAmount}
-                />
-                {!hasEnough && (
-                  <p className="text-destructive text-xs">
-                    Warning: Withdrawing will leave tool under-staked
-                  </p>
-                )}
-              </div>
+              {/* Timelock Status Banner */}
+              {hasPendingWithdrawal && (
+                <div className={cn(
+                  "flex items-center gap-3 rounded-lg border p-3",
+                  canWithdrawNow 
+                    ? "border-emerald-500/30 bg-emerald-500/10" 
+                    : "border-amber-500/30 bg-amber-500/10"
+                )}>
+                  <Clock className={cn(
+                    "size-5 shrink-0",
+                    canWithdrawNow ? "text-emerald-600" : "text-amber-600"
+                  )} />
+                  <div className="flex-1">
+                    <p className={cn(
+                      "font-medium text-sm",
+                      canWithdrawNow ? "text-emerald-700" : "text-amber-700"
+                    )}>
+                      {canWithdrawNow ? "Ready to Withdraw" : "Withdrawal Pending"}
+                    </p>
+                    <p className={cn(
+                      "text-xs",
+                      canWithdrawNow ? "text-emerald-600/80" : "text-amber-600/80"
+                    )}>
+                      {canWithdrawNow 
+                        ? "7-day delay complete. You can now withdraw."
+                        : `Available in ${getTimeRemaining()}`
+                      }
+                    </p>
+                  </div>
+                  {!canWithdrawNow && (
+                    <Button
+                      className="shrink-0"
+                      disabled={isRequestBusy}
+                      onClick={handleCancelWithdrawal}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Step 1: Request Withdrawal (if not yet requested) */}
+              {!hasPendingWithdrawal && (
+                <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4">
+                  <div className="flex items-start gap-3">
+                    <Clock className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-sm">7-Day Withdrawal Delay</p>
+                      <p className="text-muted-foreground text-xs">
+                        For security, withdrawals require a 7-day waiting period.
+                        This prevents front-running if disputes are filed.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full"
+                    disabled={isRequestBusy}
+                    onClick={handleRequestWithdrawal}
+                    variant="outline"
+                  >
+                    {isRequestBusy ? (
+                      <>
+                        <span className="animate-spin">
+                          <LoaderIcon size={16} />
+                        </span>
+                        Requesting...
+                      </>
+                    ) : (
+                      "Request Withdrawal"
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 2: Enter Amount & Withdraw (only if delay passed) */}
+              {canWithdrawNow && (
+                <div className="space-y-3">
+                  <Label htmlFor="withdraw-amount">Amount (USDC)</Label>
+                  <Input
+                    disabled={isWithdrawBusy}
+                    id="withdraw-amount"
+                    max={staked}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="0.00"
+                    type="number"
+                    value={withdrawAmount}
+                  />
+                  {!hasEnough && (
+                    <p className="text-destructive text-xs">
+                      Warning: Withdrawing will leave tool under-staked
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <DialogFooter>
-              <Button
-                disabled={isWithdrawBusy}
-                onClick={handleWithdraw}
-                type="button"
-                variant="outline"
-              >
-                {isWithdrawBusy ? (
-                  <>
-                    <span className="animate-spin">
-                      <LoaderIcon size={16} />
-                    </span>
-                    {isWithdrawConfirming ? "Confirming..." : "Withdrawing..."}
-                  </>
-                ) : (
-                  "Withdraw USDC"
-                )}
-              </Button>
-            </DialogFooter>
+            {canWithdrawNow && (
+              <DialogFooter>
+                <Button
+                  disabled={isWithdrawBusy}
+                  onClick={handleWithdraw}
+                  type="button"
+                  variant="outline"
+                >
+                  {isWithdrawBusy ? (
+                    <>
+                      <span className="animate-spin">
+                        <LoaderIcon size={16} />
+                      </span>
+                      {isWithdrawConfirming ? "Confirming..." : "Withdrawing..."}
+                    </>
+                  ) : (
+                    "Withdraw USDC"
+                  )}
+                </Button>
+              </DialogFooter>
+            )}
           </DialogContent>
         </Dialog>
       </div>

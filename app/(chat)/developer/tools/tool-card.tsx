@@ -39,8 +39,7 @@ import {
 const PROVEN_QUERY_THRESHOLD = 100;
 const PROVEN_SUCCESS_RATE_THRESHOLD = 95;
 const PROVEN_UPTIME_THRESHOLD = 98;
-// Staking threshold: $1.00 per query requires collateral
-const STAKING_THRESHOLD = 1.0;
+// All paid tools require staking (100x query price)
 const STAKE_MULTIPLIER = 100;
 
 type Tool = {
@@ -107,8 +106,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
     tool.uptimePercent
   );
 
-  // Staking requirements
-  const requiresStaking = priceValue >= STAKING_THRESHOLD;
+  // Staking requirements - all paid tools require staking
+  const requiresStaking = priceValue > 0;
   const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
   const hasRequiredStake = !requiresStaking || totalStaked >= requiredStake;
 
