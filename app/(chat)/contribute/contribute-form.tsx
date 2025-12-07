@@ -25,9 +25,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
+import { calculateRequiredStake, MINIMUM_STAKE_USDC } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { submitTool } from "./actions";
-import { calculateRequiredStake, MINIMUM_STAKE_USDC } from "@/lib/constants";
 import { contributeFormInitialState } from "./schema";
 
 export function ContributeForm() {
@@ -212,9 +212,7 @@ Agent tips (optional):
                   </p>
                   <p className="text-amber-600/90 text-xs leading-relaxed">
                     Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
-                    {isMinimumStake
-                      ? "(minimum stake)"
-                      : "(100× query price)"}{" "}
+                    {isMinimumStake ? "(minimum stake)" : "(100× query price)"}{" "}
                     from your smart wallet after submission. Your tool will
                     auto-activate once staked. Fully refundable with 7-day
                     withdrawal delay.

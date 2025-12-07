@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { NextResponse } from "next/server";
 import postgres from "postgres";
 import { createPublicClient, http, parseAbi } from "viem";
 import { base, baseSepolia } from "viem/chains";
@@ -10,18 +10,18 @@ import { uuidToUint256 } from "@/lib/utils";
 
 /**
  * CRON: Stake Sync (Level 3 - Economic Security)
- * 
+ *
  * Syncs on-chain stake amounts from the ContextRouter contract to the database.
  * Runs daily to keep totalStaked in sync with actual on-chain state.
- * 
+ *
  * ALL tools require staking now (minimum $1 or 100x query price).
- * 
+ *
  * Process:
  * 1. Fetch ALL tools from the database
  * 2. For each tool, read getStake(toolId) from the contract
  * 3. Update totalStaked in the database
  * 4. Auto-activate tools when stake requirement is met
- * 
+ *
  * Authorization: Vercel Cron uses CRON_SECRET environment variable
  */
 
@@ -38,29 +38,38 @@ const CONTEXT_ROUTER_ABI = parseAbi([
 ]);
 
 // Determine chain based on environment
-const isProduction = process.env.NODE_ENV === "production" && process.env.VERCEL_ENV === "production";
+const isProduction =
+  process.env.NODE_ENV === "production" &&
+  process.env.VERCEL_ENV === "production";
 const chain = isProduction ? base : baseSepolia;
 const routerAddress = (
-  isProduction 
-    ? process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS 
-    : process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS_SEPOLIA || process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS
+  isProduction
+    ? process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS
+    : process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS_SEPOLIA ||
+      process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS
 ) as `0x${string}` | undefined;
 
 export async function GET(request: Request) {
   // Verify cron secret for security
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    console.log(LOG_PREFIX, "Unauthorized request - missing or invalid CRON_SECRET");
+    console.log(
+      LOG_PREFIX,
+      "Unauthorized request - missing or invalid CRON_SECRET"
+    );
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Check if contract address is configured
   if (!routerAddress) {
-    console.log(LOG_PREFIX, "Contract address not configured, skipping stake sync");
-    return NextResponse.json({ 
-      success: true, 
+    console.log(
+      LOG_PREFIX,
+      "Contract address not configured, skipping stake sync"
+    );
+    return NextResponse.json({
+      success: true,
       skipped: true,
-      reason: "NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS not configured" 
+      reason: "NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS not configured",
     });
   }
 
@@ -71,7 +80,9 @@ export async function GET(request: Request) {
     // Create viem client for reading contract state
     const publicClient = createPublicClient({
       chain,
-      transport: http(process.env.BASE_RPC_URL || chain.rpcUrls.default.http[0]),
+      transport: http(
+        process.env.BASE_RPC_URL || chain.rpcUrls.default.http[0]
+      ),
     });
 
     // Fetch ALL tools - all tools require staking now (minimum $1)
@@ -98,7 +109,7 @@ export async function GET(request: Request) {
     for (const tool of toolsToSync) {
       try {
         const toolIdBigInt = uuidToUint256(tool.id);
-        
+
         // Read stake from contract
         const onChainStake = await publicClient.readContract({
           address: routerAddress,
@@ -120,9 +131,12 @@ export async function GET(request: Request) {
               updatedAt: new Date(),
             })
             .where(eq(aiTool.id, tool.id));
-          
+
           results.synced++;
-          console.log(LOG_PREFIX, `✓ ${tool.name}: ${currentInUsdc} → ${stakeInUsdc} USDC`);
+          console.log(
+            LOG_PREFIX,
+            `✓ ${tool.name}: ${currentInUsdc} → ${stakeInUsdc} USDC`
+          );
         } else {
           results.unchanged++;
         }
@@ -141,9 +155,12 @@ export async function GET(request: Request) {
               updatedAt: new Date(),
             })
             .where(eq(aiTool.id, tool.id));
-          
+
           results.autoActivated++;
-          console.log(LOG_PREFIX, `✓ ${tool.name}: Auto-activated (stake $${stakeValue.toFixed(2)} >= required $${requiredStake.toFixed(2)})`);
+          console.log(
+            LOG_PREFIX,
+            `✓ ${tool.name}: Auto-activated (stake $${stakeValue.toFixed(2)} >= required $${requiredStake.toFixed(2)})`
+          );
         }
       } catch (error) {
         results.errors++;
@@ -177,7 +194,3 @@ export async function GET(request: Request) {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // 60 seconds max for cron
-
-
-
-
