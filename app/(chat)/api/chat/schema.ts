@@ -45,7 +45,11 @@ export const postRequestBodySchema = z.object({
     role: z.enum(["user"]),
     parts: z.array(partSchema),
   }),
-  selectedChatModel: z.enum(["chat-model", "chat-model-reasoning"]),
+  selectedChatModel: z.enum([
+    "chat-model",
+    "chat-model-reasoning",
+    "gemini-model",
+  ]),
   selectedVisibilityType: z.enum(["public", "private"]),
   toolInvocations: z.array(toolInvocationSchema).max(5).optional(),
   // Optional flag indicating whether the client wants developer-mode

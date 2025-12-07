@@ -31,10 +31,15 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
   /*
    * For users with an account
    * High ceiling for anti-abuse only - actual limiting is via tier system
+   * Includes gemini-model but actual availability is filtered by tier
    */
   regular: {
     maxMessagesPerDay: 10_000,
-    availableChatModelIds: ["chat-model", "chat-model-reasoning"],
+    availableChatModelIds: [
+      "chat-model",
+      "chat-model-reasoning",
+      "gemini-model",
+    ],
   },
 
   /*
@@ -70,4 +75,27 @@ export function canMakeQuery(tier: UserTier, usedToday: number): boolean {
     return true; // Unlimited for BYOK and convenience tiers
   }
   return usedToday < FREE_TIER_DAILY_LIMIT;
+}
+
+/**
+ * Model IDs available by tier (for non-BYOK users).
+ * BYOK users get their provider's models instead.
+ *
+ * - Free tier: Only Kimi models (platform default)
+ * - Convenience tier: Kimi + Gemini (paid pass-through)
+ */
+export const modelIdsByTier: Record<Exclude<UserTier, "byok">, string[]> = {
+  free: ["chat-model", "chat-model-reasoning"],
+  convenience: ["chat-model", "chat-model-reasoning", "gemini-model"],
+};
+
+/**
+ * Get available model IDs for a user based on their tier.
+ * For BYOK users, returns null (they use provider-specific models).
+ */
+export function getAvailableModelIds(tier: UserTier): string[] | null {
+  if (tier === "byok") {
+    return null; // BYOK users get models from their provider
+  }
+  return modelIdsByTier[tier];
 }

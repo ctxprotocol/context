@@ -47,8 +47,7 @@ export const PROVIDER_MODEL_INFO: Record<
     },
     reasoning: {
       name: "Gemini 3 Pro Thinking+",
-      description:
-        "Deep reasoning with high thinking level for complex tasks",
+      description: "Deep reasoning with high thinking level for complex tasks",
     },
   },
   anthropic: {
@@ -65,7 +64,9 @@ export const PROVIDER_MODEL_INFO: Record<
 };
 
 /**
- * Base chat models (platform default - Kimi)
+ * Base chat models (platform defaults)
+ * - Kimi models: Available to all tiers
+ * - Gemini model: Convenience tier only (uses platform's API key)
  */
 export const chatModels: ChatModel[] = [
   {
@@ -86,32 +87,72 @@ export const chatModels: ChatModel[] = [
     estimatedCostPerQuery: 0.008,
     supportsBYOK: true,
   },
+  {
+    id: "gemini-model",
+    name: "Gemini 3 Pro",
+    description: "Google's advanced reasoning model with thinking capabilities",
+    // Gemini 3 Pro pricing: ~$1.25/1M input, ~$10/1M output
+    // Average ~2000 input + ~500 output = ~$0.0075 avg
+    estimatedCostPerQuery: 0.0075,
+    supportsBYOK: false, // Platform-only model for Convenience tier
+  },
 ];
 
 /**
  * Get chat models with provider-specific names
  * @param provider - The BYOK provider (or null for platform default)
+ * @returns Array of chat models. For BYOK, returns provider-specific models.
+ *          For platform (null), returns all platform models including Gemini.
  */
 export function getChatModelsForProvider(
   provider: BYOKProvider | null
 ): ChatModel[] {
-  const activeProvider = provider || "kimi";
-  const providerInfo = PROVIDER_MODEL_INFO[activeProvider];
+  // BYOK mode - return provider-specific models only
+  if (provider) {
+    const providerInfo = PROVIDER_MODEL_INFO[provider];
+    return [
+      {
+        id: "chat-model",
+        name: providerInfo.chat.name,
+        description: providerInfo.chat.description,
+        estimatedCostPerQuery: 0.003,
+        supportsBYOK: true,
+      },
+      {
+        id: "chat-model-reasoning",
+        name: providerInfo.reasoning.name,
+        description: providerInfo.reasoning.description,
+        estimatedCostPerQuery: 0.008,
+        supportsBYOK: true,
+      },
+    ];
+  }
 
+  // Platform mode (Free/Convenience tier) - return all platform models
+  // Filtering by tier (hiding Gemini from Free tier) happens in model-selector
+  const kimiInfo = PROVIDER_MODEL_INFO.kimi;
   return [
     {
       id: "chat-model",
-      name: providerInfo.chat.name,
-      description: providerInfo.chat.description,
+      name: kimiInfo.chat.name,
+      description: kimiInfo.chat.description,
       estimatedCostPerQuery: 0.003,
       supportsBYOK: true,
     },
     {
       id: "chat-model-reasoning",
-      name: providerInfo.reasoning.name,
-      description: providerInfo.reasoning.description,
+      name: kimiInfo.reasoning.name,
+      description: kimiInfo.reasoning.description,
       estimatedCostPerQuery: 0.008,
       supportsBYOK: true,
+    },
+    {
+      id: "gemini-model",
+      name: "Gemini 3 Pro",
+      description:
+        "Google's advanced reasoning model with thinking capabilities",
+      estimatedCostPerQuery: 0.0075,
+      supportsBYOK: false,
     },
   ];
 }

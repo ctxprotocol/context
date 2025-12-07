@@ -12,7 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUserSettings } from "@/hooks/use-user-settings";
-import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import {
+  entitlementsByUserType,
+  getAvailableModelIds,
+} from "@/lib/ai/entitlements";
 import { getChatModelsForProvider } from "@/lib/ai/models";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { cn } from "@/lib/utils";
@@ -49,9 +52,23 @@ export function ModelSelector({
 
   const allModelsForProvider = getChatModelsForProvider(byokProvider);
 
-  const availableChatModels = allModelsForProvider.filter((chatModel) =>
-    availableChatModelIds.includes(chatModel.id)
-  );
+  // Filter models by:
+  // 1. User type entitlements (guest vs regular)
+  // 2. Tier-based availability (free vs convenience) - only for non-BYOK
+  const tierModelIds = getAvailableModelIds(settings.tier);
+
+  const availableChatModels = allModelsForProvider.filter((chatModel) => {
+    // Must be in user type entitlements
+    if (!availableChatModelIds.includes(chatModel.id)) {
+      return false;
+    }
+    // For BYOK, tierModelIds is null - show all provider models
+    // For Free/Convenience, filter by tier-specific models
+    if (tierModelIds !== null && !tierModelIds.includes(chatModel.id)) {
+      return false;
+    }
+    return true;
+  });
 
   const selectedChatModel = useMemo(
     () =>
@@ -92,7 +109,7 @@ export function ModelSelector({
         {providerInfo && (
           <>
             <div className="px-2 py-1.5">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
                 <span className="rounded bg-primary/10 px-1.5 py-0.5 font-medium text-primary">
                   {providerInfo.badge}
                 </span>

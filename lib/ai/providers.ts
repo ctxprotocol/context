@@ -6,8 +6,8 @@ import {
   extractReasoningMiddleware,
   wrapLanguageModel,
 } from "ai";
-import type { BYOKProvider } from "../db/schema";
 import { isTestEnvironment } from "../constants";
+import type { BYOKProvider } from "../db/schema";
 
 // =============================================================================
 // BYOK Provider Configuration
@@ -26,6 +26,12 @@ import { isTestEnvironment } from "../constants";
 const platformKimi = createOpenAI({
   baseURL: process.env.KIMI_BASE_URL || "https://api.moonshot.ai/v1",
   apiKey: process.env.KIMI_API_KEY,
+});
+
+// Platform's Gemini provider (for Convenience tier)
+// Uses platform's API key - cost passed through to user
+const platformGemini = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 /**
@@ -91,10 +97,12 @@ export type BYOKConfig = {
  * Supports Kimi, Gemini, and Anthropic.
  */
 export function getProviderForUser(byokConfig?: BYOKConfig) {
-  // No BYOK config - use platform's default (Kimi)
+  // No BYOK config - use platform's default providers
+  // Includes Kimi (default) + Gemini (for Convenience tier)
   if (!byokConfig) {
     return customProvider({
       languageModels: {
+        // Kimi models (available to all tiers)
         "chat-model": platformKimi.chat(PROVIDER_MODELS.kimi.chat),
         "chat-model-reasoning": wrapLanguageModel({
           model: platformKimi.chat(PROVIDER_MODELS.kimi.reasoning),
@@ -102,6 +110,11 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
         }),
         "title-model": platformKimi.chat(PROVIDER_MODELS.kimi.title),
         "artifact-model": platformKimi.chat(PROVIDER_MODELS.kimi.artifact),
+        // Gemini model (Convenience tier only - filtered in UI)
+        "gemini-model": wrapLanguageModel({
+          model: platformGemini(PROVIDER_MODELS.gemini.chat),
+          middleware: extractReasoningMiddleware({ tagName: "thinking" }),
+        }),
       },
     });
   }

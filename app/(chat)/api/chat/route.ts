@@ -821,6 +821,36 @@ export async function POST(request: Request) {
             // Track AI call for cost estimation (tool selection)
             aiCallCount++;
 
+            // Get usage data from selection stream and track actual cost
+            try {
+              const selectionUsage = await selectionStream.usage;
+              const providers = await getTokenlensCatalog();
+              const modelId = provider.languageModel(selectedChatModel).modelId;
+              if (modelId && providers && selectionUsage) {
+                const summary = getUsage({
+                  modelId,
+                  usage: selectionUsage,
+                  providers,
+                });
+                if (summary.costUSD?.totalUSD) {
+                  totalActualCost += Number(summary.costUSD.totalUSD);
+                  console.log(
+                    "[chat-api] Auto Mode Discovery: selection cost tracked",
+                    {
+                      chatId: id,
+                      cost: summary.costUSD.totalUSD,
+                      totalActualCost,
+                    }
+                  );
+                }
+              }
+            } catch (err) {
+              console.warn(
+                "[chat-api] Auto Mode Discovery: failed to track selection cost",
+                err
+              );
+            }
+
             selectionText = selectionText.trim();
 
             // Parse the AI's JSON response
@@ -1096,6 +1126,37 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
               chatId: id,
               totalCost,
             });
+
+            // Record discovery phase cost before returning
+            // This ensures the tool selection AI call cost is tracked even though
+            // the full agentic flow will continue in a separate request after payment
+            if (userTier === "convenience" && totalActualCost > 0) {
+              try {
+                await addAccumulatedModelCost(session.user.id, totalActualCost);
+                await recordActualCost({
+                  userId: session.user.id,
+                  chatId: id,
+                  modelId: selectedChatModel,
+                  flowType: "auto_mode", // Discovery is part of auto_mode
+                  estimatedCost: estimatedTotalCost,
+                  actualCost: totalActualCost,
+                  aiCallCount,
+                });
+                console.log(
+                  "[chat-api] Auto Mode Discovery: recorded discovery phase cost",
+                  {
+                    chatId: id,
+                    actualCost: totalActualCost,
+                    aiCallCount,
+                  }
+                );
+              } catch (err) {
+                console.warn(
+                  "[chat-api] Auto Mode Discovery: failed to record cost",
+                  err
+                );
+              }
+            }
 
             // Return early - wait for payment
             return;
