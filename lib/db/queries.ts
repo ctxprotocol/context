@@ -703,10 +703,8 @@ export async function createAITool({
     }
 
     // Create the tool with embedding if available
-    // Free tools (price = 0) are active immediately
-    // Paid tools start inactive until stake is deposited
-    const priceValue = Number.parseFloat(pricePerQuery) || 0;
-    const isFreeAndActive = priceValue === 0;
+    // ALL tools start inactive until stake is deposited (minimum $1 or 100x price)
+    // This ensures quality and prevents spam for both free and paid tools
 
     let newTool;
     if (embeddingStr) {
@@ -722,7 +720,7 @@ export async function createAITool({
         ) VALUES (
           ${name}, ${description}, ${developerId}, ${developerWallet},
           ${pricePerQuery}, ${JSON.stringify(toolSchema)}::jsonb, ${apiEndpoint}, 
-          ${categoryVal}, ${iconUrlVal}, ${isFreeAndActive}, ${searchText}, ${embeddingStr}::vector
+          ${categoryVal}, ${iconUrlVal}, false, ${searchText}, ${embeddingStr}::vector
         )
         RETURNING *
       `);
@@ -743,7 +741,7 @@ export async function createAITool({
           apiEndpoint,
           category,
           iconUrl,
-          isActive: isFreeAndActive,
+          isActive: false,
           searchText,
         })
         .returning();

@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
+import { calculateRequiredStake } from "@/lib/constants";
 import {
   useReadContextRouterGetWithdrawalStatus,
   useWriteContextRouterCancelWithdrawal,
@@ -43,10 +44,6 @@ import {
   useWriteErc20Approve,
 } from "@/lib/generated";
 import { cn, formatPrice, uuidToUint256 } from "@/lib/utils";
-
-// All paid tools require staking (100x query price)
-// Free tools ($0) = no stake requirement
-const STAKE_MULTIPLIER = 100;
 
 type StakePanelProps = {
   tools: Array<{
@@ -58,26 +55,30 @@ type StakePanelProps = {
 };
 
 /**
- * StakePanel - Manage stakes for paid tools
+ * StakePanel - Manage stakes for ALL tools
  *
- * All paid tools require developers to stake 100x the query price as collateral.
- * This provides economic security for users against scams (like Apple's $99/yr fee,
- * but refundable). Free tools ($0) require no stake.
+ * All tools require developers to stake collateral as economic security.
+ * Formula: MAX($1.00 minimum, 100x query price)
+ *
+ * Examples:
+ *   Free tool ($0.00/query)   → $1.00 stake (minimum)
+ *   $0.01/query tool          → $1.00 stake
+ *   $0.10/query tool          → $10.00 stake
+ *
+ * This creates accountability similar to Apple's $99/year developer fee,
+ * but the stake is fully refundable with a 7-day withdrawal delay.
  */
 export function StakePanel({ tools }: StakePanelProps) {
   const { activeWallet } = useWalletIdentity();
   const isConnected = !!activeWallet?.address;
 
-  // Filter to paid tools (price > 0) - all paid tools require staking
-  const toolsRequiringStake = tools.filter((tool) => {
-    const price = Number.parseFloat(tool.pricePerQuery) || 0;
-    return price > 0;
-  });
+  // ALL tools require staking now (minimum $1 or 100x price)
+  const toolsRequiringStake = tools;
 
-  // Calculate total required vs total staked
+  // Calculate total required vs total staked using the new formula
   const totalRequired = toolsRequiringStake.reduce((sum, tool) => {
     const price = Number.parseFloat(tool.pricePerQuery) || 0;
-    return sum + price * STAKE_MULTIPLIER;
+    return sum + calculateRequiredStake(price);
   }, 0);
 
   const totalStaked = toolsRequiringStake.reduce((sum, tool) => {
@@ -87,11 +88,11 @@ export function StakePanel({ tools }: StakePanelProps) {
   const hasUnderstakedTools = toolsRequiringStake.some((tool) => {
     const price = Number.parseFloat(tool.pricePerQuery) || 0;
     const staked = Number.parseFloat(tool.totalStaked ?? "0") || 0;
-    const required = price * STAKE_MULTIPLIER;
+    const required = calculateRequiredStake(price);
     return staked < required;
   });
 
-  // Don't render if no high-value tools
+  // Don't render if no tools
   if (toolsRequiringStake.length === 0) {
     return null;
   }
@@ -253,7 +254,7 @@ function StakeToolRow({
 
   const price = Number.parseFloat(tool.pricePerQuery) || 0;
   const staked = Number.parseFloat(tool.totalStaked ?? "0") || 0;
-  const required = price * STAKE_MULTIPLIER;
+  const required = calculateRequiredStake(price);
   const hasEnough = staked >= required;
   const shortfall = Math.max(0, required - staked);
 

@@ -27,11 +27,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { cn } from "@/lib/utils";
 import { submitTool } from "./actions";
+import { calculateRequiredStake, MINIMUM_STAKE_USDC } from "@/lib/constants";
 import { contributeFormInitialState } from "./schema";
-
-// All paid tools require staking (100x query price)
-// Free tools ($0) = no stake. This creates skin-in-the-game like Apple's $99/year dev fee.
-const STAKE_MULTIPLIER = 100;
 
 export function ContributeForm() {
   const router = useRouter();
@@ -54,10 +51,11 @@ export function ContributeForm() {
   }, [state.status, router]);
 
   // Track price for staking requirement display
+  // ALL tools require staking (minimum $1.00, or 100x query price if higher)
   const [price, setPrice] = useState(state.payload?.price || "0.00");
   const priceValue = Number.parseFloat(price) || 0;
-  const requiresStaking = priceValue > 0; // All paid tools require staking
-  const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
+  const requiredStake = calculateRequiredStake(priceValue);
+  const isMinimumStake = requiredStake === MINIMUM_STAKE_USDC;
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -205,33 +203,35 @@ Agent tips (optional):
                 <strong>once per chat turn</strong>.
               </p>
 
-              {/* Staking Requirement Notice */}
-              {requiresStaking && (
-                <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                  <Shield className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                  <div className="space-y-1">
-                    <p className="font-medium text-amber-700 text-xs">
-                      Staking Required for Paid Tools
-                    </p>
-                    <p className="text-amber-600/90 text-xs leading-relaxed">
-                      Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
-                      (100× query price) from your smart wallet after
-                      submission. Fully refundable with 7-day withdrawal delay.
-                      Set price to $0.00 for no stake.
-                    </p>
-                    <p className="text-amber-600/70 text-xs">
-                      💡 Add funds to your smart wallet first via the sidebar.
-                    </p>
-                    <Link
-                      className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"
-                      href="/developer/tools"
-                    >
-                      Manage stakes in Developer Tools
-                      <ExternalLink className="size-3" />
-                    </Link>
-                  </div>
+              {/* Staking Requirement Notice - ALL tools require stake */}
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                <Shield className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                <div className="space-y-1">
+                  <p className="font-medium text-amber-700 text-xs">
+                    Staking Required
+                  </p>
+                  <p className="text-amber-600/90 text-xs leading-relaxed">
+                    Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
+                    {isMinimumStake
+                      ? "(minimum stake)"
+                      : "(100× query price)"}{" "}
+                    from your smart wallet after submission. Your tool will
+                    auto-activate once staked. Fully refundable with 7-day
+                    withdrawal delay.
+                  </p>
+                  <p className="text-amber-600/70 text-xs">
+                    💡 All tools require a minimum $1.00 stake to ensure quality
+                    and prevent spam.
+                  </p>
+                  <Link
+                    className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"
+                    href="/developer/tools"
+                  >
+                    Manage stakes in Developer Tools
+                    <ExternalLink className="size-3" />
+                  </Link>
                 </div>
-              )}
+              </div>
 
               <FieldError message={priceError} />
             </div>

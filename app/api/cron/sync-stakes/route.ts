@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { eq, gte, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createPublicClient, http, parseAbi } from "viem";
 import { base, baseSepolia } from "viem/chains";
+import { calculateRequiredStake } from "@/lib/constants";
 import { aiTool } from "@/lib/db/schema";
 import { uuidToUint256 } from "@/lib/utils";
 
@@ -11,23 +12,24 @@ import { uuidToUint256 } from "@/lib/utils";
  * CRON: Stake Sync (Level 3 - Economic Security)
  * 
  * Syncs on-chain stake amounts from the ContextRouter contract to the database.
- * Runs every 6 hours to keep totalStaked in sync with actual on-chain state.
+ * Runs daily to keep totalStaked in sync with actual on-chain state.
+ * 
+ * ALL tools require staking now (minimum $1 or 100x query price).
  * 
  * Process:
- * 1. Fetch all tools with pricePerQuery >= $1.00 (staking threshold)
+ * 1. Fetch ALL tools from the database
  * 2. For each tool, read getStake(toolId) from the contract
  * 3. Update totalStaked in the database
+ * 4. Auto-activate tools when stake requirement is met
  * 
  * Authorization: Vercel Cron uses CRON_SECRET environment variable
  */
 
 const LOG_PREFIX = "[cron/sync-stakes]";
 
-// All paid tools require staking - sync any tool with price > 0
-const MIN_PRICE_FOR_STAKING = "0.000001"; // Anything above $0
-
 // Create database connection
-const client = postgres(process.env.POSTGRES_URL!);
+const connectionString = process.env.POSTGRES_URL ?? "";
+const client = postgres(connectionString);
 const db = drizzle(client);
 
 // Contract ABI for stake reading
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
       transport: http(process.env.BASE_RPC_URL || chain.rpcUrls.default.http[0]),
     });
 
-    // Fetch all paid tools that require staking (price > 0)
+    // Fetch ALL tools - all tools require staking now (minimum $1)
     const toolsToSync = await db
       .select({
         id: aiTool.id,
@@ -81,10 +83,9 @@ export async function GET(request: Request) {
         currentStaked: aiTool.totalStaked,
         isActive: aiTool.isActive,
       })
-      .from(aiTool)
-      .where(gte(aiTool.pricePerQuery, MIN_PRICE_FOR_STAKING));
+      .from(aiTool);
 
-    console.log(LOG_PREFIX, `Found ${toolsToSync.length} tools requiring stake sync`);
+    console.log(LOG_PREFIX, `Found ${toolsToSync.length} tools to sync`);
 
     const results = {
       synced: 0,
@@ -127,9 +128,9 @@ export async function GET(request: Request) {
         }
 
         // Auto-activate tool if stake requirement is now met and tool is inactive
-        // This is a QoL improvement - paid tools start inactive and auto-activate once staked
-        const priceValue = Number.parseFloat(tool.pricePerQuery);
-        const requiredStake = priceValue * 100; // 100x multiplier
+        // ALL tools start inactive until staked (minimum $1 or 100x price)
+        const priceValue = Number.parseFloat(tool.pricePerQuery) || 0;
+        const requiredStake = calculateRequiredStake(priceValue);
         const stakeValue = Number.parseFloat(stakeInUsdc);
 
         if (!tool.isActive && stakeValue >= requiredStake) {

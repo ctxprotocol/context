@@ -35,9 +35,15 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     uint256 public constant PLATFORM_FEE_PERCENT = 10;
     
     // Staking constants (USDC has 6 decimals)
-    // ALL paid tools require staking (price > 0). Free tools ($0) = no stake.
-    // Required stake = 100x the query price (e.g., $0.50/query = $50 stake)
+    // ALL tools require a minimum stake to prevent spam and ensure quality.
+    // Formula: requiredStake = MAX(MINIMUM_STAKE, pricePerQuery * STAKE_MULTIPLIER)
+    //
+    // Examples:
+    //   Free tool ($0.00/query)   → $1.00 stake (minimum applies)
+    //   $0.01/query tool          → $1.00 stake (100x = $1.00)
+    //   $0.10/query tool          → $10.00 stake (100x applies)
     uint256 public constant STAKE_MULTIPLIER = 100;
+    uint256 public constant MINIMUM_STAKE = 1_000_000; // $1.00 USDC (6 decimals)
     
     // Tracking
     mapping(address => uint256) public developerBalances;
@@ -514,22 +520,27 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Calculate the minimum stake required for a tool based on its query price
      * @param pricePerQuery The tool's price per query in USDC (6 decimals)
-     * @return The minimum stake required (0 for free tools, 100x price for paid tools)
+     * @return The minimum stake required - MAX($1.00, 100x price) for ALL tools
+     *
+     * All tools require a minimum $1.00 stake to prevent spam and ensure quality.
+     * This creates accountability even for free tools, similar to Apple's $99/year
+     * developer fee but much lower and fully refundable.
      */
     function getMinimumStake(uint256 pricePerQuery) public pure returns (uint256) {
-        if (pricePerQuery == 0) {
-            return 0; // Free tools don't require staking
+        uint256 proportionalStake = pricePerQuery * STAKE_MULTIPLIER;
+        // Return the greater of minimum stake or proportional stake
+        if (proportionalStake > MINIMUM_STAKE) {
+            return proportionalStake;
         }
-        return pricePerQuery * STAKE_MULTIPLIER;
+        return MINIMUM_STAKE;
     }
 
     /**
      * @notice Check if a tool requires staking based on its price
-     * @param pricePerQuery The tool's price per query in USDC (6 decimals)
-     * @return True if the tool requires staking (any paid tool)
+     * @return True - ALL tools require staking (minimum $1.00)
      */
-    function requiresStaking(uint256 pricePerQuery) public pure returns (bool) {
-        return pricePerQuery > 0;
+    function requiresStaking(uint256) public pure returns (bool) {
+        return true; // All tools require staking
     }
 
     /**

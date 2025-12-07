@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
+import { calculateRequiredStake } from "@/lib/constants";
 import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
 import { type ContributeFormState, contributeFormSchema } from "./schema";
 
@@ -247,18 +248,12 @@ export async function submitTool(
   const skillCount = mcpTools.length;
   const skillWord = skillCount === 1 ? "skill" : "skills";
   const priceValue = Number.parseFloat(parsed.data.price) || 0;
+  const stakeRequired = calculateRequiredStake(priceValue);
 
-  // Return success message - client will handle redirect after showing message
-  if (priceValue > 0) {
-    const stakeRequired = priceValue * 100;
-    return {
-      status: "success",
-      message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Deposit $${stakeRequired.toFixed(2)} USDC stake to activate. Your tool will auto-activate once staked.`,
-    };
-  }
-
+  // Return success message - ALL tools require stake now
+  // Client will handle redirect after showing message
   return {
     status: "success",
-    message: `Tool submitted and activated! Discovered ${skillCount} ${skillWord}. Your free tool is now live in the marketplace.`,
+    message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Deposit $${stakeRequired.toFixed(2)} USDC stake to activate. Your tool will auto-activate once staked.`,
   };
 }

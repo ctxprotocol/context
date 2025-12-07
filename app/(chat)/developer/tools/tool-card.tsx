@@ -27,6 +27,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { calculateRequiredStake } from "@/lib/constants";
 import { cn, formatPrice } from "@/lib/utils";
 import {
   type EditToolState,
@@ -39,8 +40,6 @@ import {
 const PROVEN_QUERY_THRESHOLD = 100;
 const PROVEN_SUCCESS_RATE_THRESHOLD = 95;
 const PROVEN_UPTIME_THRESHOLD = 98;
-// All paid tools require staking (100x query price)
-const STAKE_MULTIPLIER = 100;
 
 type Tool = {
   id: string;
@@ -106,10 +105,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
     tool.uptimePercent
   );
 
-  // Staking requirements - all paid tools require staking
-  const requiresStaking = priceValue > 0;
-  const requiredStake = requiresStaking ? priceValue * STAKE_MULTIPLIER : 0;
-  const hasRequiredStake = !requiresStaking || totalStaked >= requiredStake;
+  // Staking requirements - ALL tools require staking (minimum $1 or 100x price)
+  const requiredStake = calculateRequiredStake(priceValue);
+  const hasRequiredStake = totalStaked >= requiredStake;
 
   const handleRefresh = () => {
     setRefreshMessage(null);
@@ -123,8 +121,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
   };
 
   const handleToggle = () => {
-    // Prevent activation if stake is required but not provided
-    if (!tool.isActive && requiresStaking && !hasRequiredStake) {
+    // Prevent activation if stake requirement not met (ALL tools require stake)
+    if (!tool.isActive && !hasRequiredStake) {
       return; // Don't allow activation without stake
     }
     startToggle(async () => {
@@ -231,9 +229,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
             <TooltipContent>Success Rate</TooltipContent>
           </Tooltip>
 
-          {/* Staking Status (for high-value tools) */}
-          {requiresStaking && (
-            <Tooltip>
+          {/* Staking Status - ALL tools require stake */}
+          <Tooltip>
               <TooltipTrigger asChild>
                 <Badge
                   className={cn(
@@ -253,7 +250,6 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   : `Need $${requiredStake.toFixed(2)} stake (have $${totalStaked.toFixed(2)})`}
               </TooltipContent>
             </Tooltip>
-          )}
 
           {/* Legacy Verified badge (identity verified, not performance) */}
           {tool.isVerified && !isProven && (
@@ -270,13 +266,13 @@ export function ToolCard({ tool }: { tool: Tool }) {
           )}
         </div>
 
-        {/* Staking Warning */}
-        {requiresStaking && !hasRequiredStake && (
+        {/* Staking Warning - ALL tools require stake */}
+        {!hasRequiredStake && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
             <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <p className="text-amber-600/90 text-xs leading-relaxed">
               This tool requires <strong>${requiredStake.toFixed(2)}</strong>{" "}
-              stake. Users may avoid high-price tools without collateral.
+              stake to activate. Deposit stake to make your tool visible in the marketplace.
             </p>
           </div>
         )}
@@ -538,7 +534,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
               <TooltipContent>
                 {tool.isActive
                   ? "Tool is visible in the marketplace"
-                  : requiresStaking && !hasRequiredStake
+                  : !hasRequiredStake
                     ? `Deposit $${requiredStake.toFixed(2)} stake to activate this tool`
                     : "Tool is hidden from the marketplace"}
               </TooltipContent>
@@ -553,7 +549,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                     "disabled:cursor-not-allowed disabled:opacity-50",
                     tool.isActive ? "bg-emerald-500" : "bg-input"
                   )}
-                  disabled={isToggling || (!tool.isActive && requiresStaking && !hasRequiredStake)}
+                  disabled={isToggling || (!tool.isActive && !hasRequiredStake)}
                   onClick={handleToggle}
                   role="switch"
                   type="button"
@@ -566,7 +562,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   />
                 </button>
               </TooltipTrigger>
-              {!tool.isActive && requiresStaking && !hasRequiredStake && (
+              {!tool.isActive && !hasRequiredStake && (
                 <TooltipContent>
                   Deposit $${requiredStake.toFixed(2)} stake to activate this tool
                 </TooltipContent>
