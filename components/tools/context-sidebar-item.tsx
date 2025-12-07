@@ -25,14 +25,14 @@ const PureContextSidebarItem = ({
     <SidebarMenuItem>
       <div className="flex w-full items-center gap-1">
         <SidebarMenuButton
-          className="group/item h-auto flex-1 justify-between py-2.5"
+          className="group/item h-auto flex-1 justify-between py-2.5 data-[active=true]:font-normal"
           isActive={isActive}
           onClick={() => onToggle(tool.id)}
           type="button"
         >
           <div className="flex min-w-0 flex-col items-start gap-1 text-left">
             <div className="flex w-full items-center gap-2">
-              <span className="truncate font-medium text-sm">{tool.name}</span>
+              <span className="truncate text-sm">{tool.name}</span>
             </div>
             <span className="font-normal text-muted-foreground text-xs">
               ${formattedPrice}
