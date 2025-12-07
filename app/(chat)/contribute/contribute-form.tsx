@@ -218,8 +218,8 @@ Agent tips (optional):
                     withdrawal delay.
                   </p>
                   <p className="text-amber-600/70 text-xs">
-                    💡 All tools require a minimum $10.00 stake to ensure quality
-                    and prevent spam. Enforced on-chain.
+                    💡 All tools require a minimum $10.00 stake to ensure
+                    quality and prevent spam. Enforced on-chain.
                   </p>
                   <Link
                     className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"
