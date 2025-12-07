@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { parseUnits } from "viem";
 import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { toggleToolStatus } from "@/app/(chat)/developer/tools/actions";
 import { LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ type StakePanelProps = {
     name: string;
     pricePerQuery: string;
     totalStaked: string | null;
+    isActive: boolean;
   }>;
 };
 
@@ -181,6 +183,7 @@ function StakeToolRow({
     name: string;
     pricePerQuery: string;
     totalStaked: string | null;
+    isActive: boolean;
   };
   isConnected: boolean;
   walletAddress?: string;
@@ -209,7 +212,7 @@ function StakeToolRow({
     isPending: isWithdrawing,
     data: withdrawTxHash,
   } = useWriteContextRouterWithdrawStake();
-  
+
   // Withdrawal timelock hooks (7-day delay)
   const {
     writeContractAsync: requestWithdrawalAsync,
@@ -235,8 +238,10 @@ function StakeToolRow({
     useWaitForTransactionReceipt({ hash: depositTxHash });
   const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } =
     useWaitForTransactionReceipt({ hash: withdrawTxHash });
-  const { isLoading: isRequestWithdrawalConfirming, isSuccess: isRequestWithdrawalSuccess } =
-    useWaitForTransactionReceipt({ hash: requestWithdrawalTxHash });
+  const {
+    isLoading: isRequestWithdrawalConfirming,
+    isSuccess: isRequestWithdrawalSuccess,
+  } = useWaitForTransactionReceipt({ hash: requestWithdrawalTxHash });
 
   // Check current USDC allowance for the router
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract(
@@ -263,27 +268,32 @@ function StakeToolRow({
   const toolIdBigInt = uuidToUint256(tool.id);
 
   // Read withdrawal timelock status from contract (7-day delay)
-  const { data: withdrawalStatus, refetch: refetchWithdrawalStatus } = useReadContextRouterGetWithdrawalStatus({
-    args: [toolIdBigInt],
-    query: {
-      enabled: Boolean(routerAddress && staked > 0),
-    },
-  });
-  
+  const { data: withdrawalStatus, refetch: refetchWithdrawalStatus } =
+    useReadContextRouterGetWithdrawalStatus({
+      args: [toolIdBigInt],
+      query: {
+        enabled: Boolean(routerAddress && staked > 0),
+      },
+    });
+
   // Parse withdrawal status (requestTime, availableAt, canWithdraw)
-  const withdrawalRequestTime = withdrawalStatus?.[0] ? Number(withdrawalStatus[0]) : 0;
-  const withdrawalAvailableAt = withdrawalStatus?.[1] ? Number(withdrawalStatus[1]) : 0;
+  const withdrawalRequestTime = withdrawalStatus?.[0]
+    ? Number(withdrawalStatus[0])
+    : 0;
+  const withdrawalAvailableAt = withdrawalStatus?.[1]
+    ? Number(withdrawalStatus[1])
+    : 0;
   const canWithdrawNow = withdrawalStatus?.[2] ?? false;
   const hasPendingWithdrawal = withdrawalRequestTime > 0;
-  
+
   // Calculate time remaining for pending withdrawal
   const getTimeRemaining = () => {
     if (!hasPendingWithdrawal || canWithdrawNow) return null;
     const now = Math.floor(Date.now() / 1000);
     const remaining = withdrawalAvailableAt - now;
     if (remaining <= 0) return null;
-    const days = Math.floor(remaining / 86400);
-    const hours = Math.floor((remaining % 86400) / 3600);
+    const days = Math.floor(remaining / 86_400);
+    const hours = Math.floor((remaining % 86_400) / 3600);
     if (days > 0) return `${days}d ${hours}h`;
     const minutes = Math.floor((remaining % 3600) / 60);
     return `${hours}h ${minutes}m`;
@@ -362,7 +372,8 @@ function StakeToolRow({
       toast.success("Withdrawal requested! 7-day timer started.");
     } catch (error) {
       console.error("Request withdrawal failed:", error);
-      const msg = error instanceof Error ? error.message : "Failed to request withdrawal";
+      const msg =
+        error instanceof Error ? error.message : "Failed to request withdrawal";
       if (msg.includes("User rejected") || msg.includes("user rejected")) {
         toast.error("Transaction cancelled");
       } else {
@@ -382,7 +393,9 @@ function StakeToolRow({
       toast.success("Withdrawal request cancelled");
     } catch (error) {
       console.error("Cancel withdrawal failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to cancel withdrawal");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel withdrawal"
+      );
     }
   };
 
@@ -425,13 +438,40 @@ function StakeToolRow({
   };
 
   // Close dialogs and reset on successful transactions (properly in useEffect)
+  // Also immediately activate tool if stake now meets requirement
   useEffect(() => {
     if (isDepositSuccess && isDepositOpen) {
+      // Calculate if stake now meets requirement BEFORE clearing the amount
+      // Use the deposit amount to estimate new stake (on-chain will be authoritative)
+      const depositedAmount = Number.parseFloat(depositAmount) || 0;
+      const newStakeEstimate = staked + depositedAmount;
+      const shouldActivate = !tool.isActive && newStakeEstimate >= required;
+
       setIsDepositOpen(false);
       setDepositAmount("");
       toast.success("Stake deposited successfully!");
+
+      // If tool was inactive and stake now meets requirement, activate immediately
+      // The cron will also catch this, but this provides instant feedback
+      if (shouldActivate) {
+        toggleToolStatus(tool.id, true)
+          .then((result) => {
+            if (result.success) {
+              toast.success("Tool activated! Now visible in marketplace.");
+            }
+          })
+          .catch(console.error);
+      }
     }
-  }, [isDepositSuccess, isDepositOpen]);
+  }, [
+    isDepositSuccess,
+    isDepositOpen,
+    depositAmount,
+    staked,
+    required,
+    tool.isActive,
+    tool.id,
+  ]);
 
   useEffect(() => {
     if (isWithdrawSuccess && isWithdrawOpen) {
@@ -442,12 +482,31 @@ function StakeToolRow({
     }
   }, [isWithdrawSuccess, isWithdrawOpen, refetchWithdrawalStatus]);
 
-  // Refetch withdrawal status after requesting/cancelling
+  // Handle successful withdrawal request - immediately deactivate tool
+  // This prevents the tool from being used during the 7-day withdrawal period
   useEffect(() => {
     if (isRequestWithdrawalSuccess) {
       refetchWithdrawalStatus();
+
+      // Immediately deactivate the tool when withdrawal is requested
+      // The cron will also catch this, but this provides instant action
+      // Once a withdrawal is requested, the tool should not be visible in the marketplace
+      if (tool.isActive) {
+        toggleToolStatus(tool.id, false)
+          .then((result) => {
+            if (result.success) {
+              toast.info("Tool deactivated during withdrawal period.");
+            }
+          })
+          .catch(console.error);
+      }
     }
-  }, [isRequestWithdrawalSuccess, refetchWithdrawalStatus]);
+  }, [
+    isRequestWithdrawalSuccess,
+    refetchWithdrawalStatus,
+    tool.isActive,
+    tool.id,
+  ]);
 
   const isDepositBusy =
     isDepositing ||
@@ -456,7 +515,10 @@ function StakeToolRow({
     isApproveConfirming ||
     approvalStatus !== "idle";
   const isWithdrawBusy = isWithdrawing || isWithdrawConfirming;
-  const isRequestBusy = isRequestingWithdrawal || isRequestWithdrawalConfirming || isCancellingWithdrawal;
+  const isRequestBusy =
+    isRequestingWithdrawal ||
+    isRequestWithdrawalConfirming ||
+    isCancellingWithdrawal;
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
@@ -582,31 +644,42 @@ function StakeToolRow({
             <div className="flex flex-col gap-4 py-4">
               {/* Timelock Status Banner */}
               {hasPendingWithdrawal && (
-                <div className={cn(
-                  "flex items-center gap-3 rounded-lg border p-3",
-                  canWithdrawNow 
-                    ? "border-emerald-500/30 bg-emerald-500/10" 
-                    : "border-amber-500/30 bg-amber-500/10"
-                )}>
-                  <Clock className={cn(
-                    "size-5 shrink-0",
-                    canWithdrawNow ? "text-emerald-600" : "text-amber-600"
-                  )} />
+                <div
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border p-3",
+                    canWithdrawNow
+                      ? "border-emerald-500/30 bg-emerald-500/10"
+                      : "border-amber-500/30 bg-amber-500/10"
+                  )}
+                >
+                  <Clock
+                    className={cn(
+                      "size-5 shrink-0",
+                      canWithdrawNow ? "text-emerald-600" : "text-amber-600"
+                    )}
+                  />
                   <div className="flex-1">
-                    <p className={cn(
-                      "font-medium text-sm",
-                      canWithdrawNow ? "text-emerald-700" : "text-amber-700"
-                    )}>
-                      {canWithdrawNow ? "Ready to Withdraw" : "Withdrawal Pending"}
+                    <p
+                      className={cn(
+                        "font-medium text-sm",
+                        canWithdrawNow ? "text-emerald-700" : "text-amber-700"
+                      )}
+                    >
+                      {canWithdrawNow
+                        ? "Ready to Withdraw"
+                        : "Withdrawal Pending"}
                     </p>
-                    <p className={cn(
-                      "text-xs",
-                      canWithdrawNow ? "text-emerald-600/80" : "text-amber-600/80"
-                    )}>
-                      {canWithdrawNow 
+                    <p
+                      className={cn(
+                        "text-xs",
+                        canWithdrawNow
+                          ? "text-emerald-600/80"
+                          : "text-amber-600/80"
+                      )}
+                    >
+                      {canWithdrawNow
                         ? "7-day delay complete. You can now withdraw."
-                        : `Available in ${getTimeRemaining()}`
-                      }
+                        : `Available in ${getTimeRemaining()}`}
                     </p>
                   </div>
                   {!canWithdrawNow && (
@@ -629,10 +702,13 @@ function StakeToolRow({
                   <div className="flex items-start gap-3">
                     <Clock className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
                     <div>
-                      <p className="font-medium text-sm">7-Day Withdrawal Delay</p>
+                      <p className="font-medium text-sm">
+                        7-Day Withdrawal Delay
+                      </p>
                       <p className="text-muted-foreground text-xs">
-                        For security, withdrawals require a 7-day waiting period.
-                        This prevents front-running if disputes are filed.
+                        For security, withdrawals require a 7-day waiting
+                        period. This prevents front-running if disputes are
+                        filed.
                       </p>
                     </div>
                   </div>
@@ -690,7 +766,9 @@ function StakeToolRow({
                       <span className="animate-spin">
                         <LoaderIcon size={16} />
                       </span>
-                      {isWithdrawConfirming ? "Confirming..." : "Withdrawing..."}
+                      {isWithdrawConfirming
+                        ? "Confirming..."
+                        : "Withdrawing..."}
                     </>
                   ) : (
                     "Withdraw USDC"

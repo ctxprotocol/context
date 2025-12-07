@@ -14,13 +14,14 @@ import { uuidToUint256 } from "@/lib/utils";
  * Syncs on-chain stake amounts from the ContextRouter contract to the database.
  * Runs daily to keep totalStaked in sync with actual on-chain state.
  *
- * ALL tools require staking now (minimum $1 or 100x query price).
+ * ALL tools require staking now (minimum $10 or 100x query price).
  *
  * Process:
  * 1. Fetch ALL tools from the database
  * 2. For each tool, read getStake(toolId) from the contract
  * 3. Update totalStaked in the database
  * 4. Auto-activate tools when stake requirement is met
+ * 5. Auto-deactivate tools when stake falls below requirement (after withdrawal)
  *
  * Authorization: Vercel Cron uses CRON_SECRET environment variable
  */
@@ -103,6 +104,7 @@ export async function GET(request: Request) {
       unchanged: 0,
       errors: 0,
       autoActivated: 0,
+      autoDeactivated: 0,
     };
 
     // Sync each tool's stake
@@ -141,12 +143,13 @@ export async function GET(request: Request) {
           results.unchanged++;
         }
 
-        // Auto-activate tool if stake requirement is now met and tool is inactive
-        // ALL tools start inactive until staked (minimum $1 or 100x price)
+        // Calculate stake requirements
         const priceValue = Number.parseFloat(tool.pricePerQuery) || 0;
         const requiredStake = calculateRequiredStake(priceValue);
         const stakeValue = Number.parseFloat(stakeInUsdc);
 
+        // Auto-activate tool if stake requirement is now met and tool is inactive
+        // ALL tools start inactive until staked (minimum $10 or 100x price)
         if (!tool.isActive && stakeValue >= requiredStake) {
           await db
             .update(aiTool)
@@ -160,6 +163,22 @@ export async function GET(request: Request) {
           console.log(
             LOG_PREFIX,
             `✓ ${tool.name}: Auto-activated (stake $${stakeValue.toFixed(2)} >= required $${requiredStake.toFixed(2)})`
+          );
+        }
+        // Auto-deactivate tool if stake falls below requirement (e.g., after withdrawal)
+        else if (tool.isActive && stakeValue < requiredStake) {
+          await db
+            .update(aiTool)
+            .set({
+              isActive: false,
+              updatedAt: new Date(),
+            })
+            .where(eq(aiTool.id, tool.id));
+
+          results.autoDeactivated++;
+          console.log(
+            LOG_PREFIX,
+            `⚠ ${tool.name}: Auto-deactivated (stake $${stakeValue.toFixed(2)} < required $${requiredStake.toFixed(2)})`
           );
         }
       } catch (error) {

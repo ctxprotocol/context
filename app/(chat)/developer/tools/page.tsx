@@ -1,6 +1,6 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus } from "lucide-react";
 import { auth } from "@/app/(auth)/auth";
 import { EarningsPanel } from "@/components/tools/earnings-panel";
 import { StakePanel } from "@/components/tools/stake-panel";
@@ -44,26 +44,27 @@ export default async function DeveloperToolsPage() {
 
         <div className="space-y-6">
           <EarningsPanel />
-          
-          <StakePanel 
+
+          <StakePanel
             tools={tools.map((t) => ({
               id: t.id,
               name: t.name,
               pricePerQuery: t.pricePerQuery,
               totalStaked: t.totalStaked,
+              isActive: t.isActive,
             }))}
           />
 
           <div className="space-y-4">
             {tools.length > 0 && (
-              <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+              <h2 className="font-semibold text-muted-foreground text-sm uppercase tracking-wider">
                 Active Tools
               </h2>
             )}
 
             {tools.length === 0 ? (
               <Card className="flex flex-col items-center justify-center border-dashed p-12 text-center">
-                <div className="rounded-full bg-muted p-3 mb-4">
+                <div className="mb-4 rounded-full bg-muted p-3">
                   <Plus className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <h3 className="mb-2 font-semibold text-lg">
