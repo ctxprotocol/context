@@ -253,12 +253,12 @@ export async function submitTool(
     const stakeRequired = priceValue * 100;
     return {
       status: "success",
-      message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Deposit $${stakeRequired.toFixed(2)} USDC stake to activate.`,
+      message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Deposit $${stakeRequired.toFixed(2)} USDC stake to activate. Your tool will auto-activate once staked.`,
     };
   }
 
   return {
     status: "success",
-    message: `Tool submitted! Discovered ${skillCount} ${skillWord}. Your free tool is now active.`,
+    message: `Tool submitted and activated! Discovered ${skillCount} ${skillWord}. Your free tool is now live in the marketplace.`,
   };
 }

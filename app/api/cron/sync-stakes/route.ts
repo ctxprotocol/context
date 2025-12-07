@@ -79,6 +79,7 @@ export async function GET(request: Request) {
         name: aiTool.name,
         pricePerQuery: aiTool.pricePerQuery,
         currentStaked: aiTool.totalStaked,
+        isActive: aiTool.isActive,
       })
       .from(aiTool)
       .where(gte(aiTool.pricePerQuery, MIN_PRICE_FOR_STAKING));
@@ -89,6 +90,7 @@ export async function GET(request: Request) {
       synced: 0,
       unchanged: 0,
       errors: 0,
+      autoActivated: 0,
     };
 
     // Sync each tool's stake
@@ -122,6 +124,25 @@ export async function GET(request: Request) {
           console.log(LOG_PREFIX, `✓ ${tool.name}: ${currentInUsdc} → ${stakeInUsdc} USDC`);
         } else {
           results.unchanged++;
+        }
+
+        // Auto-activate tool if stake requirement is now met and tool is inactive
+        // This is a QoL improvement - paid tools start inactive and auto-activate once staked
+        const priceValue = Number.parseFloat(tool.pricePerQuery);
+        const requiredStake = priceValue * 100; // 100x multiplier
+        const stakeValue = Number.parseFloat(stakeInUsdc);
+
+        if (!tool.isActive && stakeValue >= requiredStake) {
+          await db
+            .update(aiTool)
+            .set({
+              isActive: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(aiTool.id, tool.id));
+          
+          results.autoActivated++;
+          console.log(LOG_PREFIX, `✓ ${tool.name}: Auto-activated (stake $${stakeValue.toFixed(2)} >= required $${requiredStake.toFixed(2)})`);
         }
       } catch (error) {
         results.errors++;
