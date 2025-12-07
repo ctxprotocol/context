@@ -78,6 +78,8 @@ This **Composability** is the superpower of Context. Any frontier model can stit
 
 All value flows through `ContextRouter.sol` on Base. Payments are split instantly: 90% to the tool developer, 10% to the protocol treasury. When multiple tools are used, payments are batched into a single transaction.
 
+**Staking System:** All tools (including free) require a minimum $10 USDC stake, enforced on-chain. For paid tools, the stake is 100x the query price if higher. This creates accountability and enables slashing for fraud. Stakes are fully refundable with a 7-day withdrawal delay.
+
 ## 🚀 Getting Started
 
 ### Run the App Locally
@@ -114,6 +116,7 @@ Want to earn revenue from your data? Build an MCP server and register it as an M
    - `$0.00` for free tools (great for adoption)
    - `$0.01+` for paid tools
    - **Note:** This fee is paid **once per chat turn**. The Agent can call your skills up to 100 times within that single paid turn via `callMcpSkill()`.
+   - **Staking:** All tools require a minimum $10 USDC stake (or 100x query price if higher). This is enforced on-chain, fully refundable with 7-day withdrawal delay.
 
 5. **Earn:** Your MCP Tool is now instantly available on the **decentralized marketplace**!
 

@@ -51,7 +51,7 @@ export function ContributeForm() {
   }, [state.status, router]);
 
   // Track price for staking requirement display
-  // ALL tools require staking (minimum $1.00, or 100x query price if higher)
+  // ALL tools require staking (minimum $10.00, or 100x query price if higher)
   const [price, setPrice] = useState(state.payload?.price || "0.00");
   const priceValue = Number.parseFloat(price) || 0;
   const requiredStake = calculateRequiredStake(priceValue);
@@ -218,8 +218,8 @@ Agent tips (optional):
                     withdrawal delay.
                   </p>
                   <p className="text-amber-600/70 text-xs">
-                    💡 All tools require a minimum $1.00 stake to ensure quality
-                    and prevent spam.
+                    💡 All tools require a minimum $10.00 stake to ensure quality
+                    and prevent spam. Enforced on-chain.
                   </p>
                   <Link
                     className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"

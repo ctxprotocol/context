@@ -21,11 +21,12 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * on behalf of users who have pre-approved this contract.
  * 
  * STAKING SYSTEM (Trust Level 3):
- * ALL paid tools require developers to stake collateral (100x query price).
+ * ALL tools (including free) require developers to stake collateral.
+ * Minimum stake is $10.00 USDC, or 100x query price if higher.
  * This provides economic security against scams - if a tool is fraudulent,
  * the stake can be slashed by the admin to compensate affected users.
- * Free tools ($0) require no stake. Paid tools stake proportionally.
- * Example: $0.50/query = $50 stake, $1.00/query = $100 stake
+ * Stake parameters are configurable by admin without redeployment.
+ * Example: Free = $10 stake, $0.50/query = $50 stake, $1.00/query = $100 stake
  */
 contract ContextRouter is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -34,18 +35,21 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
     uint256 public constant PLATFORM_FEE_PERCENT = 10;
     
-    // Staking constants (USDC has 6 decimals)
+    // Staking parameters (USDC has 6 decimals)
     // ALL tools require a minimum stake to prevent spam and ensure quality.
-    // Formula: requiredStake = MAX(MINIMUM_STAKE, pricePerQuery * STAKE_MULTIPLIER)
+    // Formula: requiredStake = MAX(minimumStake, pricePerQuery * stakeMultiplier)
     //
-    // Examples:
+    // These are configurable by admin to allow adjustment without redeployment.
+    // Changes take effect immediately for new stakes.
+    //
+    // Examples (with default $10 minimum and 100x multiplier):
     //   Free tool ($0.00/query)   → $10.00 stake (minimum applies)
     //   $0.01/query tool          → $10.00 stake (minimum applies)
     //   $0.10/query tool          → $10.00 stake (100x = minimum)
     //   $0.50/query tool          → $50.00 stake (100x applies)
     //   $1.00/query tool          → $100.00 stake (100x applies)
-    uint256 public constant STAKE_MULTIPLIER = 100;
-    uint256 public constant MINIMUM_STAKE = 10_000_000; // $10.00 USDC (6 decimals)
+    uint256 public stakeMultiplier = 100;
+    uint256 public minimumStake = 10_000_000; // $10.00 USDC (6 decimals)
     
     // Tracking
     mapping(address => uint256) public developerBalances;
@@ -91,6 +95,7 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     event WithdrawalRequested(uint256 indexed toolId, address indexed developer, uint256 availableAt);
     event StakeWithdrawn(uint256 indexed toolId, address indexed developer, uint256 amount);
     event StakeSlashed(uint256 indexed toolId, address indexed developer, uint256 amount, string reason);
+    event StakeParametersUpdated(uint256 minimumStake, uint256 stakeMultiplier);
 
     // Modifiers
     modifier onlyOperator() {
@@ -522,19 +527,34 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     /**
      * @notice Calculate the minimum stake required for a tool based on its query price
      * @param pricePerQuery The tool's price per query in USDC (6 decimals)
-     * @return The minimum stake required - MAX($1.00, 100x price) for ALL tools
+     * @return The minimum stake required - MAX(minimumStake, price * stakeMultiplier)
      *
-     * All tools require a minimum $1.00 stake to prevent spam and ensure quality.
+     * All tools require a minimum stake to prevent spam and ensure quality.
      * This creates accountability even for free tools, similar to Apple's $99/year
      * developer fee but much lower and fully refundable.
      */
-    function getMinimumStake(uint256 pricePerQuery) public pure returns (uint256) {
-        uint256 proportionalStake = pricePerQuery * STAKE_MULTIPLIER;
+    function getMinimumStake(uint256 pricePerQuery) public view returns (uint256) {
+        uint256 proportionalStake = pricePerQuery * stakeMultiplier;
         // Return the greater of minimum stake or proportional stake
-        if (proportionalStake > MINIMUM_STAKE) {
+        if (proportionalStake > minimumStake) {
             return proportionalStake;
         }
-        return MINIMUM_STAKE;
+        return minimumStake;
+    }
+
+    /**
+     * @notice Admin updates staking parameters
+     * @dev Only callable by contract owner. Allows adjusting minimum stake and multiplier
+     *      without redeploying the contract.
+     * @param _minimumStake The new minimum stake in USDC (6 decimals)
+     * @param _stakeMultiplier The new stake multiplier (e.g., 100 = 100x query price)
+     */
+    function setStakeParameters(uint256 _minimumStake, uint256 _stakeMultiplier) external onlyOwner {
+        require(_minimumStake > 0, "Minimum stake must be > 0");
+        require(_stakeMultiplier > 0, "Multiplier must be > 0");
+        minimumStake = _minimumStake;
+        stakeMultiplier = _stakeMultiplier;
+        emit StakeParametersUpdated(_minimumStake, _stakeMultiplier);
     }
 
     /**
@@ -546,8 +566,10 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Developer deposits stake for a paid tool
-     * @dev Developer must approve this contract to spend USDC first
+     * @notice Developer deposits stake for a tool
+     * @dev Developer must approve this contract to spend USDC first.
+     *      First stake must meet the minimum stake requirement.
+     *      Additional stakes can be any amount (topping up).
      * @param toolId The ID of the tool to stake for
      * @param amount The amount of USDC to stake
      */
@@ -559,6 +581,8 @@ contract ContextRouter is Ownable, ReentrancyGuard {
         if (existingDev != address(0)) {
             require(existingDev == msg.sender, "Only tool owner can add stake");
         } else {
+            // First stake - enforce minimum stake requirement
+            require(amount >= minimumStake, "Initial stake must meet minimum");
             // First stake registers ownership
             toolDevelopers[toolId] = msg.sender;
         }
