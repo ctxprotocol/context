@@ -108,7 +108,7 @@ export function StakePanel({ tools }: StakePanelProps) {
               <h3 className="font-semibold">Stake Management</h3>
             </div>
             <p className="text-muted-foreground text-sm">
-              100× query price • Refundable with 7-day withdrawal delay
+              $10 minimum or 100× query price • Refundable with 7-day delay
             </p>
           </div>
           {hasUnderstakedTools && (
@@ -162,8 +162,9 @@ export function StakePanel({ tools }: StakePanelProps) {
 
         {/* Info */}
         <p className="text-muted-foreground text-xs">
-          Stake is held in the ContextRouter contract on Base. You can withdraw
-          anytime, but users may avoid tools without sufficient collateral.
+          Stake is held in the ContextRouter contract on Base. Withdrawals
+          require a 7-day delay to prevent front-running disputes. Tools with
+          insufficient stake remain inactive.
         </p>
       </div>
     </Card>
