@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
 import { LoaderIcon } from "@/components/icons";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -72,6 +73,7 @@ Example:
 Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism.
 
 Best practices for your MCP server:
+- Use inputSchema to define arguments your tool accepts
 - Use outputSchema in tools/list to define response structure
 - Return data in structuredContent matching your outputSchema exactly
 - Example response: { content: [...], structuredContent: { price: 72.5, chain: "ethereum" } }
@@ -127,12 +129,12 @@ Agent tips (optional):
             <p className="text-muted-foreground text-xs">
               Explain what your MCP Tool does and why users should use it.
               Skills are <strong>auto-discovered</strong> from your MCP server.
-              Use <code>outputSchema</code> and <code>structuredContent</code>{" "}
-              for reliable AI parsing.{" "}
-              <strong className="text-amber-600">
-                Your outputSchema is used for automated dispute resolution
+              Ensure you define a clear <code>inputSchema</code> for the AI to
+              use your tool, and an <code>outputSchema</code> for{" "}
+              <strong className="font-medium text-foreground">
+                automated dispute resolution
               </strong>
-              —ensure your actual output matches your declared schema.
+              .
             </p>
             <FieldError message={descriptionError} />
           </div>
@@ -202,38 +204,35 @@ Agent tips (optional):
                 query (up to 4 decimals, e.g. $0.001). Users pay{" "}
                 <strong>once per chat turn</strong>.
               </p>
-
-              {/* Staking Requirement Notice - ALL tools require stake */}
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
-                <Shield className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                <div className="space-y-1">
-                  <p className="font-medium text-amber-700 text-xs">
-                    Staking Required
-                  </p>
-                  <p className="text-amber-600/90 text-xs leading-relaxed">
-                    Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
-                    {isMinimumStake ? "(minimum stake)" : "(100× query price)"}{" "}
-                    from your smart wallet after submission. Your tool will
-                    auto-activate once staked. Fully refundable with 7-day
-                    withdrawal delay.
-                  </p>
-                  <p className="text-amber-600/70 text-xs">
-                    💡 All tools require a minimum $10.00 stake to ensure
-                    quality and prevent spam. Enforced on-chain.
-                  </p>
-                  <Link
-                    className="inline-flex items-center gap-1 text-amber-700 text-xs underline underline-offset-2 hover:text-amber-800"
-                    href="/developer/tools"
-                  >
-                    Manage stakes in Developer Tools
-                    <ExternalLink className="size-3" />
-                  </Link>
-                </div>
-              </div>
-
               <FieldError message={priceError} />
             </div>
           </div>
+
+          {/* Staking Requirement Notice - ALL tools require stake */}
+          <Alert>
+            <Shield className="size-4 text-amber-500" />
+            <AlertTitle>Staking Required</AlertTitle>
+            <AlertDescription className="space-y-2 text-xs text-muted-foreground">
+              <p>
+                Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
+                {isMinimumStake ? "(minimum stake)" : "(100× query price)"}{" "}
+                from your smart wallet after submission. Your tool will
+                auto-activate once staked. Fully refundable with 7-day
+                withdrawal delay.
+              </p>
+              <p>
+                All tools require a minimum $10.00 stake to ensure quality and
+                prevent spam. Enforced on-chain.
+              </p>
+              <Link
+                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                href="/developer/tools"
+              >
+                Manage stakes in Developer Tools
+                <ExternalLink className="size-3" />
+              </Link>
+            </AlertDescription>
+          </Alert>
 
           <div className="space-y-3">
             <Label htmlFor="endpoint">MCP Endpoint</Label>
@@ -333,12 +332,12 @@ Agent tips (optional):
       </Card>
 
       {/* Developer Resources */}
-      <div className="relative my-8">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-dashed" />
+      <div className="relative my-10">
+        <div className="absolute inset-0 flex items-center" aria-hidden="true">
+          <div className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-background px-4 text-muted-foreground text-sm">
+          <span className="bg-background px-2 text-muted-foreground text-sm">
             Developer Resources
           </span>
         </div>
@@ -346,45 +345,41 @@ Agent tips (optional):
 
       <div className="grid gap-4 md:grid-cols-2">
         <a
-          className="group relative flex items-start gap-4 rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-sm"
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-ring/20 hover:shadow-md"
           href="https://github.com/ctxprotocol/context"
           rel="noopener noreferrer"
           target="_blank"
         >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors group-hover:bg-background">
+          <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
             <Github className="size-5" />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">ctxprotocol/context</span>
-              <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-            </div>
-            <p className="mt-1 text-muted-foreground text-sm">
-              Main repository with MCP server examples, smart contracts, and
-              contribution guides.
-            </p>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-sm">ctxprotocol/context</h3>
+            <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
+          <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+            Main repository with MCP server examples, smart contracts, and
+            contribution guides.
+          </p>
         </a>
 
         <a
-          className="group relative flex items-start gap-4 rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:text-accent-foreground hover:shadow-sm"
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-ring/20 hover:shadow-md"
           href="https://github.com/ctxprotocol/sdk"
           rel="noopener noreferrer"
           target="_blank"
         >
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors group-hover:bg-background">
+          <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-muted text-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
             <Package className="size-5" />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">@ctxprotocol/sdk</span>
-              <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-            </div>
-            <p className="mt-1 text-muted-foreground text-sm">
-              TypeScript SDK for building AI agents that discover and execute
-              marketplace tools.
-            </p>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-sm">@ctxprotocol/sdk</h3>
+            <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
+          <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
+            TypeScript SDK for building AI agents that discover and execute
+            marketplace tools.
+          </p>
         </a>
       </div>
     </form>
