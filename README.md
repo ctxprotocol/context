@@ -51,6 +51,16 @@ Developers register **Tools** (the paid product) which are powered by:
 - **MCP Tools (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL and we auto-discover your skills via `listTools()`. This is the primary integration path.
 - **Native Tools:** Verified TypeScript modules running on our platform ("Serverless MCP"). For high-performance use cases where you need zero-latency execution. Requires a Pull Request.
 
+### 💡 The "Data Broker" Standard
+
+Context is not a text-based chat platform; it is a **Structured Data Marketplace**. We treat your tool like a financial API, not a conversational bot.
+
+- **Standard MCP:** Returns text (`content`). Good for humans, bad for code.
+- **Context Protocol:** Enforces `outputSchema` and `structuredContent`.
+  - **Why?** If you charge $0.10/query, the buyer needs a guarantee.
+  - **Verification:** Our smart contracts can verify that your returned JSON object matches your promised schema. They cannot verify vague text responses.
+  - **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
+
 > **Terminology:**
 > - **Tool** = The paid marketplace listing (what users see in the sidebar)
 > - **Skill** = The execution function (can be called multiple times per tool payment)
@@ -105,11 +115,13 @@ Want to earn revenue from your data? Build an MCP server and register it as an M
 
 1. **Build an MCP Server:** Follow the [Model Context Protocol spec](https://modelcontextprotocol.io). Use the official [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) or [Python SDK](https://github.com/modelcontextprotocol/python-sdk).
 
-2. **Deploy with SSE Transport:** Your server needs to be publicly accessible via Server-Sent Events (SSE). Example endpoint: `https://your-server.com/sse`
+2. **Deploy Your Server:** Your server needs to be publicly accessible. We support both:
+   - **HTTP Streaming** (recommended): `https://your-server.com/mcp`
+   - **SSE (Server-Sent Events)**: `https://your-server.com/sse`
 
 3. **Register in the App:** Go to `/contribute` in the running app:
    - Select **"MCP Tool"** (the default)
-   - Paste your SSE endpoint URL
+   - Paste your endpoint URL
    - We'll auto-discover your skills via `listTools()`
 
 4. **Set a Price:** Choose your fee per query:

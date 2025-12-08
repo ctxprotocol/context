@@ -80,8 +80,9 @@ export function DisputeRow({ dispute }: DisputeRowProps) {
         <div className="flex flex-col gap-1">
           <span className="font-semibold">{dispute.toolName}</span>
           <span className="max-w-[120px] truncate font-mono text-muted-foreground text-xs">
-            {dispute.transactionHash.slice(0, 8)}...
-            {dispute.transactionHash.slice(-6)}
+            {dispute.transactionHash
+              ? `${dispute.transactionHash.slice(0, 8)}...${dispute.transactionHash.slice(-6)}`
+              : "No tx hash"}
           </span>
         </div>
       </TableCell>
@@ -92,10 +93,10 @@ export function DisputeRow({ dispute }: DisputeRowProps) {
       </TableCell>
       <TableCell>
         <Badge
-          className={`border-0 ${verdictColor[dispute.verdict as keyof typeof verdictColor] || ""}`}
+          className={`border-0 ${verdictColor[(dispute.verdict ?? "pending") as keyof typeof verdictColor] || ""}`}
           variant="secondary"
         >
-          {dispute.verdict.replace("_", " ")}
+          {(dispute.verdict ?? "pending").replace("_", " ")}
         </Badge>
       </TableCell>
       <TableCell className="max-w-[200px]">
@@ -176,7 +177,7 @@ export function DisputeRow({ dispute }: DisputeRowProps) {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() =>
-                  navigator.clipboard.writeText(dispute.transactionHash)
+                  navigator.clipboard.writeText(dispute.transactionHash ?? "")
                 }
               >
                 Copy Tx Hash

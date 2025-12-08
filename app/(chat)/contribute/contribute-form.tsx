@@ -65,21 +65,14 @@ export function ContributeForm() {
 
   const connectedWallet = walletAddress || "";
 
-  const descriptionPlaceholder = `What does your MCP Tool do? (Skills are auto-discovered)
+  const descriptionPlaceholder = `Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism.
 
-Example:
-Real-time gas prices for 50+ EVM chains including Ethereum, Base, Arbitrum, and Optimism.
+Features:
+- Gas estimates at multiple confidence levels (70-99%)
+- EIP-1559 support (maxFeePerGas, maxPriorityFeePerGas)
+- Estimated confirmation times in seconds
 
-Best practices for your MCP server:
-- Use inputSchema to define arguments your tool accepts
-- Use outputSchema in tools/list to define response structure
-- Return data in structuredContent matching your outputSchema exactly
-- Example response: { content: [...], structuredContent: { price: 72.5, chain: "ethereum" } }
-
-⚠️ Schema Accuracy Matters:
-Your outputSchema is used for automated dispute resolution. If your tool's actual output doesn't match your declared schema, users can file disputes that are auto-adjudicated against you.
-
-Agent tips (optional):
+Agent tips:
 - Call list_chains first to get all supported chainIds
 - Gas prices returned in Gwei with confidence levels`;
 
@@ -127,12 +120,16 @@ Agent tips (optional):
             <p className="text-muted-foreground text-xs">
               Explain what your MCP Tool does and why users should use it.
               Skills are <strong>auto-discovered</strong> from your MCP server.
-              Ensure you define a clear <code>inputSchema</code> for the AI to
-              use your tool, and an <code>outputSchema</code> for{" "}
-              <strong>
-                automated dispute resolution
-              </strong>
-              .
+              See{" "}
+              <a
+                className="underline"
+                href="https://github.com/ctxprotocol/context#-the-data-broker-standard"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                The Data Broker Standard
+              </a>{" "}
+              for <code>outputSchema</code> requirements and dispute resolution.
             </p>
             <FieldError message={descriptionError} />
           </div>

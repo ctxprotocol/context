@@ -90,9 +90,15 @@ export function ToolCard({ tool }: { tool: Tool }) {
     initialEditState
   );
 
-  const schema = tool.toolSchema as { kind?: string; tools?: unknown[] } | null;
+  const schema = tool.toolSchema as { kind?: string; tools?: { name: string; outputSchema?: unknown }[] } | null;
   const isMCP = schema?.kind === "mcp";
   const skillCount = isMCP ? (schema?.tools?.length ?? 0) : 0;
+
+  // Check for missing outputSchema on any skill (Context Protocol recommendation)
+  const skillsWithoutOutputSchema = isMCP && schema?.tools
+    ? schema.tools.filter((skill) => !skill.outputSchema)
+    : [];
+  const hasMissingSchema = skillsWithoutOutputSchema.length > 0;
 
   // Trust metrics
   const successRate = Number.parseFloat(tool.successRate ?? "100");
@@ -274,6 +280,40 @@ export function ToolCard({ tool }: { tool: Tool }) {
               This tool requires <strong>${requiredStake.toFixed(2)}</strong>{" "}
               stake to activate. Deposit stake to make your tool visible in the marketplace.
             </p>
+          </div>
+        )}
+
+        {/* Missing outputSchema Warning */}
+        {hasMissingSchema && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <div className="text-amber-600/90 text-xs leading-relaxed">
+              <p>
+                {skillsWithoutOutputSchema.length === 1 ? (
+                  <>
+                    Skill <strong>{skillsWithoutOutputSchema[0].name}</strong> is missing{" "}
+                    <code className="rounded bg-amber-600/20 px-1">outputSchema</code>.
+                  </>
+                ) : (
+                  <>
+                    {skillsWithoutOutputSchema.length} skills are missing{" "}
+                    <code className="rounded bg-amber-600/20 px-1">outputSchema</code>.
+                  </>
+                )}
+              </p>
+              <p className="mt-1">
+                This is recommended for{" "}
+                <a
+                  className="underline"
+                  href="https://github.com/ctxprotocol/context#-the-data-broker-standard"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  dispute resolution
+                </a>
+                .
+              </p>
+            </div>
           </div>
         )}
 

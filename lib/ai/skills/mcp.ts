@@ -15,20 +15,20 @@ import type { AITool } from "@/lib/db/schema";
  * MCP Skill Module
  *
  * This module provides the skill functions to interact with MCP Tools.
- * 
+ *
  * Terminology:
  * - **MCP Tool**: A paid marketplace listing (appears in sidebar, has a price)
  * - **MCP Skill**: This execution layer that calls the MCP server (can be called up to 100x per tool payment)
- * 
+ *
  * The relationship:
  * - User pays for an "MCP Tool" once per chat turn
  * - Agent can call `callMcpSkill()` up to 100 times within that paid turn
  * - Each call invokes a specific tool on the remote MCP server
- * 
+ *
  * Supported Transports:
  * - SSE (Server-Sent Events): Endpoints ending with `/sse`
  * - HTTP Streaming (Streamable HTTP): Endpoints ending with `/mcp` or other paths
- * 
+ *
  * The transport is auto-detected based on the endpoint URL pattern.
  */
 
@@ -73,17 +73,20 @@ type McpCallToolResult = {
 
 /**
  * Unwrap MCP result to return clean, predictable data
- * 
+ *
  * MCP spec (2025-06-18) defines two ways to return data:
  * 1. `structuredContent` - Preferred, typed JSON object matching outputSchema
  * 2. `content` - Array of content blocks (text, image, etc.)
- * 
+ *
  * We prioritize `structuredContent` when available for consistent data access.
  */
 function unwrapMcpResult(result: McpCallToolResult): unknown {
   // Prefer structuredContent if available (MCP 2025-06-18 standard)
   // This gives us clean, predictable data structure
-  if (result.structuredContent && Object.keys(result.structuredContent).length > 0) {
+  if (
+    result.structuredContent &&
+    Object.keys(result.structuredContent).length > 0
+  ) {
     console.log("[mcp-skill] Using structuredContent (MCP standard)");
     return result.structuredContent;
   }
@@ -97,22 +100,87 @@ function unwrapMcpResult(result: McpCallToolResult): unknown {
  * MCP returns: { content: [{ type: "text", text: "..." }, ...] }
  * We want to return the actual parsed data directly
  */
+/**
+ * Helper to strip Markdown code blocks from LLM output
+ * Matches ```json ... ``` or just ``` ... ``` and returns the inner content
+ */
+function stripCodeBlocks(text: string): string {
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  return match ? match[1] : text;
+}
+
+/**
+ * Heuristic to find the first valid JSON object in a string
+ * Useful when the LLM wraps JSON in natural language
+ * e.g. "Here is the data: { "price": 100 }" -> { "price": 100 }
+ */
+function extractFirstJson(text: string): unknown | null {
+  const firstOpen = text.indexOf("{");
+  const lastClose = text.lastIndexOf("}");
+
+  if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+    const potentialJson = text.slice(firstOpen, lastClose + 1);
+    try {
+      return JSON.parse(potentialJson);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Unwrap MCP content array format to return clean data
+ * MCP returns: { content: [{ type: "text", text: "..." }, ...] }
+ * We want to return the actual parsed data directly
+ */
 function unwrapMcpContent(content: unknown): unknown {
   if (!Array.isArray(content) || content.length === 0) {
     return content;
   }
 
+  // Helper to try parsing a string as JSON with multiple fallback strategies
+  const tryParse = (text: string): unknown => {
+    // Strategy 1: Clean Parse (Fast Path)
+    try {
+      return JSON.parse(text);
+    } catch {
+      // Continue to strategies
+    }
+
+    // Strategy 2: Strip Markdown Code Blocks
+    const stripped = stripCodeBlocks(text);
+    if (stripped !== text) {
+      try {
+        return JSON.parse(stripped);
+      } catch {
+        // Continue
+      }
+    }
+
+    // Strategy 3: Heuristic Extraction (Find first {...})
+    const extracted = extractFirstJson(text);
+    if (extracted) {
+      console.warn(
+        "[mcp-skill] Heuristic JSON extraction used (Lazy Developer detected)"
+      );
+      return extracted;
+    }
+
+    // Fallback: Return original string
+    return text;
+  };
+
   // If there's only one content block and it's text, parse and return it
   if (content.length === 1) {
     const block = content[0];
-    if (block && typeof block === 'object' && 'type' in block) {
-      if (block.type === 'text' && 'text' in block && typeof block.text === 'string') {
-        // Try to parse as JSON, otherwise return as string
-        try {
-          return JSON.parse(block.text);
-        } catch {
-          return block.text;
-        }
+    if (block && typeof block === "object" && "type" in block) {
+      if (
+        block.type === "text" &&
+        "text" in block &&
+        typeof block.text === "string"
+      ) {
+        return tryParse(block.text);
       }
       // For other types (image, etc.), return as-is
       return block;
@@ -121,28 +189,30 @@ function unwrapMcpContent(content: unknown): unknown {
 
   // Multiple content blocks - try to combine text blocks
   const textBlocks = content.filter(
-    (block): block is { type: 'text'; text: string } =>
-      block && typeof block === 'object' && 'type' in block && block.type === 'text' && 'text' in block
+    (block): block is { type: "text"; text: string } =>
+      block &&
+      typeof block === "object" &&
+      "type" in block &&
+      block.type === "text" &&
+      "text" in block
   );
 
   if (textBlocks.length === content.length) {
     // All blocks are text - combine them
-    const combined = textBlocks.map(b => b.text).join('\n');
-    try {
-      return JSON.parse(combined);
-    } catch {
-      return combined;
-    }
+    const combined = textBlocks.map((b) => b.text).join("\n");
+    return tryParse(combined);
   }
 
   // Mixed content - return as array
-  return content.map(block => {
-    if (block && typeof block === 'object' && 'type' in block && block.type === 'text' && 'text' in block) {
-      try {
-        return JSON.parse(block.text as string);
-      } catch {
-        return block.text;
-      }
+  return content.map((block) => {
+    if (
+      block &&
+      typeof block === "object" &&
+      "type" in block &&
+      block.type === "text" &&
+      "text" in block
+    ) {
+      return tryParse(block.text as string);
     }
     return block;
   });
@@ -150,12 +220,12 @@ function unwrapMcpContent(content: unknown): unknown {
 
 /**
  * Determine the appropriate transport type based on endpoint URL pattern
- * 
+ *
  * Transport selection rules:
  * - `/sse` suffix → SSE transport (legacy, widely supported)
  * - `/mcp` suffix → HTTP Streaming (modern, recommended)
  * - Other paths → Try HTTP Streaming first (newer default), fall back to SSE
- * 
+ *
  * Examples:
  * - https://mcp.api.coingecko.com/sse → SSE
  * - https://mcp.api.coingecko.com/mcp → HTTP Streaming
@@ -166,38 +236,40 @@ type TransportType = "sse" | "http-streaming";
 function detectTransportType(endpoint: string): TransportType {
   const url = new URL(endpoint);
   const pathname = url.pathname.toLowerCase();
-  
+
   // Explicit SSE endpoint
-  if (pathname.endsWith('/sse')) {
+  if (pathname.endsWith("/sse")) {
     return "sse";
   }
-  
+
   // Explicit MCP HTTP streaming endpoint
-  if (pathname.endsWith('/mcp')) {
+  if (pathname.endsWith("/mcp")) {
     return "http-streaming";
   }
-  
+
   // Default: prefer HTTP streaming for unknown paths (modern default)
   // But most community servers use /sse, so check for common patterns
-  if (pathname.includes('sse')) {
+  if (pathname.includes("sse")) {
     return "sse";
   }
-  
+
   return "http-streaming";
 }
 
 /**
  * Create the appropriate MCP transport based on endpoint URL
  */
-function createMcpTransport(endpoint: string): SSEClientTransport | StreamableHTTPClientTransport {
+function createMcpTransport(
+  endpoint: string
+): SSEClientTransport | StreamableHTTPClientTransport {
   const url = new URL(endpoint);
   const transportType = detectTransportType(endpoint);
-  
+
   if (transportType === "sse") {
     console.log("[mcp-skill] Using SSE transport for:", endpoint);
     return new SSEClientTransport(url);
   }
-  
+
   console.log("[mcp-skill] Using HTTP Streaming transport for:", endpoint);
   return new StreamableHTTPClientTransport(url);
 }
@@ -206,9 +278,9 @@ function createMcpTransport(endpoint: string): SSEClientTransport | StreamableHT
  * Get or create an MCP client for the given endpoint
  * Uses TTL-based caching (2 minutes) to reuse connections within a code execution
  * while still ensuring connections don't become stale across requests.
- * 
+ *
  * Auto-detects transport type (SSE vs HTTP Streaming) based on endpoint URL.
- * 
+ *
  * IMPORTANT: Uses a pending connection pattern to prevent race conditions.
  * When multiple parallel calls try to connect to the same endpoint simultaneously,
  * only the first call actually creates the connection - all others wait for it.
@@ -218,7 +290,7 @@ async function getMcpClient(endpoint: string): Promise<Client> {
   const cached = clientCache.get(endpoint);
 
   // Check if we have a valid cached connection
-  if (cached && (now - cached.createdAt) < CONNECTION_CACHE_TTL_MS) {
+  if (cached && now - cached.createdAt < CONNECTION_CACHE_TTL_MS) {
     console.log("[mcp-skill] Reusing cached MCP connection to:", endpoint);
     return cached.client;
   }
@@ -260,7 +332,10 @@ async function getMcpClient(endpoint: string): Promise<Client> {
  * Internal function to actually create the MCP connection
  * Separated from getMcpClient to enable the pending connection pattern
  */
-async function createMcpConnection(endpoint: string, timestamp: number): Promise<Client> {
+async function createMcpConnection(
+  endpoint: string,
+  timestamp: number
+): Promise<Client> {
   console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
   const transportType = detectTransportType(endpoint);
 
@@ -277,7 +352,12 @@ async function createMcpConnection(endpoint: string, timestamp: number): Promise
     );
 
     await client.connect(transport);
-    console.log("[mcp-skill] Successfully connected via", transportType, "to:", endpoint);
+    console.log(
+      "[mcp-skill] Successfully connected via",
+      transportType,
+      "to:",
+      endpoint
+    );
 
     // Cache the connection with timestamp
     clientCache.set(endpoint, { client, createdAt: timestamp });
@@ -286,7 +366,10 @@ async function createMcpConnection(endpoint: string, timestamp: number): Promise
   } catch (error) {
     // If HTTP Streaming fails, try SSE as fallback (for servers that don't support HTTP Streaming)
     if (transportType === "http-streaming") {
-      console.log("[mcp-skill] HTTP Streaming failed, trying SSE fallback for:", endpoint);
+      console.log(
+        "[mcp-skill] HTTP Streaming failed, trying SSE fallback for:",
+        endpoint
+      );
       try {
         const sseTransport = new SSEClientTransport(new URL(endpoint));
         const client = new Client(
@@ -294,7 +377,10 @@ async function createMcpConnection(endpoint: string, timestamp: number): Promise
           { capabilities: {} }
         );
         await client.connect(sseTransport);
-        console.log("[mcp-skill] Successfully connected via SSE fallback to:", endpoint);
+        console.log(
+          "[mcp-skill] Successfully connected via SSE fallback to:",
+          endpoint
+        );
         clientCache.set(endpoint, { client, createdAt: timestamp });
         return client;
       } catch (fallbackError) {
@@ -302,8 +388,12 @@ async function createMcpConnection(endpoint: string, timestamp: number): Promise
         // Throw original error for better diagnostics
       }
     }
-    
-    console.error("[mcp-skill] Failed to connect to MCP server:", endpoint, error);
+
+    console.error(
+      "[mcp-skill] Failed to connect to MCP server:",
+      endpoint,
+      error
+    );
     throw error;
   }
 }
@@ -340,23 +430,29 @@ function getResultPreview(content: unknown): string {
   if (content === null || content === undefined) {
     return "empty response";
   }
-  
+
   if (typeof content === "string") {
     return content.length > 50 ? `${content.slice(0, 50)}...` : content;
   }
-  
+
   if (Array.isArray(content)) {
     return `${content.length} item${content.length !== 1 ? "s" : ""}`;
   }
-  
+
   if (typeof content === "object") {
     const keys = Object.keys(content);
     // Look for common patterns
-    if ("chains" in content && Array.isArray((content as Record<string, unknown>).chains)) {
+    if (
+      "chains" in content &&
+      Array.isArray((content as Record<string, unknown>).chains)
+    ) {
       const chains = (content as Record<string, unknown[]>).chains;
       return `${chains.length} chain${chains.length !== 1 ? "s" : ""}`;
     }
-    if ("estimates" in content && Array.isArray((content as Record<string, unknown>).estimates)) {
+    if (
+      "estimates" in content &&
+      Array.isArray((content as Record<string, unknown>).estimates)
+    ) {
       return "gas estimates";
     }
     if ("error" in content) {
@@ -365,7 +461,7 @@ function getResultPreview(content: unknown): string {
     // Generic object
     return `${keys.length} field${keys.length !== 1 ? "s" : ""} (${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""})`;
   }
-  
+
   return String(content).slice(0, 50);
 }
 
@@ -404,30 +500,33 @@ export async function callMcpSkill({
 
   // Check payment authorization for paid tools
   const isFree = isFreeTool(tool);
-  
+
   if (!isFree) {
     // Check if tool is pre-authorized (manual selection with payment)
     const isPreAuthorized = runtime.allowedTools?.has(toolId);
-    
+
     // Auto Mode phases:
     // - Discovery phase: DON'T execute paid tools, only search
     // - Execution phase: Execute paid tools with verified payment
     const isAutoModeEnabled = runtime.isAutoMode === true;
     const isDiscoveryPhase = runtime.isDiscoveryPhase === true;
-    
+
     // During discovery phase, reject paid tool execution
     // The AI should only search the marketplace, not execute tools
     if (isDiscoveryPhase) {
-      console.log("[mcp-skill] Discovery phase: rejecting paid tool execution", {
-        toolId,
-        toolName: tool.name,
-        price: tool.pricePerQuery,
-      });
+      console.log(
+        "[mcp-skill] Discovery phase: rejecting paid tool execution",
+        {
+          toolId,
+          toolName: tool.name,
+          price: tool.pricePerQuery,
+        }
+      );
       throw new Error(
         `Tool "${tool.name}" requires payment ($${tool.pricePerQuery}/query). This is the discovery phase - tool will be executed after payment confirmation.`
       );
     }
-    
+
     if (!isPreAuthorized && !isAutoModeEnabled) {
       throw new Error(
         `Tool "${tool.name}" requires payment ($${tool.pricePerQuery}/query). Please enable it in the sidebar and confirm payment.`
@@ -455,23 +554,29 @@ export async function callMcpSkill({
       if (!runtime.autoModeToolsUsed) {
         runtime.autoModeToolsUsed = new Map();
       }
-      
+
       // Track this tool usage
       const existing = runtime.autoModeToolsUsed.get(toolId);
       if (existing) {
         existing.callCount++;
-        console.log("[mcp-skill] Auto Mode Execution: tool call tracked (repeated)", { 
-          toolId, 
-          toolName: tool.name,
-          callCount: existing.callCount,
-        });
+        console.log(
+          "[mcp-skill] Auto Mode Execution: tool call tracked (repeated)",
+          {
+            toolId,
+            toolName: tool.name,
+            callCount: existing.callCount,
+          }
+        );
       } else {
         runtime.autoModeToolsUsed.set(toolId, { tool, callCount: 1 });
-        console.log("[mcp-skill] Auto Mode Execution: tool call tracked (new)", { 
-          toolId, 
-          toolName: tool.name,
-          price: tool.pricePerQuery,
-        });
+        console.log(
+          "[mcp-skill] Auto Mode Execution: tool call tracked (new)",
+          {
+            toolId,
+            toolName: tool.name,
+            price: tool.pricePerQuery,
+          }
+        );
       }
     }
   }
@@ -480,10 +585,18 @@ export async function callMcpSkill({
   const endpoint = extractMcpEndpoint(tool);
   const chatId = runtime.chatId ?? runtime.requestId;
 
-  console.log("[mcp-skill] Calling tool:", { toolId, toolName, args, endpoint });
+  console.log("[mcp-skill] Calling tool:", {
+    toolId,
+    toolName,
+    args,
+    endpoint,
+  });
 
   // Helper to emit execution progress to the UI
-  const emitProgress = (type: "query" | "result" | "error", message: string) => {
+  const emitProgress = (
+    type: "query" | "result" | "error",
+    message: string
+  ) => {
     if (runtime.dataStream) {
       runtime.dataStream.write({
         type: "data-executionProgress",
@@ -493,9 +606,8 @@ export async function callMcpSkill({
   };
 
   // Emit query start
-  const argsPreview = Object.keys(args).length > 0 
-    ? ` with ${Object.keys(args).join(", ")}`
-    : "";
+  const argsPreview =
+    Object.keys(args).length > 0 ? ` with ${Object.keys(args).join(", ")}` : "";
   emitProgress("query", `Querying ${toolName}${argsPreview}...`);
 
   try {
@@ -514,13 +626,19 @@ export async function callMcpSkill({
       });
 
       clearTimeout(timeout);
-      console.log("[mcp-skill] Raw MCP result:", JSON.stringify(result).slice(0, 500));
+      console.log(
+        "[mcp-skill] Raw MCP result:",
+        JSON.stringify(result).slice(0, 500)
+      );
 
       // Unwrap MCP result to return clean data to the agent
       // MCP 2025-06-18 spec supports `structuredContent` for typed responses
       // We prefer that over parsing the content array
       const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
-      console.log("[mcp-skill] Unwrapped content:", JSON.stringify(unwrappedContent).slice(0, 500));
+      console.log(
+        "[mcp-skill] Unwrapped content:",
+        JSON.stringify(unwrappedContent).slice(0, 500)
+      );
 
       // Record to tool call history for agentic reflection
       // This allows the AI to see raw outputs if execution produces suspicious results
@@ -547,7 +665,7 @@ export async function callMcpSkill({
         amountPaid: isFree ? "0" : tool.pricePerQuery,
         transactionHash: isFree
           ? "free-tool"
-          : runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown",
+          : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
         queryInput: { toolName, args },
         queryOutput: unwrappedContent as Record<string, unknown>,
         status: result.isError ? "failed" : "completed",
@@ -556,8 +674,15 @@ export async function callMcpSkill({
       // Return unwrapped content directly so agent code can access it naturally
       // e.g., result.data.chains instead of result.content[0].text
       if (result.isError) {
-        emitProgress("error", `${toolName} failed: ${typeof unwrappedContent === 'string' ? unwrappedContent : 'Unknown error'}`);
-        throw new Error(typeof unwrappedContent === 'string' ? unwrappedContent : JSON.stringify(unwrappedContent));
+        emitProgress(
+          "error",
+          `${toolName} failed: ${typeof unwrappedContent === "string" ? unwrappedContent : "Unknown error"}`
+        );
+        throw new Error(
+          typeof unwrappedContent === "string"
+            ? unwrappedContent
+            : JSON.stringify(unwrappedContent)
+        );
       }
 
       return unwrappedContent;
@@ -568,7 +693,8 @@ export async function callMcpSkill({
     console.error("[mcp-skill] Tool call failed:", { toolId, toolName, error });
 
     // Emit error progress
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     emitProgress("error", `${toolName} failed: ${errorMessage.slice(0, 100)}`);
 
     // Record failed query
@@ -579,7 +705,7 @@ export async function callMcpSkill({
       amountPaid: isFree ? "0" : tool.pricePerQuery,
       transactionHash: isFree
         ? "free-tool"
-        : runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown",
+        : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
       queryInput: { toolName, args },
       status: "failed",
     });
@@ -597,7 +723,14 @@ export async function callMcpSkill({
  */
 export async function listMcpTools(
   endpoint: string
-): Promise<{ name: string; description?: string; inputSchema?: unknown; outputSchema?: unknown }[]> {
+): Promise<
+  {
+    name: string;
+    description?: string;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+  }[]
+> {
   const client = await getMcpClient(endpoint);
   const result = await client.listTools();
 
@@ -646,7 +779,7 @@ function needsSchemaRefresh(toolId: string): boolean {
 /**
  * Refresh the schema for a single MCP tool from its server
  * This is the self-healing mechanism that keeps schemas up-to-date
- * 
+ *
  * @param tool - The AITool to refresh
  * @returns true if schema was updated, false if unchanged or failed
  */
@@ -663,10 +796,12 @@ export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
   }
 
   try {
-    console.log(`[mcp-refresh] Refreshing schema for ${tool.name} from ${endpoint}`);
-    
+    console.log(
+      `[mcp-refresh] Refreshing schema for ${tool.name} from ${endpoint}`
+    );
+
     const freshTools = await listMcpTools(endpoint);
-    
+
     if (!freshTools || freshTools.length === 0) {
       console.warn(`[mcp-refresh] No tools found at ${endpoint}`);
       return false;
@@ -684,8 +819,10 @@ export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
     }
 
     // Schema has changed - update the database
-    console.log(`[mcp-refresh] Schema changed for ${tool.name}, updating database`);
-    
+    console.log(
+      `[mcp-refresh] Schema changed for ${tool.name}, updating database`
+    );
+
     const updatedSchema = {
       ...schema,
       tools: freshTools,
@@ -713,14 +850,20 @@ export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
       console.log(`[mcp-refresh] Regenerated embedding for ${tool.name}`);
     } catch (embeddingError) {
       // Log but don't fail if embedding regeneration fails
-      console.warn(`[mcp-refresh] Failed to regenerate embedding for ${tool.name}:`, embeddingError);
+      console.warn(
+        `[mcp-refresh] Failed to regenerate embedding for ${tool.name}:`,
+        embeddingError
+      );
     }
 
     schemaRefreshCache.set(tool.id, Date.now());
     console.log(`[mcp-refresh] Successfully updated schema for ${tool.name}`);
     return true;
   } catch (error) {
-    console.error(`[mcp-refresh] Failed to refresh schema for ${tool.name}:`, error);
+    console.error(
+      `[mcp-refresh] Failed to refresh schema for ${tool.name}:`,
+      error
+    );
     // Don't throw - schema refresh failures shouldn't break the chat
     return false;
   }
@@ -729,11 +872,13 @@ export async function refreshMcpToolSchema(tool: AITool): Promise<boolean> {
 /**
  * Refresh schemas for multiple MCP tools if they need it (based on TTL)
  * Called at the start of chat sessions to ensure fresh schemas
- * 
+ *
  * @param tools - Array of AITools to potentially refresh
  * @returns Number of tools that were refreshed
  */
-export async function refreshMcpToolSchemasIfNeeded(tools: AITool[]): Promise<number> {
+export async function refreshMcpToolSchemasIfNeeded(
+  tools: AITool[]
+): Promise<number> {
   const mcpTools = tools.filter((t) => {
     const schema = t.toolSchema as Record<string, unknown> | null;
     return schema?.kind === "mcp";
@@ -744,13 +889,17 @@ export async function refreshMcpToolSchemasIfNeeded(tools: AITool[]): Promise<nu
   }
 
   const toolsNeedingRefresh = mcpTools.filter((t) => needsSchemaRefresh(t.id));
-  
+
   if (toolsNeedingRefresh.length === 0) {
-    console.log(`[mcp-refresh] All ${mcpTools.length} MCP tools have fresh schemas`);
+    console.log(
+      `[mcp-refresh] All ${mcpTools.length} MCP tools have fresh schemas`
+    );
     return 0;
   }
 
-  console.log(`[mcp-refresh] Refreshing ${toolsNeedingRefresh.length}/${mcpTools.length} MCP tool schemas`);
+  console.log(
+    `[mcp-refresh] Refreshing ${toolsNeedingRefresh.length}/${mcpTools.length} MCP tool schemas`
+  );
 
   // Refresh in parallel with a concurrency limit
   const results = await Promise.allSettled(
@@ -764,4 +913,3 @@ export async function refreshMcpToolSchemasIfNeeded(tools: AITool[]): Promise<nu
   console.log(`[mcp-refresh] Refreshed ${refreshedCount} tool schemas`);
   return refreshedCount;
 }
-

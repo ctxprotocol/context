@@ -51,61 +51,11 @@ export function SlashButton({
 
   const isPending = isWritePending || isConfirming;
 
-  const handleSlash = async () => {
-    try {
-      // 1. Prepare transaction data via API (acts as a check and formats data)
-      const res = await fetch("/api/admin/slash", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toolId, disputeId, amount }),
-      });
+  // The API call and writeContract logic is handled in onConfirm below.
+  // This component uses a two-step pattern:
+  // 1. User clicks "Slash Stake" -> modal opens
+  // 2. User confirms -> onConfirm calls API, then triggers writeContract
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to prepare slash transaction");
-      }
-
-      const { transaction } = await res.json();
-
-      // 2. Execute on-chain
-      writeContract({
-        address: transaction.to as `0x${string}`,
-        abi: contextRouterAbi,
-        functionName: "slash",
-        args: [
-          // We need to parse the args from the API response specifically if they are complex
-          // But here we can just use the args we know:
-          // slash(uint256 toolId, uint256 amount, string reason)
-          // However, the API returns raw calldata.
-          // Can we just send the raw transaction? useWriteContract expects abi/functionName for type safety usually.
-          // Let's rely on the API for validation but construct args here to be safe with wagmi type inference.
-          // Actually, the API returns `transaction` object with `data`.
-          // Wagmi's sendTransaction might be more appropriate if we have raw data,
-          // but writeContract is better for ABI interaction.
-          // let's parse the BigInts.
-          // toolId needs to be numeric. The API does `uuidToNumeric`. We should probably expose that helper or just use the one from api response "details".
-          // Let's use the details from api response.
-        ],
-      });
-
-      // WAIT. writing raw calldata with wagmi is `sendTransaction`.
-      // But verify-tool uses server-side logic? No, verify-tool was simple DB update.
-      // Slash is on-chain.
-
-      // Let's use the `details` from the API response to call writeContract properly.
-      // We need to fetch first in the onClick, then write.
-
-      // Refetching to get the numeric ID inside the event handler:
-      // We already did the fetch above.
-    } catch (err) {
-      toast.error("Error preparing slash", {
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
-      setOpen(false); // Close modal on error
-    }
-  };
-
-  // Re-implementing handleSlash to properly wait for the API and then write
   const onConfirm = async (e: React.MouseEvent) => {
     e.preventDefault();
 
