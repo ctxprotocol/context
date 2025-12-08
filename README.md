@@ -46,10 +46,7 @@ Context is built on a **Code Execution** paradigm. Instead of rigid "tool callin
 
 ### 1. The Marketplace (Supply)
 
-Developers register **Tools** (the paid product) which are powered by:
-
-- **MCP Tools (Recommended):** Standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your SSE endpoint URL and we auto-discover your skills via `listTools()`. This is the primary integration path.
-- **Native Tools:** Verified TypeScript modules running on our platform ("Serverless MCP"). For high-performance use cases where you need zero-latency execution. Requires a Pull Request.
+Developers register **Tools** (the paid product) powered by standard [Model Context Protocol](https://modelcontextprotocol.io) servers. Just paste your endpoint URL and we auto-discover your skills via `listTools()`.
 
 ### 💡 The "Data Broker" Standard
 
