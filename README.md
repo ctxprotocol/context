@@ -55,10 +55,19 @@ Developers register **Tools** (the paid product) which are powered by:
 
 Context is not a text-based chat platform; it is a **Structured Data Marketplace**. We treat your tool like a financial API, not a conversational bot.
 
+**Why `outputSchema` and `structuredContent` matter:**
+
+| Feature | Without Schema | With Schema |
+|---------|----------------|-------------|
+| **AI Code Generation** | Agent guesses response format | Agent writes precise parsing code |
+| **Type Safety** | Runtime errors, broken parsing | Guaranteed structure |
+| **Dispute Resolution** | Manual review required | Auto-adjudicated on-chain |
+| **Trust Signal** | Unknown reliability | "Data Broker" verified |
+
 - **Standard MCP:** Returns text (`content`). Good for humans, bad for code.
-- **Context Protocol:** Enforces `outputSchema` and `structuredContent`.
-  - **Why?** If you charge $0.10/query, the buyer needs a guarantee.
-  - **Verification:** Our smart contracts can verify that your returned JSON object matches your promised schema. They cannot verify vague text responses.
+- **Context Protocol:** Enforces `outputSchema` (in `listTools`) and `structuredContent` (in tool response).
+  - **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
+  - **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
   - **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
 
 > **Terminology:**

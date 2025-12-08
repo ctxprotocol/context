@@ -302,16 +302,16 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 )}
               </p>
               <p className="mt-1">
-                This is recommended for{" "}
+                Without it, the AI agent cannot write accurate code to parse your responses, and
+                disputes cannot be auto-resolved.{" "}
                 <a
                   className="underline"
                   href="https://github.com/ctxprotocol/context#-the-data-broker-standard"
                   rel="noopener noreferrer"
                   target="_blank"
                 >
-                  dispute resolution
+                  Learn more
                 </a>
-                .
               </p>
             </div>
           </div>

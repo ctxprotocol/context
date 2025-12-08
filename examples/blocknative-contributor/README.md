@@ -35,18 +35,21 @@ curl http://localhost:4001/context/blocknative \
   registered in the marketplace.
 
 ### ⚠️ The "Data Broker" Requirement (Output Schemas)
- 
- You are building a **Data Broker** tool, not a chatbot. When a user pays for your tool, they are buying **structured data**, not text.
- 
- 1. **`outputSchema`**: Defines the "Contract" of what you sell.
-    - *Example:* "I promise to return an object with a `price` (number) and `currency` (string)."
- 2. **`structuredContent`**: The actual data you deliver.
-    - *Example:* `{ price: 100, currency: "USD" }`
- 
- **Why?**
- This allows our "Robot Judge" to **automatically resolve disputes**. If your API returns data that breaks your own schema, the user is automatically refunded. This creates trust without humans in the loop.
 
-- Ensure your response structure matches your `outputSchema` exactly
+You are building a **Data Broker** tool, not a chatbot. When a user pays for your tool, they are buying **structured data**, not text.
+
+**Why `outputSchema` and `structuredContent` are required:**
+
+1. **AI Agent Code Generation**: The agent uses your `outputSchema` to write accurate TypeScript code that parses your response. Without it, the agent guesses—and often fails.
+2. **Type Safety**: `structuredContent` guarantees the agent receives data in the exact format it expects. No parsing errors.
+3. **Dispute Resolution**: Our "Robot Judge" automatically resolves disputes by comparing your `structuredContent` against your `outputSchema`. Schema violations = automatic refund.
+
+**Schema Definitions:**
+- **`outputSchema`**: The "contract" of what you sell (returned in `listTools`).
+- **`structuredContent`**: The actual data you deliver (returned in tool response).
+
+**Rules:**
+- Your `structuredContent` must match your `outputSchema` exactly
 - Types matter: `"72"` (string) ≠ `72` (number)
 - Repeated schema violations (5+ flags) lead to tool deactivation
 
