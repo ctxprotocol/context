@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useState } from "react";
 import { LoaderIcon } from "@/components/icons";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -56,7 +55,6 @@ export function ContributeForm() {
   const [price, setPrice] = useState(state.payload?.price || "0.00");
   const priceValue = Number.parseFloat(price) || 0;
   const requiredStake = calculateRequiredStake(priceValue);
-  const isMinimumStake = requiredStake === MINIMUM_STAKE_USDC;
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -131,7 +129,7 @@ Agent tips (optional):
               Skills are <strong>auto-discovered</strong> from your MCP server.
               Ensure you define a clear <code>inputSchema</code> for the AI to
               use your tool, and an <code>outputSchema</code> for{" "}
-              <strong className="font-medium text-foreground">
+              <strong>
                 automated dispute resolution
               </strong>
               .
@@ -208,31 +206,27 @@ Agent tips (optional):
             </div>
           </div>
 
-          {/* Staking Requirement Notice - ALL tools require stake */}
-          <Alert>
-            <Shield className="size-4 text-amber-500" />
-            <AlertTitle>Staking Required</AlertTitle>
-            <AlertDescription className="space-y-2 text-xs text-muted-foreground">
-              <p>
-                Stake <strong>${requiredStake.toFixed(2)} USDC</strong>{" "}
-                {isMinimumStake ? "(minimum stake)" : "(100× query price)"}{" "}
-                from your smart wallet after submission. Your tool will
-                auto-activate once staked. Fully refundable with 7-day
-                withdrawal delay.
+          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+            <div className="space-y-1 text-amber-600/90 text-xs">
+              <p className="leading-relaxed">
+                Stake <strong>$10.00 USDC (minimum stake)</strong> from your
+                smart wallet after submission. Your tool will auto-activate once
+                staked. Fully refundable with 7-day withdrawal delay.
               </p>
-              <p>
+              <p className="leading-relaxed">
                 All tools require a minimum $10.00 stake to ensure quality and
                 prevent spam. Enforced on-chain.
               </p>
               <Link
-                className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-1 font-medium hover:underline"
                 href="/developer/tools"
               >
                 Manage stakes in Developer Tools
                 <ExternalLink className="size-3" />
               </Link>
-            </AlertDescription>
-          </Alert>
+            </div>
+          </div>
 
           <div className="space-y-3">
             <Label htmlFor="endpoint">MCP Endpoint</Label>

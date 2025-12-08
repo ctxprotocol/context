@@ -370,6 +370,17 @@
         "destructive": "Use AlertDialog for destructive actions",
         "footerButtons": "Cancel (outline) on left, primary action on right"
       }
+    },
+    "InlineWarning": {
+      "base": "flex items-start gap-2 rounded-md border p-2",
+      "variants": {
+        "amber": {
+          "container": "border-amber-500/30 bg-amber-500/10",
+          "icon": "mt-0.5 size-3.5 shrink-0 text-amber-600",
+          "text": "text-xs text-amber-600/90 leading-relaxed"
+        }
+      },
+      "usage": "Use for inline warnings that require user attention but block a specific action (like staking). Use Shield icon for security/trust related warnings."
     }
   },
   "patterns": {
