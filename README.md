@@ -122,9 +122,31 @@ pnpm dev
 
 Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
-1. **Build with the Context SDK:** We recommend using the **[@ctxprotocol/sdk](https://github.com/ctxprotocol/sdk)** to build your server. It handles schema validation, `structuredContent` wrapping, and ensures your tool is "Data Broker" compliant out of the box.
+1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just add two Context Protocol extensions to make it "Data Broker" compliant:
 
-   > **[See the SDK README for code examples and guides →](https://github.com/ctxprotocol/sdk)**
+   - **`outputSchema`** in your tool definitions (JSON Schema describing your response structure)
+   - **`structuredContent`** in your responses (the machine-readable data matching your schema)
+
+   ```typescript
+   // Standard MCP server - just add two fields
+   const TOOLS = [{
+     name: "get_gas_price",
+     inputSchema: { /* standard MCP input schema */ },
+     outputSchema: {  // 👈 Context Protocol extension
+       type: "object",
+       properties: { gasPrice: { type: "number" } },
+       required: ["gasPrice"],
+     },
+   }];
+
+   // In your tool handler
+   return {
+     content: [{ type: "text", text: JSON.stringify(data) }],
+     structuredContent: data,  // 👈 Context Protocol extension
+   };
+   ```
+
+   > **[See example MCP servers →](https://github.com/ctxprotocol/sdk/tree/main/examples/server)**
 
 2. **Deploy Your Server:** Your server needs to be publicly accessible. We support both:
    - **HTTP Streaming** (recommended): `https://your-server.com/mcp`
