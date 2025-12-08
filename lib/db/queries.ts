@@ -37,7 +37,9 @@ import {
   type Suggestion,
   stream,
   suggestion,
+  type ToolDispute,
   toolQuery,
+  toolReport,
   type User,
   type UserSettings,
   user,
@@ -725,7 +727,9 @@ export async function createAITool({
         RETURNING *
       `);
       // Handle both array and object-with-rows formats from db.execute()
-      const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
+      const rows = Array.isArray(result)
+        ? result
+        : ((result as { rows?: unknown[] }).rows ?? []);
       newTool = rows[0];
     } else {
       // Fallback: create without embedding
@@ -1329,7 +1333,9 @@ async function searchAIToolsVector({
   `);
 
   const rows = (
-    Array.isArray(results) ? results : ((results as { rows?: unknown[] }).rows ?? [])
+    Array.isArray(results)
+      ? results
+      : ((results as { rows?: unknown[] }).rows ?? [])
   ) as Array<Record<string, unknown>>;
 
   // Log similarity scores for debugging
@@ -1404,7 +1410,9 @@ async function searchAIToolsFallback({
   `);
 
   const rows = (
-    Array.isArray(results) ? results : ((results as { rows?: unknown[] }).rows ?? [])
+    Array.isArray(results)
+      ? results
+      : ((results as { rows?: unknown[] }).rows ?? [])
   ) as Array<Record<string, unknown>>;
 
   return rows.map((tool) => ({
@@ -1786,5 +1794,228 @@ export async function countApiKeysByUserId(userId: string): Promise<number> {
   } catch (error) {
     console.error("Failed to count API keys:", error);
     return 0;
+  }
+}
+
+// ============================================================================
+// DISPUTE RESOLUTION QUERIES (Admin Dashboard)
+// ============================================================================
+
+// Threshold for auto-deactivation (soft slash)
+const FLAG_THRESHOLD_FOR_DEACTIVATION = 5;
+
+export type DisputeFilters = {
+  verdict?: "pending" | "guilty" | "innocent" | "manual_review";
+  reason?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type DisputeWithTool = ToolDispute & {
+  toolName: string;
+  toolCategory: string | null;
+  developerWallet: string;
+  totalStaked: string | null;
+  toolIsActive: boolean;
+};
+
+/**
+ * Get disputes with filters and pagination (for admin dashboard)
+ */
+export async function getDisputes({
+  verdict,
+  reason,
+  limit = 50,
+  offset = 0,
+}: DisputeFilters = {}): Promise<{
+  disputes: DisputeWithTool[];
+  total: number;
+  hasMore: boolean;
+}> {
+  try {
+    const conditions: SQL<unknown>[] = [];
+
+    if (verdict) {
+      conditions.push(eq(toolReport.verdict, verdict));
+    }
+    if (reason) {
+      conditions.push(eq(toolReport.reason, reason));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Get total count
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(toolReport)
+      .where(whereClause);
+    const total = countResult?.count ?? 0;
+
+    // Get disputes with tool info
+    const disputes = await db
+      .select({
+        id: toolReport.id,
+        toolId: toolReport.toolId,
+        reporterId: toolReport.reporterId,
+        transactionHash: toolReport.transactionHash,
+        queryId: toolReport.queryId,
+        reason: toolReport.reason,
+        details: toolReport.details,
+        verdict: toolReport.verdict,
+        schemaErrors: toolReport.schemaErrors,
+        status: toolReport.status,
+        createdAt: toolReport.createdAt,
+        // Tool info
+        toolName: aiTool.name,
+        toolCategory: aiTool.category,
+        developerWallet: aiTool.developerWallet,
+        totalStaked: aiTool.totalStaked,
+        toolIsActive: aiTool.isActive,
+      })
+      .from(toolReport)
+      .innerJoin(aiTool, eq(toolReport.toolId, aiTool.id))
+      .where(whereClause)
+      .orderBy(desc(toolReport.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      disputes: disputes as DisputeWithTool[],
+      total,
+      hasMore: offset + disputes.length < total,
+    };
+  } catch (error) {
+    console.error("Failed to get disputes:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get disputes");
+  }
+}
+
+/**
+ * Get a single dispute by ID with full details
+ */
+export async function getDisputeById(
+  id: string
+): Promise<DisputeWithTool | null> {
+  try {
+    const [dispute] = await db
+      .select({
+        id: toolReport.id,
+        toolId: toolReport.toolId,
+        reporterId: toolReport.reporterId,
+        transactionHash: toolReport.transactionHash,
+        queryId: toolReport.queryId,
+        reason: toolReport.reason,
+        details: toolReport.details,
+        verdict: toolReport.verdict,
+        schemaErrors: toolReport.schemaErrors,
+        status: toolReport.status,
+        createdAt: toolReport.createdAt,
+        // Tool info
+        toolName: aiTool.name,
+        toolCategory: aiTool.category,
+        developerWallet: aiTool.developerWallet,
+        totalStaked: aiTool.totalStaked,
+        toolIsActive: aiTool.isActive,
+      })
+      .from(toolReport)
+      .innerJoin(aiTool, eq(toolReport.toolId, aiTool.id))
+      .where(eq(toolReport.id, id))
+      .limit(1);
+
+    return (dispute as DisputeWithTool) ?? null;
+  } catch (error) {
+    console.error("Failed to get dispute by ID:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to get dispute");
+  }
+}
+
+/**
+ * Update dispute verdict (admin action)
+ * Handles side effects: increment flags if guilty, soft slash if threshold reached
+ */
+export async function updateDisputeVerdict({
+  disputeId,
+  verdict,
+  adminNotes,
+}: {
+  disputeId: string;
+  verdict: "guilty" | "innocent";
+  adminNotes?: string;
+}): Promise<{
+  dispute: DisputeWithTool;
+  toolStatus: {
+    totalFlags: number;
+    deactivated: boolean;
+  };
+}> {
+  try {
+    // Get the dispute first
+    const dispute = await getDisputeById(disputeId);
+    if (!dispute) {
+      throw new ChatSDKError("not_found:database", "Dispute not found");
+    }
+
+    // Update dispute verdict
+    await db
+      .update(toolReport)
+      .set({
+        verdict,
+        status: "resolved",
+        // Note: adminNotes not in schema yet, would need migration
+      })
+      .where(eq(toolReport.id, disputeId));
+
+    let toolDeactivated = false;
+    let newFlagCount = 0;
+
+    // If guilty, increment tool flags and potentially deactivate
+    if (verdict === "guilty") {
+      // Get current tool state
+      const [tool] = await db
+        .select({
+          totalFlags: aiTool.totalFlags,
+          isActive: aiTool.isActive,
+        })
+        .from(aiTool)
+        .where(eq(aiTool.id, dispute.toolId))
+        .limit(1);
+
+      newFlagCount = (tool?.totalFlags || 0) + 1;
+
+      const shouldDeactivate =
+        newFlagCount >= FLAG_THRESHOLD_FOR_DEACTIVATION && tool?.isActive;
+
+      await db
+        .update(aiTool)
+        .set({
+          totalFlags: newFlagCount,
+          updatedAt: new Date(),
+          ...(shouldDeactivate ? { isActive: false } : {}),
+        })
+        .where(eq(aiTool.id, dispute.toolId));
+
+      toolDeactivated = shouldDeactivate;
+    }
+
+    // Get updated dispute
+    const updatedDispute = await getDisputeById(disputeId);
+    if (!updatedDispute) {
+      throw new ChatSDKError(
+        "bad_request:database",
+        "Failed to retrieve updated dispute"
+      );
+    }
+
+    return {
+      dispute: updatedDispute,
+      toolStatus: {
+        totalFlags: newFlagCount,
+        deactivated: toolDeactivated,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to update dispute verdict:", error);
+    if (error instanceof ChatSDKError) throw error;
+    throw new ChatSDKError("bad_request:database", "Failed to update verdict");
   }
 }
