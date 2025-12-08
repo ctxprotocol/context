@@ -122,7 +122,9 @@ pnpm dev
 
 Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
-1. **Build an MCP Server:** Follow the [Model Context Protocol spec](https://modelcontextprotocol.io). Use the official [TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) or [Python SDK](https://github.com/modelcontextprotocol/python-sdk).
+1. **Build with the Context SDK:** We recommend using the **[@ctxprotocol/sdk](https://github.com/ctxprotocol/sdk)** to build your server. It handles schema validation, `structuredContent` wrapping, and ensures your tool is "Data Broker" compliant out of the box.
+
+   > **[See the SDK README for code examples and guides →](https://github.com/ctxprotocol/sdk)**
 
 2. **Deploy Your Server:** Your server needs to be publicly accessible. We support both:
    - **HTTP Streaming** (recommended): `https://your-server.com/mcp`
@@ -140,63 +142,6 @@ Want to earn revenue from your data? Build an MCP server and register it as an M
    - **Staking:** All tools require a minimum $10 USDC stake (or 100x query price if higher). This is enforced on-chain, fully refundable with 7-day withdrawal delay.
 
 5. **Earn:** Your MCP Tool is now instantly available on the **decentralized marketplace**!
-
-#### Example MCP Server (TypeScript)
-
-```typescript
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-
-const server = new Server({
-  name: "my-weather-server",
-  version: "1.0.0",
-});
-
-server.setRequestHandler("tools/list", async () => ({
-  tools: [{
-    name: "get_weather",
-    description: "Get current weather for a city",
-    inputSchema: {
-      type: "object",
-      properties: {
-        city: { type: "string", description: "City name" }
-      },
-      required: ["city"]
-    },
-    // Define output structure for reliable AI parsing (MCP 2025-06-18)
-    outputSchema: {
-      type: "object",
-      properties: {
-        temperature: { type: "number" },
-        conditions: { type: "string" },
-        humidity: { type: "number" }
-      },
-      required: ["temperature", "conditions"]
-    }
-  }]
-}));
-
-server.setRequestHandler("tools/call", async (request) => {
-  if (request.params.name === "get_weather") {
-    const { city } = request.params.arguments;
-    // Your API logic here
-    const data = { temperature: 72, conditions: "Sunny", humidity: 45 };
-    return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      // Return flat data in structuredContent for reliable AI parsing
-      structuredContent: data
-    };
-  }
-});
-
-// Start SSE server on port 3001
-const transport = new SSEServerTransport("/sse", response);
-await server.connect(transport);
-```
-
-> **Best Practice:** Always include `outputSchema` in your tool definitions and return data in `structuredContent`. This ensures AI agents can reliably access your data (e.g., `result.temperature` instead of guessing nested paths).
-
-See the full [Blocknative example](./examples/blocknative-contributor) for a production-ready implementation.
 
 #### ⚠️ Schema Accuracy & Dispute Resolution
 
