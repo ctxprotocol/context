@@ -18,6 +18,8 @@ type AddFundsDialogProps = {
   onFund: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  /** Show hint to resend message after funding (for Auto Mode) */
+  showResendHint?: boolean;
   toolName?: string;
   walletAddress?: string;
 };
@@ -29,6 +31,7 @@ export function AddFundsDialog({
   onFund,
   onOpenChange,
   open,
+  showResendHint,
   toolName,
   walletAddress,
 }: AddFundsDialogProps) {
@@ -50,14 +53,19 @@ export function AddFundsDialog({
         {walletAddress ? (
           <div className="flex flex-col gap-3 text-sm">
             <p className="text-muted-foreground">
-              Context is a pay-per-query marketplace where you pay only for
-              the AI tools you use. Funds are held in your smart wallet and
-              spent automatically.
+              Context is a pay-per-query marketplace where you pay only for the
+              AI tools you use. Funds are held in your smart wallet and spent
+              automatically.
             </p>
             <p className="text-muted-foreground">
-            Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
+              Funds will be deposited into {formatWalletAddress(walletAddress)}{" "}
               (smart wallet, controlled by your embedded signer).
-          </p>
+            </p>
+            {showResendHint ? (
+              <p className="text-muted-foreground">
+                After adding funds, resend your message to continue.
+              </p>
+            ) : null}
           </div>
         ) : null}
 

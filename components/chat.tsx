@@ -310,7 +310,6 @@ export function Chat({
               toolSelection,
             });
             setShowAutoModeAddFunds(true);
-            toast.error("Add funds to continue with Auto Mode.");
           } else {
             toast.error(
               `Insufficient USDC balance. You need ${totalAmountStr} USDC on Base mainnet.`
@@ -432,7 +431,6 @@ export function Chat({
               toolSelection,
             });
             setShowAutoModeAddFunds(true);
-            toast.error("Add funds to continue with Auto Mode.");
           } else {
             toast.error("Insufficient USDC balance.");
           }
@@ -491,23 +489,21 @@ export function Chat({
           amount: amountToFund,
         },
       });
-      await refetchAutoModeBalance();
-      toast.success("Funds added! Retrying payment...");
+      // Note: fundWallet resolves when the modal opens, not when funding completes.
+      // User will need to resend their message after adding funds.
       setShowAutoModeAddFunds(false);
-
-      // Retry the payment with the stored tool selection
-      const storedSelection = autoModeFundingRequest.toolSelection;
       setAutoModeFundingRequest(null);
-
-      // Re-trigger payment processing
-      if (storedSelection) {
-        setPendingToolSelection(storedSelection);
-      }
+      setPendingToolSelection(null);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Funding flow cancelled.";
-      if (message.toLowerCase().includes("exited")) {
-        toast.error("Funding cancelled.");
+      // User closing the modal is not an error - just log it
+      if (
+        message.toLowerCase().includes("exited") ||
+        message.toLowerCase().includes("closed") ||
+        message.toLowerCase().includes("cancelled")
+      ) {
+        console.log("[chat] User exited funding flow");
       } else {
         console.error("fundWallet error:", error);
         toast.error("Failed to open funding flow. Please try again.");
@@ -927,6 +923,7 @@ export function Chat({
           }
         }}
         open={Boolean(autoModeFundingRequest) && showAutoModeAddFunds}
+        showResendHint
         toolName={autoModeFundingRequest?.toolName}
         walletAddress={smartWalletClient?.account?.address}
       />
