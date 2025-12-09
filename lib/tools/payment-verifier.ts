@@ -8,6 +8,17 @@ const client = createPublicClient({
   transport: http(),
 });
 
+// Sentinel hash used for free tools ($0 price) - no on-chain payment required
+const FREE_TOOL_SENTINEL_HASH =
+  "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
+
+/**
+ * Check if a transaction hash is the sentinel for free tools
+ */
+export function isFreeToolHash(txHash: string): boolean {
+  return txHash.toLowerCase() === FREE_TOOL_SENTINEL_HASH.toLowerCase();
+}
+
 export interface PaymentVerification {
   isValid: boolean;
   toolId?: string;
@@ -33,6 +44,9 @@ export interface BatchPaymentVerification {
 /**
  * Verify a payment transaction on-chain
  * Checks that the transaction exists, emitted the correct event, and hasn't been used before
+ *
+ * For FREE tools ($0 price), the client sends a sentinel hash (0x0...0).
+ * We skip on-chain verification for these since no payment was made.
  */
 export async function verifyPayment(
   txHash: `0x${string}`,
@@ -40,6 +54,23 @@ export async function verifyPayment(
   expectedDeveloperAddress: string
 ): Promise<PaymentVerification> {
   try {
+    // FREE TOOL: Skip verification for sentinel hash (no payment required)
+    if (isFreeToolHash(txHash)) {
+      console.log(
+        "[payment-verifier] Free tool detected, skipping on-chain verification",
+        {
+          toolId: expectedToolId,
+        }
+      );
+      return {
+        isValid: true,
+        userAddress: "free-tool",
+        developerAddress: expectedDeveloperAddress,
+        toolId: expectedToolId,
+        amount: 0n,
+      };
+    }
+
     // 1. Get transaction receipt
     const receipt = await client.getTransactionReceipt({ hash: txHash });
 
@@ -70,8 +101,9 @@ export async function verifyPayment(
     }
 
     // 3. Check that the transaction interacted with our ContextRouter contract
-    const contractAddress = process.env
-      .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}` | undefined;
+    const contractAddress = process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as
+      | `0x${string}`
+      | undefined;
 
     if (!contractAddress) {
       return {
@@ -114,6 +146,9 @@ export async function verifyPayment(
  * Verify a batch payment transaction on-chain
  * Checks that the transaction exists, emitted QueryPaid events for all tools,
  * and hasn't been used before
+ *
+ * For FREE tools ($0 price), the client sends a sentinel hash (0x0...0).
+ * We skip on-chain verification for these since no payment was made.
  */
 export async function verifyBatchPayment(
   txHash: `0x${string}`,
@@ -123,6 +158,26 @@ export async function verifyBatchPayment(
   }>
 ): Promise<BatchPaymentVerification> {
   try {
+    // FREE TOOLS: Skip verification for sentinel hash (no payment required)
+    if (isFreeToolHash(txHash)) {
+      console.log(
+        "[payment-verifier] Free tools detected, skipping on-chain verification",
+        {
+          toolCount: expectedTools.length,
+          toolIds: expectedTools.map((t) => t.toolId),
+        }
+      );
+      return {
+        isValid: true,
+        userAddress: "free-tool",
+        tools: expectedTools.map((tool) => ({
+          toolId: tool.toolId,
+          developerAddress: tool.developerAddress,
+          amount: 0n,
+        })),
+      };
+    }
+
     // 1. Get transaction receipt
     const receipt = await client.getTransactionReceipt({ hash: txHash });
 
@@ -153,8 +208,9 @@ export async function verifyBatchPayment(
     }
 
     // 3. Check that the transaction interacted with our ContextRouter contract
-    const contractAddress = process.env
-      .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}` | undefined;
+    const contractAddress = process.env.NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as
+      | `0x${string}`
+      | undefined;
 
     if (!contractAddress) {
       return {

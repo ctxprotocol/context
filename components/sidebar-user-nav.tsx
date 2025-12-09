@@ -1,13 +1,14 @@
 "use client";
 
+import { useFundWallet, useLogin, usePrivy } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
-import { useLogin, usePrivy } from "@privy-io/react-auth";
-import { ArrowUpRight, ChevronUp, Wrench } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { useState } from "react";
+import { toast } from "sonner";
 import { useReadContract } from "wagmi";
 import {
   DropdownMenu,
@@ -26,7 +27,6 @@ import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatWalletAddress } from "@/lib/utils";
 import { CheckIcon, CopyIcon, LoaderIcon } from "./icons";
-import { toast } from "sonner";
 import { WithdrawDialog } from "./withdraw-dialog";
 
 export function SidebarUserNav() {
@@ -44,8 +44,10 @@ export function SidebarUserNav() {
   const userEmail = privyUser?.email?.address;
   const [copied, setCopied] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [isAddingFunds, setIsAddingFunds] = useState(false);
   const { activeWallet } = useWalletIdentity();
   const { client: smartWalletClient } = useSmartWallets();
+  const { fundWallet } = useFundWallet();
 
   const walletAddress = activeWallet?.address;
   const smartWalletAddress = smartWalletClient?.account?.address;
@@ -64,7 +66,7 @@ export function SidebarUserNav() {
     args: balanceCheckAddress ? [balanceCheckAddress] : undefined,
     query: {
       enabled: Boolean(balanceCheckAddress && usdcAddress),
-      refetchInterval: 30000, // Refresh every 30 seconds
+      refetchInterval: 30_000, // Refresh every 30 seconds
     },
   });
 
@@ -141,6 +143,47 @@ export function SidebarUserNav() {
     } catch (error) {
       console.error("Export wallet error:", error);
       toast.error("Failed to export wallet. Please try again.");
+    }
+  };
+
+  const handleAddFunds = async () => {
+    // Fund the smart wallet (where USDC should be held)
+    const addressToFund = smartWalletAddress || walletAddress;
+    if (!addressToFund) {
+      toast.error("Wallet not ready. Please try again.");
+      return;
+    }
+
+    setIsAddingFunds(true);
+
+    try {
+      await fundWallet({
+        address: addressToFund,
+        options: {
+          chain: { id: 8453 }, // Base mainnet
+          asset: "USDC",
+          amount: "10.00", // Default to $10
+        },
+      });
+      // Note: fundWallet may resolve when modal opens OR when funding completes
+      // depending on the onramp provider. Balance will auto-refresh via refetchInterval.
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Funding cancelled.";
+      // "exited_auth_flow" or similar means user closed the modal - not an error
+      if (
+        message.toLowerCase().includes("exited") ||
+        message.toLowerCase().includes("closed") ||
+        message.toLowerCase().includes("cancelled")
+      ) {
+        // User closed the modal - silent, not an error
+        console.log("[sidebar-user-nav] User exited funding flow");
+      } else {
+        console.error("Add funds error:", error);
+        toast.error("Failed to open funding. Please try again.");
+      }
+    } finally {
+      setIsAddingFunds(false);
     }
   };
 
@@ -257,6 +300,18 @@ export function SidebarUserNav() {
                     </span>
                   </DropdownMenuItem>
                 )}
+                {/* Add funds to smart wallet */}
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  data-testid="user-nav-item-add-funds"
+                  disabled={isAddingFunds}
+                  onSelect={handleAddFunds}
+                >
+                  <span className="flex items-center gap-2">
+                    <ArrowDownLeft size={14} />
+                    {isAddingFunds ? "Opening..." : "Add funds"}
+                  </span>
+                </DropdownMenuItem>
                 {/* Export the signer (EOA) which controls the smart wallet */}
                 <DropdownMenuItem
                   className="cursor-pointer"

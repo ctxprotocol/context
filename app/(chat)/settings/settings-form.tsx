@@ -58,7 +58,7 @@ const TIER_CONFIG = {
   },
   convenience: {
     name: "Convenience",
-    description: "Pay-as-you-go model costs (coming soon)",
+    description: "Pay-as-you-go model costs",
     icon: Zap,
     badge: "outline" as const,
   },

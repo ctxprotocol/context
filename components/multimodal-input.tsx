@@ -429,7 +429,22 @@ function PureMultimodalInput({
           setShowPayDialog(true);
           return;
         }
-        // Free tools with free model - no payment needed, fall through
+
+        // FREE tools - no payment needed, send directly with tool info
+        // These tools have $0 price so no transaction hash is needed
+        if (toolsToPay.length > 0) {
+          const freeToolNames = toolsToPay.map((t) => t.name).join(", ");
+          submitForm({
+            toolInvocations: toolsToPay.map((tool) => ({
+              toolId: tool.id,
+              // Use 0x0 as sentinel for free tools - server should recognize this
+              transactionHash:
+                "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+            })),
+            fallbackText: `Using ${freeToolNames}`,
+          });
+          return;
+        }
       }
 
       window.history.pushState({}, "", `/chat/${chatId}`);
