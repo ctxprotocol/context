@@ -324,8 +324,8 @@ Agent tips:
 
       {/* Developer Resources */}
       <div className="relative my-10">
-        <div className="absolute inset-0 flex items-center" aria-hidden="true">
-          <div className="w-full border-t border-border" />
+        <div aria-hidden="true" className="absolute inset-0 flex items-center">
+          <div className="w-full border-border border-t" />
         </div>
         <div className="relative flex justify-center">
           <span className="bg-background px-2 text-muted-foreground text-sm">
@@ -349,8 +349,8 @@ Agent tips:
             <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
           <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
-            Main repository with MCP server examples, smart contracts, and
-            contribution guides.
+            The open-source marketplace platform. Contains the web app, smart
+            contracts, and payment infrastructure.
           </p>
         </a>
 
@@ -368,8 +368,8 @@ Agent tips:
             <ExternalLink className="size-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
           <p className="mt-1 text-muted-foreground text-xs leading-relaxed">
-            TypeScript SDK for building AI agents that discover and execute
-            marketplace tools.
+            The complete Developer Kit. Contains the Client SDK for agents and
+            MCP Server examples for tool builders.
           </p>
         </a>
       </div>
