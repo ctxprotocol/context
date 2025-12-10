@@ -222,9 +222,10 @@ export async function editTool(
       description: parsed.data.description,
       category: parsed.data.category ?? null,
       pricePerQuery: parsed.data.pricePerQuery,
-      ...(updatedToolSchema !== currentSchema && {
-        toolSchema: updatedToolSchema,
-      }),
+      ...(updatedToolSchema &&
+        updatedToolSchema !== currentSchema && {
+          toolSchema: updatedToolSchema as Record<string, unknown>,
+        }),
     });
 
     revalidatePath("/developer/tools");
