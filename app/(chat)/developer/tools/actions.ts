@@ -39,6 +39,7 @@ const editToolSchema = z.object({
   description: z.string().min(1, "Description is required").max(5000),
   category: z.string().optional(),
   pricePerQuery: z.string().regex(/^\d+\.?\d*$/, "Invalid price format"),
+  endpoint: z.string().url("Invalid URL format").optional().or(z.literal("")),
 });
 
 // ─────────────────────────────────────────────────────────
@@ -116,8 +117,9 @@ async function connectAndListTools(endpoint: string): Promise<{
 // ─────────────────────────────────────────────────────────
 
 /**
- * Edit tool metadata (name, description, category, price)
+ * Edit tool metadata (name, description, category, price, endpoint)
  * Automatically regenerates embedding after update
+ * If endpoint changes for MCP tools, auto-validates and refreshes skills
  */
 export async function editTool(
   _prevState: EditToolState,
@@ -134,6 +136,7 @@ export async function editTool(
     description: formData.get("description"),
     category: formData.get("category") || undefined,
     pricePerQuery: formData.get("pricePerQuery"),
+    endpoint: formData.get("endpoint") || undefined,
   };
 
   const parsed = editToolSchema.safeParse(raw);
@@ -145,29 +148,93 @@ export async function editTool(
         fieldErrors[field] = issue.message;
       }
     }
-    return { status: "error", message: "Please correct the errors", fieldErrors };
+    return {
+      status: "error",
+      message: "Please correct the errors",
+      fieldErrors,
+    };
   }
 
   // Verify ownership
-  const userTools = await getAIToolsByDeveloper({ developerId: session.user.id });
+  const userTools = await getAIToolsByDeveloper({
+    developerId: session.user.id,
+  });
   const tool = userTools.find((t) => t.id === parsed.data.toolId);
   if (!tool) {
     return { status: "error", message: "Tool not found or you don't own it" };
   }
 
   try {
+    // Check if this is an MCP tool and if endpoint changed
+    const currentSchema = tool.toolSchema as {
+      kind?: string;
+      endpoint?: string;
+      tools?: unknown[];
+    } | null;
+    const isMCP = currentSchema?.kind === "mcp";
+    const newEndpoint = parsed.data.endpoint;
+    const endpointChanged =
+      isMCP && newEndpoint && newEndpoint !== currentSchema?.endpoint;
+
+    let updatedToolSchema = currentSchema;
+
+    // If endpoint changed, validate by connecting and refreshing skills
+    if (endpointChanged && newEndpoint) {
+      try {
+        const { client, tools } = await connectAndListTools(newEndpoint);
+
+        // Close client gracefully
+        client.close().catch(() => {
+          // Silently ignore - AbortError is expected when closing SSE connections
+        });
+
+        if (!tools || tools.length === 0) {
+          return {
+            status: "error",
+            message:
+              "Could not connect to new endpoint: No tools found. Is the server running?",
+            fieldErrors: {
+              endpoint: "Could not find any tools at this endpoint",
+            },
+          };
+        }
+
+        // Update toolSchema with new endpoint AND refreshed skills
+        updatedToolSchema = {
+          ...currentSchema,
+          endpoint: newEndpoint,
+          tools,
+        };
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
+        return {
+          status: "error",
+          message: `Could not connect to new endpoint: ${errorMessage}`,
+          fieldErrors: { endpoint: "Could not connect to this endpoint" },
+        };
+      }
+    }
+
     await updateAITool({
       id: parsed.data.toolId,
       name: parsed.data.name,
       description: parsed.data.description,
       category: parsed.data.category ?? null,
       pricePerQuery: parsed.data.pricePerQuery,
+      ...(updatedToolSchema !== currentSchema && {
+        toolSchema: updatedToolSchema,
+      }),
     });
 
     revalidatePath("/developer/tools");
     revalidatePath("/chat");
 
-    return { status: "success", message: "Tool updated successfully" };
+    const message = endpointChanged
+      ? "Tool updated and endpoint validated successfully"
+      : "Tool updated successfully";
+
+    return { status: "success", message };
   } catch {
     return { status: "error", message: "Failed to update tool" };
   }
@@ -177,21 +244,29 @@ export async function editTool(
  * Refresh MCP tool skills by re-connecting to the MCP server
  * Automatically regenerates embedding with new skill names/descriptions
  */
-export async function refreshMCPSkills(toolId: string): Promise<RefreshToolState> {
+export async function refreshMCPSkills(
+  toolId: string
+): Promise<RefreshToolState> {
   const session = await auth();
   if (!session?.user?.id) {
     return { status: "error", message: "Not authenticated" };
   }
 
   // Verify ownership
-  const userTools = await getAIToolsByDeveloper({ developerId: session.user.id });
+  const userTools = await getAIToolsByDeveloper({
+    developerId: session.user.id,
+  });
   const tool = userTools.find((t) => t.id === toolId);
   if (!tool) {
     return { status: "error", message: "Tool not found or you don't own it" };
   }
 
   // Check if it's an MCP tool
-  const schema = tool.toolSchema as { kind?: string; endpoint?: string; tools?: unknown[] } | null;
+  const schema = tool.toolSchema as {
+    kind?: string;
+    endpoint?: string;
+    tools?: unknown[];
+  } | null;
   if (!schema || schema.kind !== "mcp" || !schema.endpoint) {
     return { status: "error", message: "This is not an MCP tool" };
   }
@@ -256,7 +331,9 @@ export async function toggleToolStatus(
   }
 
   // Verify ownership
-  const userTools = await getAIToolsByDeveloper({ developerId: session.user.id });
+  const userTools = await getAIToolsByDeveloper({
+    developerId: session.user.id,
+  });
   const tool = userTools.find((t) => t.id === toolId);
   if (!tool) {
     return { success: false, message: "Tool not found or you don't own it" };
@@ -274,4 +351,3 @@ export async function toggleToolStatus(
     return { success: false, message: "Failed to update status" };
   }
 }
-

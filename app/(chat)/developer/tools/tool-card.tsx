@@ -78,26 +78,37 @@ function isToolProven(
 
 const initialEditState: EditToolState = { status: "idle" };
 
+const DESCRIPTION_MAX_LENGTH = 5000;
+
 export function ToolCard({ tool }: { tool: Tool }) {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isRefreshing, startRefresh] = useTransition();
   const [isToggling, startToggle] = useTransition();
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [closeTooltipOpen, setCloseTooltipOpen] = useState(false);
+  const [descriptionLength, setDescriptionLength] = useState(
+    tool.description.length
+  );
 
   const [editState, editAction, isEditing] = useActionState(
     editTool,
     initialEditState
   );
 
-  const schema = tool.toolSchema as { kind?: string; tools?: { name: string; outputSchema?: unknown }[] } | null;
+  const schema = tool.toolSchema as {
+    kind?: string;
+    endpoint?: string;
+    tools?: { name: string; outputSchema?: unknown }[];
+  } | null;
   const isMCP = schema?.kind === "mcp";
   const skillCount = isMCP ? (schema?.tools?.length ?? 0) : 0;
+  const currentEndpoint = isMCP ? (schema?.endpoint ?? "") : "";
 
   // Check for missing outputSchema on any skill (Context Protocol recommendation)
-  const skillsWithoutOutputSchema = isMCP && schema?.tools
-    ? schema.tools.filter((skill) => !skill.outputSchema)
-    : [];
+  const skillsWithoutOutputSchema =
+    isMCP && schema?.tools
+      ? schema.tools.filter((skill) => !skill.outputSchema)
+      : [];
   const hasMissingSchema = skillsWithoutOutputSchema.length > 0;
 
   // Trust metrics
@@ -237,25 +248,25 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
           {/* Staking Status - ALL tools require stake */}
           <Tooltip>
-              <TooltipTrigger asChild>
-                <Badge
-                  className={cn(
-                    "gap-1",
-                    hasRequiredStake
-                      ? "bg-blue-500/10 text-blue-600"
-                      : "bg-amber-500/10 text-amber-600"
-                  )}
-                  variant="outline"
-                >
-                  <Shield className="size-3" />${totalStaked.toFixed(0)} staked
-                </Badge>
-              </TooltipTrigger>
-              <TooltipContent>
-                {hasRequiredStake
-                  ? `Staked $${totalStaked.toFixed(2)} (required: $${requiredStake.toFixed(2)})`
-                  : `Need $${requiredStake.toFixed(2)} stake (have $${totalStaked.toFixed(2)})`}
-              </TooltipContent>
-            </Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                className={cn(
+                  "gap-1",
+                  hasRequiredStake
+                    ? "bg-blue-500/10 text-blue-600"
+                    : "bg-amber-500/10 text-amber-600"
+                )}
+                variant="outline"
+              >
+                <Shield className="size-3" />${totalStaked.toFixed(0)} staked
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              {hasRequiredStake
+                ? `Staked $${totalStaked.toFixed(2)} (required: $${requiredStake.toFixed(2)})`
+                : `Need $${requiredStake.toFixed(2)} stake (have $${totalStaked.toFixed(2)})`}
+            </TooltipContent>
+          </Tooltip>
 
           {/* Legacy Verified badge (identity verified, not performance) */}
           {tool.isVerified && !isProven && (
@@ -278,7 +289,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
             <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
             <p className="text-amber-600/90 text-xs leading-relaxed">
               This tool requires <strong>${requiredStake.toFixed(2)}</strong>{" "}
-              stake to activate. Deposit stake to make your tool visible in the marketplace.
+              stake to activate. Deposit stake to make your tool visible in the
+              marketplace.
             </p>
           </div>
         )}
@@ -291,19 +303,26 @@ export function ToolCard({ tool }: { tool: Tool }) {
               <p>
                 {skillsWithoutOutputSchema.length === 1 ? (
                   <>
-                    Skill <strong>{skillsWithoutOutputSchema[0].name}</strong> is missing{" "}
-                    <code className="rounded bg-amber-600/20 px-1">outputSchema</code>.
+                    Skill <strong>{skillsWithoutOutputSchema[0].name}</strong>{" "}
+                    is missing{" "}
+                    <code className="rounded bg-amber-600/20 px-1">
+                      outputSchema
+                    </code>
+                    .
                   </>
                 ) : (
                   <>
                     {skillsWithoutOutputSchema.length} skills are missing{" "}
-                    <code className="rounded bg-amber-600/20 px-1">outputSchema</code>.
+                    <code className="rounded bg-amber-600/20 px-1">
+                      outputSchema
+                    </code>
+                    .
                   </>
                 )}
               </p>
               <p className="mt-1">
-                Without it, the AI agent cannot write accurate code to parse your responses, and
-                disputes cannot be auto-resolved.{" "}
+                Without it, the AI agent cannot write accurate code to parse
+                your responses, and disputes cannot be auto-resolved.{" "}
                 <a
                   className="underline"
                   href="https://github.com/ctxprotocol/context#-the-data-broker-standard"
@@ -430,7 +449,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       )}
                       defaultValue={tool.description}
                       id="edit-description"
+                      maxLength={DESCRIPTION_MAX_LENGTH}
                       name="description"
+                      onChange={(e) => setDescriptionLength(e.target.value.length)}
                       rows={5}
                     />
                     {editState.fieldErrors?.description && (
@@ -438,10 +459,22 @@ export function ToolCard({ tool }: { tool: Tool }) {
                         {editState.fieldErrors.description}
                       </p>
                     )}
-                    <p className="text-[10px] text-sidebar-foreground/50 leading-tight">
-                      Shown in the marketplace and used for semantic search.
-                      Updating regenerates the search embedding.
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[10px] text-sidebar-foreground/50 leading-tight">
+                        Shown in the marketplace and used for semantic search.
+                        Updating regenerates the search embedding.
+                      </p>
+                      <span
+                        className={cn(
+                          "shrink-0 text-[10px] tabular-nums",
+                          descriptionLength > DESCRIPTION_MAX_LENGTH * 0.9
+                            ? "text-amber-600"
+                            : "text-sidebar-foreground/50"
+                        )}
+                      >
+                        {descriptionLength.toLocaleString()}/{DESCRIPTION_MAX_LENGTH.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Category */}
@@ -512,6 +545,42 @@ export function ToolCard({ tool }: { tool: Tool }) {
                     )}
                   </div>
 
+                  {/* Endpoint (MCP tools only) */}
+                  {isMCP && (
+                    <div className="space-y-1.5">
+                      <Label
+                        className="font-medium text-sidebar-foreground/60 text-xs"
+                        htmlFor="edit-endpoint"
+                      >
+                        MCP Endpoint
+                      </Label>
+                      <Input
+                        aria-invalid={
+                          editState.fieldErrors?.endpoint ? true : undefined
+                        }
+                        className={cn(
+                          "h-9 border-sidebar-border bg-sidebar-accent font-mono text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
+                          editState.fieldErrors?.endpoint &&
+                            "border-destructive"
+                        )}
+                        defaultValue={currentEndpoint}
+                        id="edit-endpoint"
+                        name="endpoint"
+                        placeholder="https://your-mcp-server.com/mcp"
+                        type="url"
+                      />
+                      {editState.fieldErrors?.endpoint && (
+                        <p className="text-destructive text-xs">
+                          {editState.fieldErrors.endpoint}
+                        </p>
+                      )}
+                      <p className="text-[10px] text-sidebar-foreground/50 leading-tight">
+                        Changing the endpoint will automatically validate the
+                        connection and refresh skills.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Error message */}
                   {editState.status === "error" && editState.message && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2">
@@ -574,9 +643,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
               <TooltipContent>
                 {tool.isActive
                   ? "Tool is visible in the marketplace"
-                  : !hasRequiredStake
-                    ? `Deposit $${requiredStake.toFixed(2)} stake to activate this tool`
-                    : "Tool is hidden from the marketplace"}
+                  : hasRequiredStake
+                    ? "Tool is hidden from the marketplace"
+                    : `Deposit $${requiredStake.toFixed(2)} stake to activate this tool`}
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -604,7 +673,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
               </TooltipTrigger>
               {!tool.isActive && !hasRequiredStake && (
                 <TooltipContent>
-                  Deposit $${requiredStake.toFixed(2)} stake to activate this tool
+                  Deposit $${requiredStake.toFixed(2)} stake to activate this
+                  tool
                 </TooltipContent>
               )}
             </Tooltip>
