@@ -87,7 +87,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [closeTooltipOpen, setCloseTooltipOpen] = useState(false);
   const [descriptionLength, setDescriptionLength] = useState(
-    tool.description.length
+    tool.description?.length ?? 0
   );
 
   const [editState, editAction, isEditing] = useActionState(
