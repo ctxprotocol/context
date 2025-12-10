@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  headers() {
+  async headers() {
     return [
       {
         source: "/:path*",
