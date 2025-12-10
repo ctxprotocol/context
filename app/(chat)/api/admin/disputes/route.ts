@@ -15,10 +15,7 @@ import { getDisputes } from "@/lib/db/queries";
  * - offset: number (default 0)
  */
 
-const ADMIN_EMAILS = [
-  "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
-];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 export async function GET(request: Request) {
   try {

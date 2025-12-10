@@ -20,10 +20,7 @@ import { contextRouterAbi } from "@/lib/generated";
  * - Tool and dispute info for confirmation
  */
 
-const ADMIN_EMAILS = [
-  "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
-];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 const LOG_PREFIX = "[api/admin/slash]";
 

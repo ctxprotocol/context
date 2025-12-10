@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/app/(auth)/auth";
 import { verifyAITool } from "@/lib/db/queries";
 
-const ADMIN_EMAILS = ["alex.r.macleod@gmail.com", "dev+blocknative-http@context.local"];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 export async function verifyToolAction(toolId: string) {
   const session = await auth();
@@ -26,4 +26,3 @@ export async function verifyToolAction(toolId: string) {
     return { success: false, error: "Database error" };
   }
 }
-

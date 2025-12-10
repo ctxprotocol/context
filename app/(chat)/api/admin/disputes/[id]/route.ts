@@ -16,10 +16,7 @@ import { getDisputeById, updateDisputeVerdict } from "@/lib/db/queries";
  * - If flags >= 5: Set tool.isActive = false (soft slash)
  */
 
-const ADMIN_EMAILS = [
-  "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
-];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 export async function GET(
   request: Request,

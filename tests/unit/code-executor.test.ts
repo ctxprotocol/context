@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { executeSkillCode } from "@/lib/ai/code-executor";
-import { fetchBlocknativeData } from "@/lib/ai/skills/blocknative";
 import type { SkillRuntime } from "@/lib/ai/skills/runtime";
 
 const NOT_PERMITTED_REGEX = /not permitted/i;
@@ -72,40 +71,18 @@ export async function main() {
 
 test("executeSkillCode rejects unauthorized modules", async () => {
   const result = await executeSkillCode({
-    code: `import { fetchBlocknativeData } from "@/lib/ai/skills/blocknative";
+    code: `import { getWeather } from "@/lib/ai/skills/weather";
 
 export async function main() {
-  return fetchBlocknativeData({ chainId: 8453 });
+  // Try to use weather module when only a different module is allowed
+  return getWeather({ city: "Test" });
 }`,
-    allowedModules: ["@/lib/ai/skills/weather"],
+    allowedModules: ["@/lib/ai/skills/storage"],
     runtime,
   });
 
   assert.equal(result.ok, false);
   if (!result.ok) {
     assert.match(result.error ?? "", NOT_PERMITTED_REGEX);
-  }
-});
-
-test("fetchBlocknativeData calls the default Base gas endpoint", async () => {
-  process.env.BLOCKNATIVE_API_KEY = "test-key";
-  const originalFetch = global.fetch;
-  let requestedUrl: string | null = null;
-  global.fetch = ((input: RequestInfo | URL) => {
-    requestedUrl = typeof input === "string" ? input : input.toString();
-    return Promise.resolve({
-      ok: true,
-      json: async () => ({
-        blockPrices: [],
-      }),
-    });
-  }) as typeof fetch;
-
-  try {
-    const result = await fetchBlocknativeData();
-    assert.equal(result.endpoint, "gas_price");
-    assert.ok(requestedUrl?.includes("chainid=8453"));
-  } finally {
-    global.fetch = originalFetch;
   }
 });

@@ -10,7 +10,6 @@
 
 export const ADMIN_EMAILS = [
   "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
   // Add your email here:
   // "your-email@example.com",
 ];

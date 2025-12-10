@@ -15,10 +15,7 @@ import {
 import { getDisputes } from "@/lib/db/queries";
 import { DisputeRow } from "./dispute-row";
 
-const ADMIN_EMAILS = [
-  "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
-];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 export default async function AdminDisputesPage({
   searchParams,

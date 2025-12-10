@@ -13,10 +13,7 @@ import {
 import { getActiveAIToolsFull } from "@/lib/db/queries";
 import { VerifyButton } from "./verify-button";
 
-const ADMIN_EMAILS = [
-  "alex.r.macleod@gmail.com",
-  "dev+blocknative-http@context.local",
-];
+const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
 
 export default async function AdminToolsPage() {
   const session = await auth();
