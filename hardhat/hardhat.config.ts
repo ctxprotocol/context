@@ -68,6 +68,10 @@ const config: HardhatUserConfig = {
     outDir: "typechain-types",
     target: "ethers-v6",
   },
+  gasReporter: {
+    enabled: true,
+    outputJSON: false, // Don't output JSON file
+  },
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {
