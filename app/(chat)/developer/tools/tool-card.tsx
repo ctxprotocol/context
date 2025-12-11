@@ -147,12 +147,23 @@ export function ToolCard({ tool }: { tool: Tool }) {
     });
   };
 
-  // Close sheet on successful edit
+  // Track if we're in an active edit session (form was submitted)
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  // Close sheet on successful edit (only if we actually submitted the form)
   useEffect(() => {
-    if (editState.status === "success" && isSheetOpen) {
+    if (editState.status === "success" && isSheetOpen && hasSubmitted) {
       setIsSheetOpen(false);
+      setHasSubmitted(false);
     }
-  }, [editState.status, isSheetOpen]);
+  }, [editState.status, isSheetOpen, hasSubmitted]);
+
+  // Reset submitted state when sheet closes
+  useEffect(() => {
+    if (!isSheetOpen) {
+      setHasSubmitted(false);
+    }
+  }, [isSheetOpen]);
 
   // Reset tooltip state when sheet closes
   useEffect(() => {
@@ -365,7 +376,13 @@ export function ToolCard({ tool }: { tool: Tool }) {
               hideCloseButton
               side="right"
             >
-              <form action={editAction} className="flex flex-1 flex-col">
+              <form
+                action={(formData) => {
+                  setHasSubmitted(true);
+                  editAction(formData);
+                }}
+                className="flex flex-1 flex-col"
+              >
                 {/* Header */}
                 <div className="flex items-start justify-between border-sidebar-border border-b px-4 py-3">
                   <div className="flex flex-col gap-1.5">
@@ -416,15 +433,15 @@ export function ToolCard({ tool }: { tool: Tool }) {
                         editState.fieldErrors?.name ? true : undefined
                       }
                       className={cn(
-                        "h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
-                        editState.fieldErrors?.name && "border-destructive"
+                        editState.fieldErrors?.name &&
+                          "border-destructive focus-visible:ring-destructive"
                       )}
                       defaultValue={tool.name}
                       id="edit-name"
                       name="name"
                     />
                     {editState.fieldErrors?.name && (
-                      <p className="text-destructive text-xs">
+                      <p className="text-destructive text-sm">
                         {editState.fieldErrors.name}
                       </p>
                     )}
@@ -443,9 +460,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
                         editState.fieldErrors?.description ? true : undefined
                       }
                       className={cn(
-                        "resize-none border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
+                        "resize-none",
                         editState.fieldErrors?.description &&
-                          "border-destructive"
+                          "border-destructive focus-visible:ring-destructive"
                       )}
                       defaultValue={tool.description}
                       id="edit-description"
@@ -455,7 +472,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       rows={5}
                     />
                     {editState.fieldErrors?.description && (
-                      <p className="text-destructive text-xs">
+                      <p className="text-destructive text-sm">
                         {editState.fieldErrors.description}
                       </p>
                     )}
@@ -486,7 +503,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       Category
                     </Label>
                     <Select defaultValue={tool.category ?? ""} name="category">
-                      <SelectTrigger className="h-9 border-sidebar-border bg-sidebar-accent text-sidebar-foreground focus:ring-ring">
+                      <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -526,9 +543,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                         editState.fieldErrors?.pricePerQuery ? true : undefined
                       }
                       className={cn(
-                        "h-9 border-sidebar-border bg-sidebar-accent font-mono text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
                         editState.fieldErrors?.pricePerQuery &&
-                          "border-destructive"
+                          "border-destructive focus-visible:ring-destructive"
                       )}
                       defaultValue={tool.pricePerQuery}
                       id="edit-price"
@@ -539,7 +555,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       type="number"
                     />
                     {editState.fieldErrors?.pricePerQuery && (
-                      <p className="text-destructive text-xs">
+                      <p className="text-destructive text-sm">
                         {editState.fieldErrors.pricePerQuery}
                       </p>
                     )}
@@ -559,9 +575,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
                           editState.fieldErrors?.endpoint ? true : undefined
                         }
                         className={cn(
-                          "h-9 border-sidebar-border bg-sidebar-accent font-mono text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus-visible:ring-ring",
+                          "font-mono",
                           editState.fieldErrors?.endpoint &&
-                            "border-destructive"
+                            "border-destructive focus-visible:ring-destructive"
                         )}
                         defaultValue={currentEndpoint}
                         id="edit-endpoint"
@@ -570,7 +586,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                         type="url"
                       />
                       {editState.fieldErrors?.endpoint && (
-                        <p className="text-destructive text-xs">
+                        <p className="text-destructive text-sm">
                           {editState.fieldErrors.endpoint}
                         </p>
                       )}
@@ -584,7 +600,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   {/* Error message */}
                   {editState.status === "error" && editState.message && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2">
-                      <p className="text-destructive text-xs">
+                      <p className="text-destructive text-sm">
                         {editState.message}
                       </p>
                     </div>
