@@ -61,11 +61,12 @@ Context is not a text-based chat platform; it is a **Structured Data Marketplace
 | **Dispute Resolution** | Manual review required | Auto-adjudicated on-chain |
 | **Trust Signal** | Unknown reliability | "Data Broker" verified |
 
-- **Standard MCP:** Returns text (`content`). Good for humans, bad for code.
-- **Context Protocol:** Enforces `outputSchema` (in `listTools`) and `structuredContent` (in tool response).
-  - **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
-  - **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
-  - **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
+Context enforces the **MCP 2025-06-18 Structured Output standard** for all paid tools. While `outputSchema` and `structuredContent` are optional in vanilla MCP, Context *requires* them because:
+
+- **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
+- **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
+- **Dispute Resolution:** Schema mismatches can be auto-adjudicated on-chain without manual review.
+- **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
 
 > **Terminology:**
 > - **Tool** = The paid marketplace listing (what users see in the sidebar)
@@ -119,17 +120,17 @@ pnpm dev
 
 Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
-1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just add two Context Protocol extensions to make it "Data Broker" compliant:
+1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just implement the MCP 2025-06-18 structured output standard:
 
    - **`outputSchema`** in your tool definitions (JSON Schema describing your response structure)
    - **`structuredContent`** in your responses (the machine-readable data matching your schema)
 
    ```typescript
-   // Standard MCP server - just add two fields
+   // MCP 2025-06-18 compliant server
    const TOOLS = [{
      name: "get_gas_price",
      inputSchema: { /* standard MCP input schema */ },
-     outputSchema: {  // 👈 Context Protocol extension
+     outputSchema: {  // 👈 MCP 2025-06-18 standard (required by Context)
        type: "object",
        properties: { gasPrice: { type: "number" } },
        required: ["gasPrice"],
@@ -138,8 +139,8 @@ Want to earn revenue from your data? Build an MCP server and register it as an M
 
    // In your tool handler
    return {
-     content: [{ type: "text", text: JSON.stringify(data) }],
-     structuredContent: data,  // 👈 Context Protocol extension
+     content: [{ type: "text", text: JSON.stringify(data) }],  // Backward compat
+     structuredContent: data,  // 👈 MCP 2025-06-18 standard (required by Context)
    };
    ```
 
