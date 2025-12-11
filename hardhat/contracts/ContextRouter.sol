@@ -706,6 +706,19 @@ contract ContextRouter is Ownable, ReentrancyGuard {
         address developer = toolDevelopers[toolId];
         require(developer != address(0), "Tool has no stake");
 
+        // ============================================
+        // VALIDATE: Calculate total refunds upfront
+        // ============================================
+        uint256 totalRefunded = 0;
+        for (uint256 i = 0; i < recipients.length; i++) {
+            require(recipients[i] != address(0), "Invalid recipient");
+            require(refundAmounts[i] > 0, "Refund must be > 0");
+            totalRefunded += refundAmounts[i];
+        }
+        
+        // Safety check: refunds can't exceed slash amount
+        require(totalRefunded <= slashAmount, "Refunds exceed slash");
+
         // Reset pending withdrawal (prevent front-running)
         if (withdrawalRequestTime[toolId] > 0) {
             withdrawalRequestTime[toolId] = 0;
@@ -717,16 +730,9 @@ contract ContextRouter is Ownable, ReentrancyGuard {
         // ============================================
         // STEP 1: Refund all affected users (make whole)
         // ============================================
-        uint256 totalRefunded = 0;
         for (uint256 i = 0; i < recipients.length; i++) {
-            require(recipients[i] != address(0), "Invalid recipient");
-            require(refundAmounts[i] > 0, "Refund must be > 0");
             usdc.safeTransfer(recipients[i], refundAmounts[i]);
-            totalRefunded += refundAmounts[i];
         }
-        
-        // Safety check: refunds can't exceed slash amount
-        require(totalRefunded <= slashAmount, "Refunds exceed slash");
 
         emit UsersCompensated(toolId, totalRefunded, recipients.length);
 
