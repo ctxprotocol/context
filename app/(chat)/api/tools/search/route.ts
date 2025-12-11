@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { searchAITools } from "@/lib/db/queries";
+import { auth } from "@/app/(auth)/auth";
+import { searchAITools, trackEngagementEvent } from "@/lib/db/queries";
 
 const LOG_PREFIX = "[api/tools/search]";
 
@@ -8,6 +9,8 @@ const LOG_PREFIX = "[api/tools/search]";
  *
  * Semantic search for AI tools using pgvector.
  * Falls back to LIKE search if vector search fails.
+ *
+ * Protocol Ledger: Tracks MARKETPLACE_SEARCH events for TGE allocation.
  */
 export async function GET(request: Request) {
   const startTime = performance.now();
@@ -17,6 +20,16 @@ export async function GET(request: Request) {
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 20;
 
   console.log(LOG_PREFIX, "Request received:", { query, limit });
+
+  // Track search event for Protocol Ledger (fire and forget)
+  const session = await auth();
+  if (session?.user?.id && query.trim().length > 0) {
+    trackEngagementEvent({
+      userId: session.user.id,
+      eventType: "MARKETPLACE_SEARCH",
+      metadata: { query, limit },
+    });
+  }
 
   try {
     const { tools, searchType } = await searchAITools({ query, limit });

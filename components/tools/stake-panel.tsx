@@ -33,6 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { trackEngagement } from "@/hooks/use-track-engagement";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { calculateRequiredStake } from "@/lib/constants";
@@ -450,6 +451,18 @@ function StakeToolRow({
       setIsDepositOpen(false);
       setDepositAmount("");
       toast.success("Stake deposited successfully!");
+
+      // Protocol Ledger: Track stake deposit (developer economic commitment)
+      trackEngagement({
+        eventType: "TOOL_STAKED",
+        resourceId: tool.id,
+        metadata: {
+          amount: depositedAmount,
+          newTotalStake: newStakeEstimate,
+          required,
+          meetsRequirement: newStakeEstimate >= required,
+        },
+      });
 
       // If tool was inactive and stake now meets requirement, activate immediately
       // The cron will also catch this, but this provides instant feedback

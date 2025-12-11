@@ -290,9 +290,10 @@ export const aiTool = pgTable("AITool", {
 
   // Level 4 Future-Proofing: Optimistic Payments / Escrow
   // For expensive queries ($10+), funds could be held pending validation
-  pendingBalance: numeric("pending_balance", { precision: 18, scale: 6 }).default(
-    "0"
-  ),
+  pendingBalance: numeric("pending_balance", {
+    precision: 18,
+    scale: 6,
+  }).default("0"),
 
   // Vector search fields (pgvector)
   // Note: The 'embedding' column is vector(1536) - managed via raw SQL
@@ -418,7 +419,10 @@ export const modelCostHistory = pgTable("ModelCostHistory", {
   flowType: text("flow_type").notNull().$type<FlowType>(),
 
   // Cost tracking
-  estimatedCost: numeric("estimated_cost", { precision: 18, scale: 6 }).notNull(),
+  estimatedCost: numeric("estimated_cost", {
+    precision: 18,
+    scale: 6,
+  }).notNull(),
   actualCost: numeric("actual_cost", { precision: 18, scale: 6 }).notNull(),
   aiCallCount: integer("ai_call_count").notNull().default(1),
 
@@ -454,3 +458,48 @@ export const flowCostMultipliers = pgTable(
 );
 
 export type FlowCostMultiplier = InferSelectModel<typeof flowCostMultipliers>;
+
+// =============================================================================
+// PROTOCOL LEDGER: Engagement Events (Stealth Points System)
+// =============================================================================
+// This table captures "intent" signals that don't result in on-chain transactions.
+// Combined with ToolQuery and AITool tables, this provides complete data for
+// retroactive TGE allocation using the "Hyperliquid Path" approach.
+//
+// Key principle: We store RAW EVENTS, not points. The allocation formula is
+// computed at TGE time from a private script (see scripts/allocation/).
+// This prevents users from gaming the system.
+// =============================================================================
+
+export type EngagementEventType =
+  | "MARKETPLACE_SEARCH" // User searched for tools (shows intent)
+  | "TOOL_VIEW" // User viewed tool details
+  | "WALLET_CONNECTED" // Privy wallet linked (high trust signal)
+  | "USDC_APPROVED" // User approved spending (very high intent!)
+  | "TOOL_CREATED" // Developer submitted a tool (supply side)
+  | "TOOL_STAKED" // Developer staked on their tool (economic commitment)
+  | "REFERRAL_LINK_CREATED" // User generated invite link
+  | "REFERRAL_CONVERTED"; // Referred user made first payment
+
+export const engagementEvent = pgTable("EngagementEvent", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => user.id),
+
+  // The event type (what action was taken)
+  eventType: varchar("event_type", { length: 50 })
+    .notNull()
+    .$type<EngagementEventType>(),
+
+  // Optional resource link (toolId, referral code, etc.)
+  resourceId: uuid("resource_id"),
+
+  // Flexible metadata for event-specific data
+  // e.g., { searchQuery: "gas prices", referrerId: "uuid" }
+  metadata: jsonb("metadata"),
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type EngagementEvent = InferSelectModel<typeof engagementEvent>;

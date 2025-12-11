@@ -2,7 +2,10 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import type { DefaultJWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 // CORRECTED IMPORT: Import the specific function from queries.ts
-import { findOrCreateUserByPrivyDid } from "@/lib/db/queries";
+import {
+  findOrCreateUserByPrivyDid,
+  trackEngagementEvent,
+} from "@/lib/db/queries";
 import { verifyPrivyToken } from "@/lib/privy";
 import { authConfig } from "./auth.config";
 
@@ -82,6 +85,14 @@ export const {
           if (!dbUser) {
             return null;
           }
+
+          // Protocol Ledger: Track wallet connection (fire and forget)
+          // This is a high-trust signal - user linked their Privy wallet
+          trackEngagementEvent({
+            userId: dbUser.id,
+            eventType: "WALLET_CONNECTED",
+            metadata: { hasEmail: Boolean(email) },
+          });
 
           // Return a user object that next-auth can use for the session
           return {

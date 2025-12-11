@@ -33,6 +33,9 @@ import {
   chat,
   type DBMessage,
   document,
+  type EngagementEvent,
+  type EngagementEventType,
+  engagementEvent,
   message,
   type Suggestion,
   stream,
@@ -757,6 +760,17 @@ export async function createAITool({
       .update(user)
       .set({ isDeveloper: true })
       .where(eq(user.id, developerId));
+
+    // Protocol Ledger: Track tool creation (supply side signal)
+    // This tracks developer contribution to the ecosystem
+    if (newTool && typeof newTool === "object" && "id" in newTool) {
+      trackEngagementEvent({
+        userId: developerId,
+        eventType: "TOOL_CREATED",
+        resourceId: newTool.id as string,
+        metadata: { name, category, pricePerQuery },
+      });
+    }
 
     return newTool;
   } catch (error) {
@@ -2147,5 +2161,140 @@ export async function updateDisputeVerdict({
     console.error("Failed to update dispute verdict:", error);
     if (error instanceof ChatSDKError) throw error;
     throw new ChatSDKError("bad_request:database", "Failed to update verdict");
+  }
+}
+
+// =============================================================================
+// PROTOCOL LEDGER: Engagement Event Tracking (Stealth Points System)
+// =============================================================================
+// These functions track "intent" signals that don't result in on-chain txns.
+// Combined with ToolQuery and AITool data, this enables retroactive TGE
+// allocation using the "Hyperliquid Path" approach.
+//
+// Key principle: Track raw events, compute allocation at TGE with secret formula.
+// =============================================================================
+
+/**
+ * Track an engagement event for the Protocol Ledger.
+ *
+ * This is a "fire and forget" function - it should never block the main flow.
+ * Failures are logged but don't throw to prevent disrupting user experience.
+ *
+ * @example
+ * // Track marketplace search
+ * trackEngagementEvent({
+ *   userId: session.user.id,
+ *   eventType: "MARKETPLACE_SEARCH",
+ *   metadata: { query: "gas prices", resultsCount: 5 }
+ * });
+ *
+ * // Track tool view
+ * trackEngagementEvent({
+ *   userId: session.user.id,
+ *   eventType: "TOOL_VIEW",
+ *   resourceId: toolId
+ * });
+ *
+ * // Track referral conversion
+ * trackEngagementEvent({
+ *   userId: referrerId,
+ *   eventType: "REFERRAL_CONVERTED",
+ *   metadata: { referredUserId: newUser.id, referredUserFirstSpend: "5.00" }
+ * });
+ */
+export async function trackEngagementEvent({
+  userId,
+  eventType,
+  resourceId,
+  metadata,
+}: {
+  userId: string;
+  eventType: EngagementEventType;
+  resourceId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await db.insert(engagementEvent).values({
+      userId,
+      eventType,
+      resourceId,
+      metadata,
+    });
+  } catch (error) {
+    // Log but don't throw - engagement tracking should never block main flow
+    console.warn("[trackEngagementEvent] Failed to track event:", {
+      userId,
+      eventType,
+      error,
+    });
+  }
+}
+
+/**
+ * Batch track multiple engagement events (more efficient for bulk operations)
+ */
+export async function trackEngagementEventsBatch(
+  events: {
+    userId: string;
+    eventType: EngagementEventType;
+    resourceId?: string;
+    metadata?: Record<string, unknown>;
+  }[]
+): Promise<void> {
+  if (events.length === 0) {
+    return;
+  }
+
+  try {
+    await db.insert(engagementEvent).values(
+      events.map((e) => ({
+        userId: e.userId,
+        eventType: e.eventType,
+        resourceId: e.resourceId,
+        metadata: e.metadata,
+      }))
+    );
+  } catch (error) {
+    console.warn("[trackEngagementEventsBatch] Failed to track events:", {
+      count: events.length,
+      error,
+    });
+  }
+}
+
+/**
+ * Get engagement event count for a user (useful for debugging/admin)
+ */
+export async function getEngagementEventCount(userId: string): Promise<number> {
+  try {
+    const [result] = await db
+      .select({ count: count() })
+      .from(engagementEvent)
+      .where(eq(engagementEvent.userId, userId));
+    return result?.count ?? 0;
+  } catch (error) {
+    console.warn("[getEngagementEventCount] Failed:", error);
+    return 0;
+  }
+}
+
+/**
+ * Get engagement events by type for analytics
+ */
+export async function getEngagementEventsByType(
+  eventType: EngagementEventType,
+  { limit = 100, offset = 0 }: { limit?: number; offset?: number } = {}
+): Promise<EngagementEvent[]> {
+  try {
+    return await db
+      .select()
+      .from(engagementEvent)
+      .where(eq(engagementEvent.eventType, eventType))
+      .orderBy(desc(engagementEvent.createdAt))
+      .limit(limit)
+      .offset(offset);
+  } catch (error) {
+    console.error("[getEngagementEventsByType] Failed:", error);
+    return [];
   }
 }

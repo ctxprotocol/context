@@ -49,3 +49,15 @@ yarn-error.log*
 
 # local-only DB maintenance scripts
 scripts/wipe-all-users-and-data.ts
+
+# =============================================================================
+# PROTOCOL LEDGER: Stealth Allocation System
+# =============================================================================
+# These directories contain the secret TGE allocation formula and Sybil filters.
+# NEVER commit these to version control.
+#
+# The "Hyperliquid Path" requires keeping allocation logic private until TGE.
+# Users should not know how points are calculated to prevent gaming.
+# =============================================================================
+scripts/allocation/
+lib/allocation/

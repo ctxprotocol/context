@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { SPENDING_CAP_OPTIONS, useAutoPay } from "@/hooks/use-auto-pay";
+import { trackEngagement } from "@/hooks/use-track-engagement";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { formatPrice } from "@/lib/utils";
@@ -144,6 +145,13 @@ export function AutoPayApprovalDialog({
         toast.success(
           "Auto Pay enabled! You can now use tools without signing each time."
         );
+
+        // Protocol Ledger: Track USDC approval (very high intent signal)
+        trackEngagement({
+          eventType: "USDC_APPROVED",
+          metadata: { spendingCap: selectedCap, txHash },
+        });
+
         onApprovalSuccess();
       }
     } catch (error) {
