@@ -49,7 +49,9 @@ export function SlashButton({
 }: SlashButtonProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [compensation, setCompensation] = useState<CompensationPreview | null>(null);
+  const [compensation, setCompensation] = useState<CompensationPreview | null>(
+    null
+  );
   const [affectedUsers, setAffectedUsers] = useState<AffectedUser[]>([]);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -79,10 +81,12 @@ export function SlashButton({
       const data = await res.json();
       setCompensation(data.compensation);
       setAffectedUsers(data.affectedUsers);
-      
+
       if (!data.canSlash) {
         if (data.insufficientStake) {
-          setError(`Insufficient stake. Need $${data.compensation.totalRefunds} but only $${data.tool.stake} staked.`);
+          setError(
+            `Insufficient stake. Need $${data.compensation.totalRefunds} but only $${data.tool.stake} staked.`
+          );
         } else if (data.compensation.userCount === 0) {
           setError("No affected users found. At least one dispute must exist.");
         }
@@ -129,7 +133,9 @@ export function SlashButton({
       toast.dismiss();
 
       // Build arrays for contract call
-      const recipients = users.map((u: AffectedUser) => u.wallet as `0x${string}`);
+      const recipients = users.map(
+        (u: AffectedUser) => u.wallet as `0x${string}`
+      );
       const refundAmounts = users.map((u: AffectedUser) =>
         parseUnits(u.refund, 6)
       );
@@ -188,7 +194,8 @@ export function SlashButton({
           <AlertDialogDescription asChild>
             <div className="space-y-4">
               <p>
-                Slash stake from <strong>{toolName}</strong> and compensate all affected users.
+                Slash stake from <strong>{toolName}</strong> and compensate all
+                affected users.
               </p>
 
               {loading && (
@@ -207,14 +214,20 @@ export function SlashButton({
                 <>
                   {/* Compensation Breakdown */}
                   <div className="space-y-3 rounded-lg border bg-muted/50 p-4">
-                    <h4 className="font-medium text-sm">Compensation Breakdown</h4>
-                    
+                    <h4 className="font-medium text-sm">
+                      Compensation Breakdown
+                    </h4>
+
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Slash:</span>
-                        <span className="font-medium font-mono">${compensation.totalSlash}</span>
+                        <span className="text-muted-foreground">
+                          Total Slash:
+                        </span>
+                        <span className="font-medium font-mono">
+                          ${compensation.totalSlash}
+                        </span>
                       </div>
-                      
+
                       <div className="space-y-1 border-t pt-2">
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -225,7 +238,7 @@ export function SlashButton({
                             ${compensation.totalRefunds}
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
                             <Trophy className="h-3.5 w-3.5" />
@@ -235,10 +248,14 @@ export function SlashButton({
                             ${compensation.bounty}
                           </span>
                         </div>
-                        
+
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Adjudication Fee:</span>
-                          <span className="font-mono">${compensation.adjudicationFee}</span>
+                          <span className="text-muted-foreground">
+                            Adjudication Fee:
+                          </span>
+                          <span className="font-mono">
+                            ${compensation.adjudicationFee}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -255,10 +272,14 @@ export function SlashButton({
                         {compensation.firstReporterWallet}
                       </p>
                       <p className="mt-1 text-yellow-600 dark:text-yellow-400">
-                        Receives: ${affectedUsers.length > 0 && affectedUsers[0].isFirstReporter
-                          ? (Number.parseFloat(affectedUsers[0].refund) + Number.parseFloat(compensation.bounty)).toFixed(2)
-                          : compensation.bounty
-                        }
+                        Receives: $
+                        {affectedUsers.length > 0 &&
+                        affectedUsers[0].isFirstReporter
+                          ? (
+                              Number.parseFloat(affectedUsers[0].refund) +
+                              Number.parseFloat(compensation.bounty)
+                            ).toFixed(2)
+                          : compensation.bounty}
                       </p>
                     </div>
                   )}
@@ -269,17 +290,31 @@ export function SlashButton({
                       <table className="w-full text-xs">
                         <thead className="sticky top-0 bg-muted/50">
                           <tr>
-                            <th className="px-2 py-1.5 text-left font-medium">Wallet</th>
-                            <th className="px-2 py-1.5 text-right font-medium">Refund</th>
+                            <th className="px-2 py-1.5 text-left font-medium">
+                              Wallet
+                            </th>
+                            <th className="px-2 py-1.5 text-right font-medium">
+                              Refund
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {affectedUsers.map((affUser) => (
-                            <tr key={affUser.disputeId} className={affUser.isFirstReporter ? "bg-yellow-50/50 dark:bg-yellow-950/20" : ""}>
+                            <tr
+                              className={
+                                affUser.isFirstReporter
+                                  ? "bg-yellow-50/50 dark:bg-yellow-950/20"
+                                  : ""
+                              }
+                              key={affUser.disputeId}
+                            >
                               <td className="max-w-[200px] truncate px-2 py-1.5 font-mono">
-                                {affUser.wallet.slice(0, 6)}...{affUser.wallet.slice(-4)}
+                                {affUser.wallet.slice(0, 6)}...
+                                {affUser.wallet.slice(-4)}
                                 {affUser.isFirstReporter && (
-                                  <span className="ml-1.5 text-yellow-600">🏆</span>
+                                  <span className="ml-1.5 text-yellow-600">
+                                    🏆
+                                  </span>
                                 )}
                               </td>
                               <td className="px-2 py-1.5 text-right font-mono">
@@ -293,7 +328,8 @@ export function SlashButton({
                   )}
 
                   <p className="text-red-500 text-xs">
-                    ⚠️ This action requires an on-chain transaction and cannot be undone.
+                    ⚠️ This action requires an on-chain transaction and cannot be
+                    undone.
                   </p>
                 </>
               )}
