@@ -255,7 +255,7 @@ export function SlashButton({
                         {compensation.firstReporterWallet}
                       </p>
                       <p className="mt-1 text-yellow-600 dark:text-yellow-400">
-                        Receives: ${compensation.totalRefunds && affectedUsers[0] 
+                        Receives: ${affectedUsers.length > 0 && affectedUsers[0].isFirstReporter
                           ? (Number.parseFloat(affectedUsers[0].refund) + Number.parseFloat(compensation.bounty)).toFixed(2)
                           : compensation.bounty
                         }
