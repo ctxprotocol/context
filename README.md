@@ -54,6 +54,8 @@ Context is not a text-based chat platform; it is a **Structured Data Marketplace
 
 **Why `outputSchema` and `structuredContent` matter:**
 
+The [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#output-schema) defines `outputSchema` and `structuredContent` as optional features for tools. Context *requires* them for all paid tools because structured data enables powerful marketplace features:
+
 | Feature | Without Schema | With Schema |
 |---------|----------------|-------------|
 | **AI Code Generation** | Agent guesses response format | Agent writes precise parsing code |
@@ -61,7 +63,7 @@ Context is not a text-based chat platform; it is a **Structured Data Marketplace
 | **Dispute Resolution** | Manual review required | Auto-adjudicated on-chain |
 | **Trust Signal** | Unknown reliability | "Data Broker" verified |
 
-Context enforces the **MCP 2025-06-18 Structured Output standard** for all paid tools. While `outputSchema` and `structuredContent` are optional in vanilla MCP, Context *requires* them because:
+While these fields are optional in vanilla MCP, Context requires them because:
 
   - **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
   - **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
@@ -120,17 +122,17 @@ pnpm dev
 
 Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
-1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just implement the MCP 2025-06-18 structured output standard:
+1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just implement the [MCP structured output standard](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#output-schema):
 
    - **`outputSchema`** in your tool definitions (JSON Schema describing your response structure)
    - **`structuredContent`** in your responses (the machine-readable data matching your schema)
 
    ```typescript
-   // MCP 2025-06-18 compliant server
+   // MCP spec compliant server (see: modelcontextprotocol.io/specification)
    const TOOLS = [{
      name: "get_gas_price",
      inputSchema: { /* standard MCP input schema */ },
-     outputSchema: {  // 👈 MCP 2025-06-18 standard (required by Context)
+     outputSchema: {  // 👈 MCP spec feature (required by Context)
        type: "object",
        properties: { gasPrice: { type: "number" } },
        required: ["gasPrice"],
@@ -140,7 +142,7 @@ Want to earn revenue from your data? Build an MCP server and register it as an M
    // In your tool handler
    return {
      content: [{ type: "text", text: JSON.stringify(data) }],  // Backward compat
-     structuredContent: data,  // 👈 MCP 2025-06-18 standard (required by Context)
+     structuredContent: data,  // 👈 MCP spec feature (required by Context)
    };
    ```
 
