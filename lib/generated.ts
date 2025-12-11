@@ -49,6 +49,50 @@ export const contextRouterAbi = [
     anonymous: false,
     inputs: [
       {
+        name: 'toolId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
+        name: 'firstReporter',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'bountyAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'BountyPaid',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'bountyPercent',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'minimumBounty',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'BountyParametersUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
         name: 'developer',
         internalType: 'address',
         type: 'address',
@@ -284,6 +328,31 @@ export const contextRouterAbi = [
         indexed: true,
       },
       {
+        name: 'totalRefunded',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'userCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'UsersCompensated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'toolId',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: true,
+      },
+      {
         name: 'developer',
         internalType: 'address',
         type: 'address',
@@ -321,6 +390,13 @@ export const contextRouterAbi = [
   },
   {
     type: 'function',
+    inputs: [],
+    name: 'bountyPercent',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     inputs: [{ name: 'toolId', internalType: 'uint256', type: 'uint256' }],
     name: 'cancelWithdrawal',
     outputs: [],
@@ -337,13 +413,6 @@ export const contextRouterAbi = [
     type: 'function',
     inputs: [],
     name: 'claimPlatformFees',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'claimSlashedFunds',
     outputs: [],
     stateMutability: 'nonpayable',
   },
@@ -544,6 +613,13 @@ export const contextRouterAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'minimumBounty',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'minimumStake',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -600,6 +676,16 @@ export const contextRouterAbi = [
   {
     type: 'function',
     inputs: [
+      { name: '_bountyPercent', internalType: 'uint256', type: 'uint256' },
+      { name: '_minimumBounty', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'setBountyParameters',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
       { name: '_minimumStake', internalType: 'uint256', type: 'uint256' },
       { name: '_stakeMultiplier', internalType: 'uint256', type: 'uint256' },
     ],
@@ -611,19 +697,15 @@ export const contextRouterAbi = [
     type: 'function',
     inputs: [
       { name: 'toolId', internalType: 'uint256', type: 'uint256' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+      { name: 'slashAmount', internalType: 'uint256', type: 'uint256' },
+      { name: 'recipients', internalType: 'address[]', type: 'address[]' },
+      { name: 'refundAmounts', internalType: 'uint256[]', type: 'uint256[]' },
+      { name: 'firstReporter', internalType: 'address', type: 'address' },
       { name: 'reason', internalType: 'string', type: 'string' },
     ],
-    name: 'slash',
+    name: 'slashAndCompensateAll',
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'slashedBalance',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -1730,6 +1812,19 @@ export const useReadContextRouterWithdrawalDelay =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"bountyPercent"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useReadContextRouterBountyPercent =
+  /*#__PURE__*/ createUseReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'bountyPercent',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"developerBalances"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -1848,6 +1943,19 @@ export const useReadContextRouterIsOperator =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"minimumBounty"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useReadContextRouterMinimumBounty =
+  /*#__PURE__*/ createUseReadContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'minimumBounty',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"minimumStake"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -1909,19 +2017,6 @@ export const useReadContextRouterRequiresStaking =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'requiresStaking',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashedBalance"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const useReadContextRouterSlashedBalance =
-  /*#__PURE__*/ createUseReadContract({
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'slashedBalance',
   })
 
 /**
@@ -2049,19 +2144,6 @@ export const useWriteContextRouterClaimPlatformFees =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'claimPlatformFees',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimSlashedFunds"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const useWriteContextRouterClaimSlashedFunds =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'claimSlashedFunds',
   })
 
 /**
@@ -2221,6 +2303,19 @@ export const useWriteContextRouterRequestWithdrawal =
   })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setBountyParameters"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useWriteContextRouterSetBountyParameters =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'setBountyParameters',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setStakeParameters"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -2234,16 +2329,17 @@ export const useWriteContextRouterSetStakeParameters =
   })
 
 /**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashAndCompensateAll"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  */
-export const useWriteContextRouterSlash = /*#__PURE__*/ createUseWriteContract({
-  abi: contextRouterAbi,
-  address: contextRouterAddress,
-  functionName: 'slash',
-})
+export const useWriteContextRouterSlashAndCompensateAll =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'slashAndCompensateAll',
+  })
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
@@ -2331,19 +2427,6 @@ export const useSimulateContextRouterClaimPlatformFees =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'claimPlatformFees',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimSlashedFunds"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const useSimulateContextRouterClaimSlashedFunds =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'claimSlashedFunds',
   })
 
 /**
@@ -2503,6 +2586,19 @@ export const useSimulateContextRouterRequestWithdrawal =
   })
 
 /**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setBountyParameters"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useSimulateContextRouterSetBountyParameters =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'setBountyParameters',
+  })
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setStakeParameters"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -2516,16 +2612,16 @@ export const useSimulateContextRouterSetStakeParameters =
   })
 
 /**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashAndCompensateAll"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  */
-export const useSimulateContextRouterSlash =
+export const useSimulateContextRouterSlashAndCompensateAll =
   /*#__PURE__*/ createUseSimulateContract({
     abi: contextRouterAbi,
     address: contextRouterAddress,
-    functionName: 'slash',
+    functionName: 'slashAndCompensateAll',
   })
 
 /**
@@ -2564,6 +2660,32 @@ export const useWatchContextRouterEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: contextRouterAbi,
     address: contextRouterAddress,
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"BountyPaid"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useWatchContextRouterBountyPaidEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'BountyPaid',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"BountyParametersUpdated"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useWatchContextRouterBountyParametersUpdatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'BountyParametersUpdated',
   })
 
 /**
@@ -2707,6 +2829,19 @@ export const useWatchContextRouterStakeWithdrawnEvent =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     eventName: 'StakeWithdrawn',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"UsersCompensated"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const useWatchContextRouterUsersCompensatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'UsersCompensated',
   })
 
 /**
@@ -3618,6 +3753,18 @@ export const readContextRouterWithdrawalDelay =
   })
 
 /**
+ * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"bountyPercent"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const readContextRouterBountyPercent = /*#__PURE__*/ createReadContract({
+  abi: contextRouterAbi,
+  address: contextRouterAddress,
+  functionName: 'bountyPercent',
+})
+
+/**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"developerBalances"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -3733,6 +3880,18 @@ export const readContextRouterIsOperator = /*#__PURE__*/ createReadContract({
 })
 
 /**
+ * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"minimumBounty"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const readContextRouterMinimumBounty = /*#__PURE__*/ createReadContract({
+  abi: contextRouterAbi,
+  address: contextRouterAddress,
+  functionName: 'minimumBounty',
+})
+
+/**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"minimumStake"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -3793,20 +3952,6 @@ export const readContextRouterRequiresStaking =
     address: contextRouterAddress,
     functionName: 'requiresStaking',
   })
-
-/**
- * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashedBalance"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const readContextRouterSlashedBalance = /*#__PURE__*/ createReadContract(
-  {
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'slashedBalance',
-  },
-)
 
 /**
  * Wraps __{@link readContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"stakeMultiplier"`
@@ -3932,19 +4077,6 @@ export const writeContextRouterClaimPlatformFees =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'claimPlatformFees',
-  })
-
-/**
- * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimSlashedFunds"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const writeContextRouterClaimSlashedFunds =
-  /*#__PURE__*/ createWriteContract({
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'claimSlashedFunds',
   })
 
 /**
@@ -4105,6 +4237,19 @@ export const writeContextRouterRequestWithdrawal =
   })
 
 /**
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setBountyParameters"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const writeContextRouterSetBountyParameters =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'setBountyParameters',
+  })
+
+/**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setStakeParameters"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -4118,16 +4263,17 @@ export const writeContextRouterSetStakeParameters =
   })
 
 /**
- * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
+ * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashAndCompensateAll"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  */
-export const writeContextRouterSlash = /*#__PURE__*/ createWriteContract({
-  abi: contextRouterAbi,
-  address: contextRouterAddress,
-  functionName: 'slash',
-})
+export const writeContextRouterSlashAndCompensateAll =
+  /*#__PURE__*/ createWriteContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'slashAndCompensateAll',
+  })
 
 /**
  * Wraps __{@link writeContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
@@ -4216,19 +4362,6 @@ export const simulateContextRouterClaimPlatformFees =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     functionName: 'claimPlatformFees',
-  })
-
-/**
- * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"claimSlashedFunds"`
- *
- * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
- */
-export const simulateContextRouterClaimSlashedFunds =
-  /*#__PURE__*/ createSimulateContract({
-    abi: contextRouterAbi,
-    address: contextRouterAddress,
-    functionName: 'claimSlashedFunds',
   })
 
 /**
@@ -4388,6 +4521,19 @@ export const simulateContextRouterRequestWithdrawal =
   })
 
 /**
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setBountyParameters"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const simulateContextRouterSetBountyParameters =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'setBountyParameters',
+  })
+
+/**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"setStakeParameters"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
@@ -4401,16 +4547,17 @@ export const simulateContextRouterSetStakeParameters =
   })
 
 /**
- * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slash"`
+ * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"slashAndCompensateAll"`
  *
  * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
  */
-export const simulateContextRouterSlash = /*#__PURE__*/ createSimulateContract({
-  abi: contextRouterAbi,
-  address: contextRouterAddress,
-  functionName: 'slash',
-})
+export const simulateContextRouterSlashAndCompensateAll =
+  /*#__PURE__*/ createSimulateContract({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    functionName: 'slashAndCompensateAll',
+  })
 
 /**
  * Wraps __{@link simulateContract}__ with `abi` set to __{@link contextRouterAbi}__ and `functionName` set to `"transferOwnership"`
@@ -4448,6 +4595,32 @@ export const watchContextRouterEvent = /*#__PURE__*/ createWatchContractEvent({
   abi: contextRouterAbi,
   address: contextRouterAddress,
 })
+
+/**
+ * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"BountyPaid"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const watchContextRouterBountyPaidEvent =
+  /*#__PURE__*/ createWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'BountyPaid',
+  })
+
+/**
+ * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"BountyParametersUpdated"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const watchContextRouterBountyParametersUpdatedEvent =
+  /*#__PURE__*/ createWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'BountyParametersUpdated',
+  })
 
 /**
  * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"EarningsClaimed"`
@@ -4590,6 +4763,19 @@ export const watchContextRouterStakeWithdrawnEvent =
     abi: contextRouterAbi,
     address: contextRouterAddress,
     eventName: 'StakeWithdrawn',
+  })
+
+/**
+ * Wraps __{@link watchContractEvent}__ with `abi` set to __{@link contextRouterAbi}__ and `eventName` set to `"UsersCompensated"`
+ *
+ * - [__View Contract on Base Basescan__](https://basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ * - [__View Contract on Base Sepolia Basescan__](https://sepolia.basescan.org/address/0x3A34cd2772324a930756752028000Aec1c108530)
+ */
+export const watchContextRouterUsersCompensatedEvent =
+  /*#__PURE__*/ createWatchContractEvent({
+    abi: contextRouterAbi,
+    address: contextRouterAddress,
+    eventName: 'UsersCompensated',
   })
 
 /**

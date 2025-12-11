@@ -63,10 +63,10 @@ Context is not a text-based chat platform; it is a **Structured Data Marketplace
 
 Context enforces the **MCP 2025-06-18 Structured Output standard** for all paid tools. While `outputSchema` and `structuredContent` are optional in vanilla MCP, Context *requires* them because:
 
-- **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
-- **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
+  - **AI Agent Benefit:** The agent uses your `outputSchema` to write accurate TypeScript code that parses your response correctly.
+  - **Payment Verification:** Our smart contracts can verify that your returned JSON matches your promised schema.
 - **Dispute Resolution:** Schema mismatches can be auto-adjudicated on-chain without manual review.
-- **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
+  - **Result:** You are not just a "Prompt Engineer"; you are a **Data Broker** selling verifiable information on-chain.
 
 > **Terminology:**
 > - **Tool** = The paid marketplace listing (what users see in the sidebar)

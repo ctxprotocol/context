@@ -1930,13 +1930,143 @@ export async function getDisputeById(
 }
 
 /**
+ * Affected user info for slash compensation
+ */
+export type AffectedUser = {
+  odId: string;
+  wallet: string;
+  amountPaid: string;
+  disputeId: string;
+  createdAt: Date;
+  isFirstReporter: boolean;
+};
+
+/**
+ * Get all affected users for a tool dispute (for slashing compensation)
+ * Returns user wallets and amounts paid, sorted by dispute creation time
+ * First reporter is marked for bounty eligibility
+ */
+export async function getAffectedUsersForTool(toolId: string): Promise<{
+  affectedUsers: AffectedUser[];
+  totalRefunds: string;
+  firstReporterWallet: string | null;
+  userCount: number;
+}> {
+  try {
+    // Get all disputes for this tool with user and query info
+    const disputes = await db
+      .select({
+        disputeId: toolReport.id,
+        reporterId: toolReport.reporterId,
+        queryId: toolReport.queryId,
+        createdAt: toolReport.createdAt,
+        verdict: toolReport.verdict,
+      })
+      .from(toolReport)
+      .where(
+        and(
+          eq(toolReport.toolId, toolId),
+          // Only include guilty or pending disputes for compensation
+          // (pending disputes being adjudicated as part of this slash)
+          inArray(toolReport.verdict, ["guilty", "pending", "manual_review"])
+        )
+      )
+      .orderBy(asc(toolReport.createdAt)); // First reporter = first in list
+
+    if (disputes.length === 0) {
+      return {
+        affectedUsers: [],
+        totalRefunds: "0",
+        firstReporterWallet: null,
+        userCount: 0,
+      };
+    }
+
+    // Get user wallets and query amounts for each dispute
+    const affectedUsers: AffectedUser[] = [];
+    let totalRefunds = 0;
+    let firstReporterWallet: string | null = null;
+
+    for (let idx = 0; idx < disputes.length; idx++) {
+      const dispute = disputes[idx];
+      const isFirst = idx === 0;
+
+      // Skip if no queryId
+      if (!dispute.queryId) {
+        console.warn(
+          `[getAffectedUsersForTool] No queryId for dispute ${dispute.disputeId}`
+        );
+        continue;
+      }
+
+      // Get the query to find amount paid
+      const [query] = await db
+        .select({
+          amountPaid: toolQuery.amountPaid,
+        })
+        .from(toolQuery)
+        .where(eq(toolQuery.id, dispute.queryId))
+        .limit(1);
+
+      // Get user wallet
+      const [userData] = await db
+        .select({
+          walletAddress: user.walletAddress,
+        })
+        .from(user)
+        .where(eq(user.id, dispute.reporterId))
+        .limit(1);
+
+      const wallet = userData?.walletAddress;
+      const amountPaid = query?.amountPaid ?? "0";
+
+      // Skip if no wallet (shouldn't happen but safety check)
+      if (!wallet) {
+        console.warn(
+          `[getAffectedUsersForTool] No wallet for user ${dispute.reporterId}`
+        );
+        continue;
+      }
+
+      if (isFirst) {
+        firstReporterWallet = wallet;
+      }
+
+      affectedUsers.push({
+        odId: dispute.reporterId,
+        wallet,
+        amountPaid,
+        disputeId: dispute.disputeId,
+        createdAt: dispute.createdAt,
+        isFirstReporter: isFirst,
+      });
+
+      totalRefunds += Number.parseFloat(amountPaid);
+    }
+
+    return {
+      affectedUsers,
+      totalRefunds: totalRefunds.toFixed(6),
+      firstReporterWallet,
+      userCount: affectedUsers.length,
+    };
+  } catch (error) {
+    console.error("Failed to get affected users for tool:", error);
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get affected users"
+    );
+  }
+}
+
+/**
  * Update dispute verdict (admin action)
  * Handles side effects: increment flags if guilty, soft slash if threshold reached
  */
 export async function updateDisputeVerdict({
   disputeId,
   verdict,
-  adminNotes,
+  adminNotes: _adminNotes, // TODO: Add adminNotes column to schema
 }: {
   disputeId: string;
   verdict: "guilty" | "innocent";

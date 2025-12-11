@@ -66,14 +66,27 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) public toolStakes;
     // Tool ownership: toolId => developer wallet (set on first stake)
     mapping(uint256 => address) public toolDevelopers;
-    // Slashed balance available for claims (goes to platform for redistribution)
-    uint256 public slashedBalance;
     
     // Withdrawal timelock: toolId => timestamp when withdrawal was requested
     // Prevents front-running slashes - must wait WITHDRAWAL_DELAY after requesting
     mapping(uint256 => uint256) public withdrawalRequestTime;
     // 7-day delay between requesting withdrawal and executing it
     uint256 public constant WITHDRAWAL_DELAY = 7 days;
+    
+    // ============================================================
+    // BOUNTY PARAMETERS (Dispute Resolution Incentives)
+    // ============================================================
+    // When a tool is slashed, funds are distributed:
+    // 1. All affected users get full refunds (made whole)
+    // 2. First reporter gets bounty (% of remaining) for finding the fraud
+    // 3. Platform keeps adjudication fee (remainder)
+    //
+    // Example: $2000 stake, 20 users paid $20 each = $400 damages
+    //   - Refunds: $400 (all users made whole)
+    //   - Bounty: 20% of $1600 = $320 (to first reporter)
+    //   - Platform: $1280 (adjudication fee)
+    uint256 public bountyPercent = 20;        // 20% of remaining goes to first reporter
+    uint256 public minimumBounty = 1_000_000; // $1.00 USDC minimum bounty (6 decimals)
     
     // Events
     event QueryPaid(
@@ -96,6 +109,11 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     event StakeWithdrawn(uint256 indexed toolId, address indexed developer, uint256 amount);
     event StakeSlashed(uint256 indexed toolId, address indexed developer, uint256 amount, string reason);
     event StakeParametersUpdated(uint256 minimumStake, uint256 stakeMultiplier);
+    
+    // Dispute resolution events
+    event UsersCompensated(uint256 indexed toolId, uint256 totalRefunded, uint256 userCount);
+    event BountyPaid(uint256 indexed toolId, address indexed firstReporter, uint256 bountyAmount);
+    event BountyParametersUpdated(uint256 bountyPercent, uint256 minimumBounty);
 
     // Modifiers
     modifier onlyOperator() {
@@ -655,44 +673,113 @@ contract ContextRouter is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Admin slashes stake from a fraudulent tool
-     * @dev Only callable by contract owner. Used to penalize scam tools.
-     *      Also resets any pending withdrawal request to prevent escape.
-     * @param toolId The ID of the tool to slash
-     * @param amount The amount of USDC to slash
-     * @param reason Human-readable reason for the slash (stored in event)
+     * @notice Admin slashes stake and compensates ALL affected users + bounty to first reporter
+     * @dev All affected users get full refunds. First reporter gets bonus bounty.
+     *      This function handles the complete dispute resolution in one transaction.
+     *
+     * Distribution logic:
+     * 1. All affected users get refunds (made whole first)
+     * 2. First reporter gets bounty (% of remaining, min $1)
+     * 3. Platform keeps adjudication fee (remainder)
+     *
+     * @param toolId The tool to slash
+     * @param slashAmount Total amount to slash from stake
+     * @param recipients Array of all affected user wallet addresses
+     * @param refundAmounts Array of what each user paid (their refund amount)
+     * @param firstReporter The user who reported first (gets bounty on top of refund)
+     * @param reason Human-readable reason for the slash
      */
-    function slash(uint256 toolId, uint256 amount, string calldata reason) external onlyOwner nonReentrant {
-        require(amount > 0, "Amount must be greater than 0");
-        require(toolStakes[toolId] >= amount, "Insufficient stake to slash");
+    function slashAndCompensateAll(
+        uint256 toolId,
+        uint256 slashAmount,
+        address[] calldata recipients,
+        uint256[] calldata refundAmounts,
+        address firstReporter,
+        string calldata reason
+    ) external onlyOwner nonReentrant {
+        require(slashAmount > 0, "Amount must be > 0");
+        require(toolStakes[toolId] >= slashAmount, "Insufficient stake");
+        require(recipients.length == refundAmounts.length, "Array mismatch");
+        require(recipients.length > 0, "No recipients");
+        require(recipients.length <= 100, "Max 100 recipients per call");
         
         address developer = toolDevelopers[toolId];
         require(developer != address(0), "Tool has no stake");
 
-        // Reset any pending withdrawal request (prevent front-running)
+        // Reset pending withdrawal (prevent front-running)
         if (withdrawalRequestTime[toolId] > 0) {
             withdrawalRequestTime[toolId] = 0;
         }
 
-        // Reduce tool stake
-        toolStakes[toolId] -= amount;
+        // Reduce stake
+        toolStakes[toolId] -= slashAmount;
 
-        // Add to slashed balance (admin can claim and redistribute to affected users)
-        slashedBalance += amount;
+        // ============================================
+        // STEP 1: Refund all affected users (make whole)
+        // ============================================
+        uint256 totalRefunded = 0;
+        for (uint256 i = 0; i < recipients.length; i++) {
+            require(recipients[i] != address(0), "Invalid recipient");
+            require(refundAmounts[i] > 0, "Refund must be > 0");
+            usdc.safeTransfer(recipients[i], refundAmounts[i]);
+            totalRefunded += refundAmounts[i];
+        }
+        
+        // Safety check: refunds can't exceed slash amount
+        require(totalRefunded <= slashAmount, "Refunds exceed slash");
 
-        emit StakeSlashed(toolId, developer, amount, reason);
+        emit UsersCompensated(toolId, totalRefunded, recipients.length);
+
+        // ============================================
+        // STEP 2: Pay bounty to first reporter
+        // ============================================
+        uint256 remaining = slashAmount - totalRefunded;
+        uint256 bounty = 0;
+        
+        if (remaining > 0) {
+            bounty = (remaining * bountyPercent) / 100;
+            
+            // Enforce minimum bounty if there's enough remaining
+            if (bounty < minimumBounty && remaining >= minimumBounty) {
+                bounty = minimumBounty;
+            }
+            
+            // Cap bounty at remaining amount
+            if (bounty > remaining) {
+                bounty = remaining;
+            }
+
+            if (bounty > 0) {
+                usdc.safeTransfer(firstReporter, bounty);
+                emit BountyPaid(toolId, firstReporter, bounty);
+            }
+        }
+
+        // ============================================
+        // STEP 3: Platform gets adjudication fee
+        // ============================================
+        uint256 adjudicationFee = remaining - bounty;
+        if (adjudicationFee > 0) {
+            platformBalance += adjudicationFee;
+        }
+
+        emit StakeSlashed(toolId, developer, slashAmount, reason);
     }
 
     /**
-     * @notice Admin claims slashed funds for redistribution to affected users
-     * @dev Only callable by contract owner
+     * @notice Admin updates bounty parameters for dispute resolution
+     * @dev Only callable by contract owner. Allows tuning incentives.
+     * @param _bountyPercent Percentage of remaining (after refunds) that goes to first reporter
+     * @param _minimumBounty Minimum bounty in USDC (6 decimals), e.g., 1_000_000 = $1.00
      */
-    function claimSlashedFunds() external onlyOwner nonReentrant {
-        uint256 balance = slashedBalance;
-        require(balance > 0, "No slashed funds to claim");
-
-        slashedBalance = 0;
-        usdc.safeTransfer(owner(), balance);
+    function setBountyParameters(
+        uint256 _bountyPercent,
+        uint256 _minimumBounty
+    ) external onlyOwner {
+        require(_bountyPercent <= 50, "Bounty cannot exceed 50%");
+        bountyPercent = _bountyPercent;
+        minimumBounty = _minimumBounty;
+        emit BountyParametersUpdated(_bountyPercent, _minimumBounty);
     }
 
     /**

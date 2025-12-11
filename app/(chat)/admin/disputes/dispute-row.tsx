@@ -147,19 +147,10 @@ export function DisputeRow({ dispute }: DisputeRowProps) {
 
           {/* Hard Slash Button if Guilty and Staked */}
           {dispute.verdict === "guilty" &&
-            // Only if tool has stake (though logic is complicated, we check totalStaked > 0)
-            // We'll pass the amount from somewhere, or default to checking via API.
-            // For now, let's assume we slash everything or a fixed amount?
-            // The prompt example said "Slash Stake" button appears.
-            // We need the stake amount to pre-fill.
-            // dispute.totalStaked is string.
             (Number(dispute.totalStaked || 0) > 0 ? (
               <SlashButton
-                amount={dispute.totalStaked || "0"}
                 contractAddress={contractAddress}
-                disputeId={dispute.id}
-                toolId={dispute.toolId} // Full slash? Or partial? Let's default to full for now or prompt
-                // Actually, Phase 2 spec says "Confirmation modal shows amount".
+                toolId={dispute.toolId}
                 toolName={dispute.toolName}
               />
             ) : (
