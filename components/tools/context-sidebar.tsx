@@ -12,7 +12,6 @@ import {
 } from "react";
 import { useReadContract } from "wagmi";
 // No router needed here; navigation handled elsewhere if needed
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sidebar,
   SidebarContent,
@@ -545,7 +544,8 @@ export function ContextSidebar({
               // No tools at all
               <SidebarGroup>
                 <SidebarGroupContent>
-                  <div className="px-2 text-sidebar-foreground/60 text-sm">
+                  <div className="flex w-full flex-row items-center gap-2 px-2 text-sm text-zinc-500">
+                    {/* <div className="px-2 text-sidebar-foreground/60 text-sm"> */}
                     No tools available yet.
                   </div>
                 </SidebarGroupContent>
@@ -785,16 +785,23 @@ export function ContextSidebar({
               </div>
 
               {/* Tool Count & Cost Summary */}
-              <div className="border-sidebar-border border-t pt-2 -mb-1">
+              <div className="-mb-1 border-sidebar-border border-t pt-2">
                 {loading ? (
-                  <div className="flex flex-row items-center justify-between text-sidebar-foreground/50 h-8">
-                    <Skeleton className="h-7 w-32 pt-2" />
-                    <div className="animate-spin">
+                  <div className="flex h-10 flex-row items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="animate-pulse rounded-md bg-zinc-500/30 text-transparent">
+                        0 tools active
+                      </span>
+                      <span className="animate-pulse rounded-md bg-zinc-500/30 text-sidebar-foreground/50 text-transparent">
+                        $0.00/query
+                      </span>
+                    </div>
+                    <div className="animate-spin text-zinc-500">
                       <LoaderIcon size={16} />
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col justify-center h-8">
+                  <div className="flex h-10 flex-col justify-center">
                     <div>
                       {activeTools.length}{" "}
                       {activeTools.length === 1 ? "tool" : "tools"} active

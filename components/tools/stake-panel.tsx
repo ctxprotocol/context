@@ -1,5 +1,6 @@
 "use client";
 
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import {
   AlertTriangle,
   ArrowDownToLine,
@@ -10,8 +11,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { parseUnits } from "viem";
-import { useReadContract, useWaitForTransactionReceipt } from "wagmi";
+import { encodeFunctionData, type Hex, parseUnits } from "viem";
+import { base } from "viem/chains";
+import { useReadContract } from "wagmi";
 import { toggleToolStatus } from "@/app/(chat)/developer/tools/actions";
 import { LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
@@ -38,12 +40,9 @@ import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
 import { calculateRequiredStake } from "@/lib/constants";
 import {
+  contextRouterAbi,
+  useReadContextRouterGetStake,
   useReadContextRouterGetWithdrawalStatus,
-  useWriteContextRouterCancelWithdrawal,
-  useWriteContextRouterDepositStake,
-  useWriteContextRouterRequestWithdrawal,
-  useWriteContextRouterWithdrawStake,
-  useWriteErc20Approve,
 } from "@/lib/generated";
 import { cn, formatPrice, uuidToUint256 } from "@/lib/utils";
 
@@ -197,76 +196,66 @@ function StakeToolRow({
     "idle" | "approving" | "depositing"
   >("idle");
 
+  // Smart wallet for gas-sponsored transactions
+  const { client: smartWalletClient } = useSmartWallets();
+  const smartWalletAddress = smartWalletClient?.account?.address;
+
   // Contract addresses
   const routerAddress = process.env
     .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 
-  // Contract hooks for staking
-  const {
-    writeContractAsync: depositStakeAsync,
-    isPending: isDepositing,
-    data: depositTxHash,
-  } = useWriteContextRouterDepositStake();
-  const {
-    writeContract: withdrawStake,
-    isPending: isWithdrawing,
-    data: withdrawTxHash,
-  } = useWriteContextRouterWithdrawStake();
+  // Transaction state management (replaces wagmi hooks)
+  const [isDepositing, setIsDepositing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [isRequestingWithdrawal, setIsRequestingWithdrawal] = useState(false);
+  const [isCancellingWithdrawal, setIsCancellingWithdrawal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
-  // Withdrawal timelock hooks (7-day delay)
-  const {
-    writeContractAsync: requestWithdrawalAsync,
-    isPending: isRequestingWithdrawal,
-    data: requestWithdrawalTxHash,
-  } = useWriteContextRouterRequestWithdrawal();
-  const {
-    writeContractAsync: cancelWithdrawalAsync,
-    isPending: isCancellingWithdrawal,
-  } = useWriteContextRouterCancelWithdrawal();
+  // Track successful transactions for effects
+  const [depositSuccess, setDepositSuccess] = useState(false);
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [requestWithdrawalSuccess, setRequestWithdrawalSuccess] =
+    useState(false);
 
-  // USDC approval hook
-  const {
-    writeContractAsync: approveUsdcAsync,
-    isPending: isApproving,
-    data: approveTxHash,
-  } = useWriteErc20Approve();
-
-  // Wait for transaction confirmations
-  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } =
-    useWaitForTransactionReceipt({ hash: approveTxHash });
-  const { isLoading: isDepositConfirming, isSuccess: isDepositSuccess } =
-    useWaitForTransactionReceipt({ hash: depositTxHash });
-  const { isLoading: isWithdrawConfirming, isSuccess: isWithdrawSuccess } =
-    useWaitForTransactionReceipt({ hash: withdrawTxHash });
-  const {
-    isLoading: isRequestWithdrawalConfirming,
-    isSuccess: isRequestWithdrawalSuccess,
-  } = useWaitForTransactionReceipt({ hash: requestWithdrawalTxHash });
-
-  // Check current USDC allowance for the router
+  // Check current USDC allowance for the router (use smart wallet address)
+  const allowanceCheckAddress = smartWalletAddress || walletAddress;
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract(
     {
       address: usdcAddress,
       abi: ERC20_ABI,
       functionName: "allowance",
-      args: walletAddress
-        ? [walletAddress as `0x${string}`, routerAddress]
+      args: allowanceCheckAddress
+        ? [allowanceCheckAddress as `0x${string}`, routerAddress]
         : undefined,
       query: {
-        enabled: Boolean(walletAddress && routerAddress && usdcAddress),
+        enabled: Boolean(allowanceCheckAddress && routerAddress && usdcAddress),
       },
     }
   );
 
+  // Tool ID for contract calls (collision-free UUID conversion)
+  const toolIdBigInt = uuidToUint256(tool.id);
+
+  // Read stake amount directly from contract (source of truth)
+  const { data: onChainStake, refetch: refetchStake } =
+    useReadContextRouterGetStake({
+      args: [toolIdBigInt],
+      query: {
+        enabled: Boolean(routerAddress),
+      },
+    });
+
+  // Use on-chain stake if available, otherwise fall back to prop value
   const price = Number.parseFloat(tool.pricePerQuery) || 0;
-  const staked = Number.parseFloat(tool.totalStaked ?? "0") || 0;
+  const stakedFromProp = Number.parseFloat(tool.totalStaked ?? "0") || 0;
+  const stakedFromChain = onChainStake
+    ? Number(onChainStake) / 1_000_000
+    : null; // USDC has 6 decimals
+  const staked = stakedFromChain ?? stakedFromProp;
   const required = calculateRequiredStake(price);
   const hasEnough = staked >= required;
   const shortfall = Math.max(0, required - staked);
-
-  // Tool ID for contract calls (collision-free UUID conversion)
-  const toolIdBigInt = uuidToUint256(tool.id);
 
   // Read withdrawal timelock status from contract (7-day delay)
   const { data: withdrawalStatus, refetch: refetchWithdrawalStatus } =
@@ -289,13 +278,19 @@ function StakeToolRow({
 
   // Calculate time remaining for pending withdrawal
   const getTimeRemaining = () => {
-    if (!hasPendingWithdrawal || canWithdrawNow) return null;
+    if (!hasPendingWithdrawal || canWithdrawNow) {
+      return null;
+    }
     const now = Math.floor(Date.now() / 1000);
     const remaining = withdrawalAvailableAt - now;
-    if (remaining <= 0) return null;
+    if (remaining <= 0) {
+      return null;
+    }
     const days = Math.floor(remaining / 86_400);
     const hours = Math.floor((remaining % 86_400) / 3600);
-    if (days > 0) return `${days}d ${hours}h`;
+    if (days > 0) {
+      return `${days}d ${hours}h`;
+    }
     const minutes = Math.floor((remaining % 3600) / 60);
     return `${hours}h ${minutes}m`;
   };
@@ -306,6 +301,11 @@ function StakeToolRow({
       return;
     }
 
+    if (!smartWalletClient) {
+      toast.error("Smart wallet not ready. Please try again.");
+      return;
+    }
+
     const amount = Number.parseFloat(depositAmount);
     if (Number.isNaN(amount) || amount <= 0) {
       toast.error("Enter a valid amount");
@@ -313,8 +313,8 @@ function StakeToolRow({
     }
 
     try {
+      setIsDepositing(true);
       const amountInUsdc = parseUnits(depositAmount, 6); // USDC has 6 decimals
-      const toolIdBigInt = uuidToUint256(tool.id);
 
       // Check if we need approval first
       const currentAllowanceNum = currentAllowance
@@ -322,33 +322,54 @@ function StakeToolRow({
         : BigInt(0);
 
       if (currentAllowanceNum < amountInUsdc) {
-        // Need to approve first
+        // Need to approve first - use smart wallet for gas sponsorship
         setApprovalStatus("approving");
+        setIsApproving(true);
         toast.info("Approving USDC spend...");
 
-        await approveUsdcAsync({
-          address: usdcAddress,
+        const approveData = encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: "approve",
           args: [routerAddress, amountInUsdc],
         });
 
-        // Wait for approval to be confirmed
+        await smartWalletClient.sendTransaction({
+          chain: base,
+          to: usdcAddress,
+          data: approveData as Hex,
+          value: BigInt(0),
+        });
+
+        setIsApproving(false);
         toast.success("USDC approved! Now depositing stake...");
         await refetchAllowance();
       }
 
-      // Now deposit
+      // Now deposit via smart wallet
       setApprovalStatus("depositing");
-      await depositStakeAsync({
+      const depositData = encodeFunctionData({
+        abi: contextRouterAbi,
+        functionName: "depositStake",
         args: [toolIdBigInt, amountInUsdc],
       });
+
+      await smartWalletClient.sendTransaction({
+        chain: base,
+        to: routerAddress,
+        data: depositData as Hex,
+        value: BigInt(0),
+      });
+
       toast.success("Deposit transaction submitted!");
+      setDepositSuccess(true);
     } catch (error) {
       console.error("Deposit failed:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to deposit stake";
       if (
         errorMessage.includes("User rejected") ||
-        errorMessage.includes("user rejected")
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("denied")
       ) {
         toast.error("Transaction cancelled");
       } else {
@@ -356,54 +377,106 @@ function StakeToolRow({
       }
     } finally {
       setApprovalStatus("idle");
+      setIsDepositing(false);
+      setIsApproving(false);
     }
   };
 
-  // Request withdrawal (starts 7-day timer)
+  // Request withdrawal (starts 7-day timer) - via smart wallet
   const handleRequestWithdrawal = async () => {
     if (!isConnected) {
       toast.error("Connect your wallet to request withdrawal");
       return;
     }
 
+    if (!smartWalletClient) {
+      toast.error("Smart wallet not ready. Please try again.");
+      return;
+    }
+
     try {
-      await requestWithdrawalAsync({
+      setIsRequestingWithdrawal(true);
+
+      const requestWithdrawalData = encodeFunctionData({
+        abi: contextRouterAbi,
+        functionName: "requestWithdrawal",
         args: [toolIdBigInt],
       });
+
+      await smartWalletClient.sendTransaction({
+        chain: base,
+        to: routerAddress,
+        data: requestWithdrawalData as Hex,
+        value: BigInt(0),
+      });
+
       toast.success("Withdrawal requested! 7-day timer started.");
+      setRequestWithdrawalSuccess(true);
     } catch (error) {
       console.error("Request withdrawal failed:", error);
       const msg =
         error instanceof Error ? error.message : "Failed to request withdrawal";
-      if (msg.includes("User rejected") || msg.includes("user rejected")) {
+      if (
+        msg.includes("User rejected") ||
+        msg.includes("user rejected") ||
+        msg.includes("denied")
+      ) {
         toast.error("Transaction cancelled");
       } else {
         toast.error(msg);
       }
+    } finally {
+      setIsRequestingWithdrawal(false);
     }
   };
 
-  // Cancel pending withdrawal
+  // Cancel pending withdrawal - via smart wallet
   const handleCancelWithdrawal = async () => {
-    if (!isConnected) return;
+    if (!isConnected) {
+      return;
+    }
+
+    if (!smartWalletClient) {
+      toast.error("Smart wallet not ready. Please try again.");
+      return;
+    }
 
     try {
-      await cancelWithdrawalAsync({
+      setIsCancellingWithdrawal(true);
+
+      const cancelWithdrawalData = encodeFunctionData({
+        abi: contextRouterAbi,
+        functionName: "cancelWithdrawal",
         args: [toolIdBigInt],
       });
+
+      await smartWalletClient.sendTransaction({
+        chain: base,
+        to: routerAddress,
+        data: cancelWithdrawalData as Hex,
+        value: BigInt(0),
+      });
+
       toast.success("Withdrawal request cancelled");
     } catch (error) {
       console.error("Cancel withdrawal failed:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to cancel withdrawal"
       );
+    } finally {
+      setIsCancellingWithdrawal(false);
     }
   };
 
-  // Execute withdrawal (only after 7-day delay)
+  // Execute withdrawal (only after 7-day delay) - via smart wallet
   const handleWithdraw = async () => {
     if (!isConnected) {
       toast.error("Connect your wallet to withdraw stake");
+      return;
+    }
+
+    if (!smartWalletClient) {
+      toast.error("Smart wallet not ready. Please try again.");
       return;
     }
 
@@ -424,24 +497,38 @@ function StakeToolRow({
     }
 
     try {
+      setIsWithdrawing(true);
       const amountInUsdc = parseUnits(withdrawAmount, 6); // USDC has 6 decimals
 
-      withdrawStake({
+      const withdrawStakeData = encodeFunctionData({
+        abi: contextRouterAbi,
+        functionName: "withdrawStake",
         args: [toolIdBigInt, amountInUsdc],
       });
+
+      await smartWalletClient.sendTransaction({
+        chain: base,
+        to: routerAddress,
+        data: withdrawStakeData as Hex,
+        value: BigInt(0),
+      });
+
       toast.success("Withdrawal transaction submitted!");
+      setWithdrawSuccess(true);
     } catch (error) {
       console.error("Withdrawal failed:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to withdraw stake"
       );
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
   // Close dialogs and reset on successful transactions (properly in useEffect)
   // Also immediately activate tool if stake now meets requirement
   useEffect(() => {
-    if (isDepositSuccess && isDepositOpen) {
+    if (depositSuccess && isDepositOpen) {
       // Calculate if stake now meets requirement BEFORE clearing the amount
       // Use the deposit amount to estimate new stake (on-chain will be authoritative)
       const depositedAmount = Number.parseFloat(depositAmount) || 0;
@@ -450,7 +537,11 @@ function StakeToolRow({
 
       setIsDepositOpen(false);
       setDepositAmount("");
+      setDepositSuccess(false);
       toast.success("Stake deposited successfully!");
+
+      // Refetch the on-chain stake to update the UI immediately
+      refetchStake();
 
       // Protocol Ledger: Track stake deposit (developer economic commitment)
       trackEngagement({
@@ -477,29 +568,34 @@ function StakeToolRow({
       }
     }
   }, [
-    isDepositSuccess,
+    depositSuccess,
     isDepositOpen,
     depositAmount,
     staked,
     required,
     tool.isActive,
     tool.id,
+    refetchStake,
   ]);
 
   useEffect(() => {
-    if (isWithdrawSuccess && isWithdrawOpen) {
+    if (withdrawSuccess && isWithdrawOpen) {
       setIsWithdrawOpen(false);
       setWithdrawAmount("");
+      setWithdrawSuccess(false);
       toast.success("Stake withdrawn successfully!");
+      // Refetch both stake and withdrawal status
+      refetchStake();
       refetchWithdrawalStatus();
     }
-  }, [isWithdrawSuccess, isWithdrawOpen, refetchWithdrawalStatus]);
+  }, [withdrawSuccess, isWithdrawOpen, refetchStake, refetchWithdrawalStatus]);
 
   // Handle successful withdrawal request - immediately deactivate tool
   // This prevents the tool from being used during the 7-day withdrawal period
   useEffect(() => {
-    if (isRequestWithdrawalSuccess) {
+    if (requestWithdrawalSuccess) {
       refetchWithdrawalStatus();
+      setRequestWithdrawalSuccess(false);
 
       // Immediately deactivate the tool when withdrawal is requested
       // The cron will also catch this, but this provides instant action
@@ -515,23 +611,19 @@ function StakeToolRow({
       }
     }
   }, [
-    isRequestWithdrawalSuccess,
+    requestWithdrawalSuccess,
     refetchWithdrawalStatus,
     tool.isActive,
     tool.id,
   ]);
 
   const isDepositBusy =
-    isDepositing ||
-    isDepositConfirming ||
-    isApproving ||
-    isApproveConfirming ||
-    approvalStatus !== "idle";
-  const isWithdrawBusy = isWithdrawing || isWithdrawConfirming;
-  const isRequestBusy =
-    isRequestingWithdrawal ||
-    isRequestWithdrawalConfirming ||
-    isCancellingWithdrawal;
+    isDepositing || isApproving || approvalStatus !== "idle";
+  const isWithdrawBusy = isWithdrawing;
+  const isRequestBusy = isRequestingWithdrawal || isCancellingWithdrawal;
+
+  // Check if smart wallet is ready
+  const isSmartWalletReady = Boolean(smartWalletClient?.account);
 
   return (
     <div className="flex items-center justify-between rounded-lg border p-3">
@@ -608,25 +700,25 @@ function StakeToolRow({
             </div>
             <DialogFooter>
               <Button
-                disabled={isDepositBusy}
+                disabled={isDepositBusy || !isSmartWalletReady}
                 onClick={handleDeposit}
                 type="button"
               >
-                {isDepositBusy ? (
-                  <>
-                    <span className="animate-spin">
-                      <LoaderIcon size={16} />
-                    </span>
-                    {approvalStatus === "approving" ||
-                    isApproving ||
-                    isApproveConfirming
-                      ? "Approving USDC..."
-                      : isDepositConfirming
-                        ? "Confirming..."
+                {isSmartWalletReady ? (
+                  isDepositBusy ? (
+                    <>
+                      <span className="animate-spin">
+                        <LoaderIcon size={16} />
+                      </span>
+                      {approvalStatus === "approving" || isApproving
+                        ? "Approving USDC..."
                         : "Depositing..."}
-                  </>
+                    </>
+                  ) : (
+                    "Deposit USDC"
+                  )
                 ) : (
-                  "Deposit USDC"
+                  "Preparing wallet..."
                 )}
               </Button>
             </DialogFooter>
@@ -779,9 +871,7 @@ function StakeToolRow({
                       <span className="animate-spin">
                         <LoaderIcon size={16} />
                       </span>
-                      {isWithdrawConfirming
-                        ? "Confirming..."
-                        : "Withdrawing..."}
+                      Withdrawing...
                     </>
                   ) : (
                     "Withdraw USDC"
