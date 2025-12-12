@@ -203,9 +203,9 @@ Agent tips:
             </div>
           </div>
 
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
-            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-            <div className="space-y-1 text-amber-600/90 text-xs">
+          <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 dark:bg-amber-500/15">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="space-y-1 text-amber-600/90 text-xs dark:text-amber-500/90">
               <p className="leading-relaxed">
                 Stake <strong>$10.00 USDC (minimum stake)</strong> from your
                 smart wallet after submission. Your tool will auto-activate once

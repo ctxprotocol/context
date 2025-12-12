@@ -609,7 +609,7 @@ export function ContextSidebar({
             <div className="flex flex-col gap-1.5 px-2 py-2 text-sidebar-foreground/50 text-xs">
               {/* Full Agentic Mode Indicator */}
               {isFullAgenticMode && (
-                <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1.5 text-amber-600 dark:bg-amber-500/15 dark:text-amber-500">
                   <ZapIcon className="size-3.5" />
                   <span className="font-medium">Full Agentic Mode</span>
                 </div>
@@ -619,7 +619,9 @@ export function ContextSidebar({
               <div className="flex items-center justify-between py-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help">Auto Pay</span>
+                    <span className="cursor-help text-sidebar-foreground/70">
+                      Auto Pay
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent align="start" className="max-w-[220px]">
                     Pre-authorize payments up to a spending cap. No signing
@@ -691,7 +693,7 @@ export function ContextSidebar({
                     <span className="text-[10px] text-sidebar-foreground/60">
                       Budget
                     </span>
-                    <span className="font-mono text-[10px]">
+                    <span className="font-mono text-[10px] text-sidebar-foreground/70">
                       ${formatPrice(spentAmount)} / ${formatPrice(spendingCap)}
                     </span>
                   </div>
@@ -719,7 +721,10 @@ export function ContextSidebar({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
-                      className={cn("cursor-help", !isAutoPay && "opacity-50")}
+                      className={cn(
+                        "cursor-help text-sidebar-foreground/70",
+                        !isAutoPay && "text-sidebar-foreground/40"
+                      )}
                     >
                       Auto Mode
                     </span>
@@ -759,7 +764,9 @@ export function ContextSidebar({
               <div className="flex items-center justify-between py-1">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className="cursor-help">Developer Mode</span>
+                    <span className="cursor-help text-sidebar-foreground/70">
+                      Developer Mode
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent align="start" className="max-w-[220px]">
                     Show detailed tool execution logs and debug information.
@@ -789,20 +796,20 @@ export function ContextSidebar({
                 {loading ? (
                   <div className="flex h-10 flex-row items-center justify-between">
                     <div className="flex flex-col gap-1">
-                      <span className="animate-pulse rounded-md bg-zinc-500/30 text-transparent">
+                      <span className="animate-pulse rounded-md bg-sidebar-accent text-transparent">
                         0 tools active
                       </span>
-                      <span className="animate-pulse rounded-md bg-zinc-500/30 text-sidebar-foreground/50 text-transparent">
+                      <span className="animate-pulse rounded-md bg-sidebar-accent text-transparent">
                         $0.00/query
                       </span>
                     </div>
-                    <div className="animate-spin text-zinc-500">
+                    <div className="animate-spin text-sidebar-foreground/50">
                       <LoaderIcon size={16} />
                     </div>
                   </div>
                 ) : (
                   <div className="flex h-10 flex-col justify-center">
-                    <div>
+                    <div className="text-sidebar-foreground/70">
                       {activeTools.length}{" "}
                       {activeTools.length === 1 ? "tool" : "tools"} active
                     </div>

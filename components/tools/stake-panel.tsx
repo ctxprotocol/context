@@ -115,7 +115,7 @@ export function StakePanel({ tools }: StakePanelProps) {
           </div>
           {hasUnderstakedTools && (
             <Badge
-              className="gap-1 bg-amber-500/10 text-amber-600"
+              className="gap-1 bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-500"
               variant="outline"
             >
               <AlertTriangle className="size-3" />
@@ -136,8 +136,8 @@ export function StakePanel({ tools }: StakePanelProps) {
               className={cn(
                 "font-bold text-lg",
                 totalStaked < totalRequired
-                  ? "text-amber-600"
-                  : "text-emerald-600"
+                  ? "text-amber-600 dark:text-amber-500"
+                  : "text-emerald-600 dark:text-emerald-400"
               )}
             >
               ${formatPrice(totalRequired)}
@@ -646,7 +646,7 @@ function StakeToolRow({
             <Tooltip>
               <TooltipTrigger>
                 <Badge
-                  className="gap-1 bg-amber-500/10 text-amber-600"
+                  className="gap-1 bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-500"
                   variant="outline"
                 >
                   <AlertTriangle className="size-3" />
@@ -751,23 +751,27 @@ function StakeToolRow({
               {hasPendingWithdrawal && (
                 <div
                   className={cn(
-                    "flex items-center gap-3 rounded-lg border p-3",
+                    "flex items-center gap-3 rounded-lg p-3",
                     canWithdrawNow
-                      ? "border-emerald-500/30 bg-emerald-500/10"
-                      : "border-amber-500/30 bg-amber-500/10"
+                      ? "bg-emerald-500/10 dark:bg-emerald-500/15"
+                      : "bg-amber-500/10 dark:bg-amber-500/15"
                   )}
                 >
                   <Clock
                     className={cn(
                       "size-5 shrink-0",
-                      canWithdrawNow ? "text-emerald-600" : "text-amber-600"
+                      canWithdrawNow
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-amber-600 dark:text-amber-500"
                     )}
                   />
                   <div className="flex-1">
                     <p
                       className={cn(
                         "font-medium text-sm",
-                        canWithdrawNow ? "text-emerald-700" : "text-amber-700"
+                        canWithdrawNow
+                          ? "text-emerald-700 dark:text-emerald-300"
+                          : "text-amber-700 dark:text-amber-400"
                       )}
                     >
                       {canWithdrawNow
@@ -778,8 +782,8 @@ function StakeToolRow({
                       className={cn(
                         "text-xs",
                         canWithdrawNow
-                          ? "text-emerald-600/80"
-                          : "text-amber-600/80"
+                          ? "text-emerald-600/80 dark:text-emerald-400/80"
+                          : "text-amber-600/80 dark:text-amber-500/80"
                       )}
                     >
                       {canWithdrawNow

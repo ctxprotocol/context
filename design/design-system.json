@@ -147,7 +147,9 @@
           "sidebar-accent": "hsl(240 3.7% 15.9%)",
           "sidebar-accent-foreground": "hsl(240 4.8% 95.9%)",
           "sidebar-border": "hsl(240 3.7% 15.9%)",
-          "sidebar-ring": "hsl(217.2 91.2% 59.8%)"
+          "sidebar-ring": "hsl(217.2 91.2% 59.8%)",
+          "sidebar-indicator": "hsl(38 92% 50% / 0.15)",
+          "sidebar-indicator-foreground": "hsl(43 96% 56%)"
         }
       },
       "usage": {
@@ -204,7 +206,29 @@
           "fg": "text-sidebar-foreground",
           "accent": "bg-sidebar-accent text-sidebar-accent-foreground",
           "primary": "bg-sidebar-primary text-sidebar-primary-foreground",
-          "ring": "ring-sidebar-ring"
+          "ring": "ring-sidebar-ring",
+          "indicator": {
+            "description": "Amber accent for attention states like Full Agentic Mode. Uses Tailwind amber-500 for both modes (consistent appearance).",
+            "bg": "bg-amber-500/10 dark:bg-amber-500/15",
+            "fg": "text-amber-600 dark:text-amber-500",
+            "usage": "Full Agentic Mode indicator, badges, and attention callouts (no border)"
+          },
+          "textHierarchy": {
+            "primary": "text-sidebar-foreground/70 (labels, active counts)",
+            "secondary": "text-sidebar-foreground/50 (descriptions, muted info)",
+            "tertiary": "text-sidebar-foreground/60 (small labels like 'Budget', 'Spending Cap')",
+            "disabled": "text-sidebar-foreground/40 (disabled or inactive states)"
+          },
+          "footer": {
+            "container": "text-sidebar-foreground/50 text-xs (base for inheritance)",
+            "toggleLabels": "text-sidebar-foreground/70 cursor-help",
+            "toggleLabelDisabled": "text-sidebar-foreground/40",
+            "descriptions": "text-sidebar-foreground/50 text-[10px] leading-tight",
+            "attentionIndicator": "bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-500 (Full Agentic Mode - no border)",
+            "summaryPrimary": "text-sidebar-foreground/70 (tool counts, primary stats)",
+            "summarySecondary": "text-sidebar-foreground/50 (cost per query, secondary stats)",
+            "skeletons": "bg-sidebar-accent (loading placeholders)"
+          }
         }
       }
     },
@@ -372,15 +396,16 @@
       }
     },
     "InlineWarning": {
-      "base": "flex items-start gap-2 rounded-md border p-2",
+      "base": "flex items-start gap-2 rounded-md p-2",
       "variants": {
         "amber": {
-          "container": "border-amber-500/30 bg-amber-500/10",
-          "icon": "mt-0.5 size-3.5 shrink-0 text-amber-600",
-          "text": "text-xs text-amber-600/90 leading-relaxed"
+          "container": "bg-amber-500/10 dark:bg-amber-500/15",
+          "icon": "mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-500",
+          "text": "text-xs text-amber-600/90 leading-relaxed dark:text-amber-500/90",
+          "code": "rounded bg-amber-600/20 px-1 dark:bg-amber-500/20"
         }
       },
-      "usage": "Use for inline warnings that require user attention but block a specific action (like staking). Use Shield icon for security/trust related warnings."
+      "usage": "Use for inline warnings that require user attention but block a specific action (like staking, missing schema). No border for cleaner look. Use Shield icon for security/trust related warnings."
     }
   },
   "patterns": {
@@ -400,7 +425,10 @@
       "Respect spacing defaults (p-6 on surfaces, gap-2 for icon+label)",
       "Use 'text-muted-foreground' for supporting text to create hierarchy",
       "Use 'shadow-sm' on borders to add subtle depth, but avoid heavy shadows",
-      "Let button's gap-2 handle icon spacing - just use size-4 on icons"
+      "Let button's gap-2 handle icon spacing - just use size-4 on icons",
+      "Use 'text-sidebar-foreground' with opacity variants (/70, /50, /40) for all sidebar text hierarchy",
+      "Use 'bg-sidebar-accent' for sidebar skeletons and neutral highlighted states",
+      "Use amber pattern for warnings/attention: bg-amber-500/10 dark:bg-amber-500/15 text-amber-600 dark:text-amber-500 (no borders, consistent across themes)"
     ],
     "doNot": [
       "Introduce new brand colors or gradients outside tokens",
@@ -409,7 +437,8 @@
       "Mix radii styles inconsistently (e.g., rounded-full on inputs)",
       "Override tokens with hardcoded hex values for core roles",
       "Use non-semantic ARIA roles or invalid aria-* attributes",
-      "Use mr-2/ml-2 on icons inside buttons (gap-2 handles spacing)"
+      "Use mr-2/ml-2 on icons inside buttons (gap-2 handles spacing)",
+      "Use hardcoded colors like bg-zinc-500 in sidebars - use sidebar-foreground tokens for text hierarchy"
     ]
   }
 }

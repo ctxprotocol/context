@@ -243,9 +243,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 className={cn(
                   "gap-1",
                   successRate >= 95
-                    ? "bg-emerald-500/10 text-emerald-600"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400"
                     : successRate >= 80
-                      ? "bg-amber-500/10 text-amber-600"
+                      ? "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-500"
                       : "bg-destructive/10 text-destructive"
                 )}
                 variant="outline"
@@ -264,8 +264,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 className={cn(
                   "gap-1",
                   hasRequiredStake
-                    ? "bg-blue-500/10 text-blue-600"
-                    : "bg-amber-500/10 text-amber-600"
+                    ? "bg-blue-500/10 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400"
+                    : "bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-500"
                 )}
                 variant="outline"
               >
@@ -296,9 +296,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
         {/* Staking Warning - ALL tools require stake */}
         {!hasRequiredStake && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
-            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-            <p className="text-amber-600/90 text-xs leading-relaxed">
+          <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 dark:bg-amber-500/15">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <p className="text-amber-600/90 text-xs leading-relaxed dark:text-amber-500/90">
               This tool requires <strong>${requiredStake.toFixed(2)}</strong>{" "}
               stake to activate. Deposit stake to make your tool visible in the
               marketplace.
@@ -308,15 +308,15 @@ export function ToolCard({ tool }: { tool: Tool }) {
 
         {/* Missing outputSchema Warning */}
         {hasMissingSchema && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2">
-            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
-            <div className="text-amber-600/90 text-xs leading-relaxed">
+          <div className="flex items-start gap-2 rounded-md bg-amber-500/10 p-2 dark:bg-amber-500/15">
+            <Shield className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-500" />
+            <div className="text-amber-600/90 text-xs leading-relaxed dark:text-amber-500/90">
               <p>
                 {skillsWithoutOutputSchema.length === 1 ? (
                   <>
                     Skill <strong>{skillsWithoutOutputSchema[0].name}</strong>{" "}
                     is missing{" "}
-                    <code className="rounded bg-amber-600/20 px-1">
+                    <code className="rounded bg-amber-600/20 px-1 dark:bg-amber-500/20">
                       outputSchema
                     </code>
                     .
@@ -324,7 +324,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                 ) : (
                   <>
                     {skillsWithoutOutputSchema.length} skills are missing{" "}
-                    <code className="rounded bg-amber-600/20 px-1">
+                    <code className="rounded bg-amber-600/20 px-1 dark:bg-amber-500/20">
                       outputSchema
                     </code>
                     .
@@ -468,7 +468,9 @@ export function ToolCard({ tool }: { tool: Tool }) {
                       id="edit-description"
                       maxLength={DESCRIPTION_MAX_LENGTH}
                       name="description"
-                      onChange={(e) => setDescriptionLength(e.target.value.length)}
+                      onChange={(e) =>
+                        setDescriptionLength(e.target.value.length)
+                      }
                       rows={5}
                     />
                     {editState.fieldErrors?.description && (
@@ -489,7 +491,8 @@ export function ToolCard({ tool }: { tool: Tool }) {
                             : "text-sidebar-foreground/50"
                         )}
                       >
-                        {descriptionLength.toLocaleString()}/{DESCRIPTION_MAX_LENGTH.toLocaleString()}
+                        {descriptionLength.toLocaleString()}/
+                        {DESCRIPTION_MAX_LENGTH.toLocaleString()}
                       </span>
                     </div>
                   </div>
