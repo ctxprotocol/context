@@ -53,3 +53,4 @@ CREATE INDEX IF NOT EXISTS idx_engagement_created_at ON "EngagementEvent"(create
 COMMENT ON TABLE "EngagementEvent" IS 'Protocol Ledger: Tracks user engagement events for retroactive TGE allocation (Hyperliquid Path)';
 COMMENT ON COLUMN "EngagementEvent"."event_type" IS 'Categorized action type: MARKETPLACE_SEARCH, TOOL_VIEW, WALLET_CONNECTED, USDC_APPROVED, TOOL_CREATED, TOOL_STAKED, REFERRAL_LINK_CREATED, REFERRAL_CONVERTED';
 COMMENT ON COLUMN "EngagementEvent"."metadata" IS 'Event-specific context data (search queries, referrer IDs, etc.)';
+

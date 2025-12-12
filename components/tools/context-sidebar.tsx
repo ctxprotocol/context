@@ -785,10 +785,10 @@ export function ContextSidebar({
               </div>
 
               {/* Tool Count & Cost Summary */}
-              <div className="border-sidebar-border border-t pt-1.5">
+              <div className="border-sidebar-border border-t pt-2 -mb-1">
                 {loading ? (
                   <div className="flex flex-row items-center justify-between text-sidebar-foreground/50 h-8">
-                    <Skeleton className="h-7 w-32" />
+                    <Skeleton className="h-7 w-32 pt-2" />
                     <div className="animate-spin">
                       <LoaderIcon size={16} />
                     </div>
