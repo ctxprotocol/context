@@ -792,7 +792,7 @@ export function ContextSidebar({
               </div>
 
               {/* Tool Count & Cost Summary */}
-              <div className="-mb-1 border-sidebar-border border-t pt-2">
+              <div className="-mb-1.5 border-sidebar-border border-t pt-2">
                 {loading ? (
                   <div className="flex h-10 flex-row items-center justify-between">
                     <div className="flex flex-col gap-1">
