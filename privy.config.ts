@@ -1,6 +1,6 @@
 // privy.config.ts
 import type { PrivyClientConfig } from "@privy-io/react-auth";
-import { base, mainnet } from "viem/chains";
+import { base, mainnet, polygon } from "viem/chains";
 
 export const privyConfig: PrivyClientConfig = {
   // Embedded wallet configuration
@@ -15,17 +15,19 @@ export const privyConfig: PrivyClientConfig = {
     // - Auto Pay OFF: Show confirmation popup (default behavior)
     // - Auto Pay ON: Pass { showWalletUIs: false } to auto-sign
   },
-  // Supported chains - must match wagmi config
-  // We transact only on Base, but Privy may use mainnet for
-  // wallet auth/SiWE. Keep wagmi on Base-only.
-  supportedChains: [base, mainnet],
-  // Login methods - NO external wallets (they can't auto-sign)
+  // Supported chains for Privy wallet recognition
+  // - Base: Where we transact (tool payments)
+  // - Mainnet: For wallet auth/SiWE
+  // - Polygon: For reading Polymarket positions (no transactions, just portfolio context)
+  // NOTE: wagmi.config.ts stays Base-only for actual transactions
+  supportedChains: [base, mainnet, polygon],
+  // Login methods - NO external wallets for login (they can't auto-sign)
   // Users authenticate with email/social, get embedded wallet automatically
+  // But we DO allow LINKING external wallets for portfolio context (read-only)
   loginMethods: ["email", "google", "github"],
   // Appearance
   appearance: {
     showWalletLoginFirst: false,
-    // No external wallets - embedded only for Auto Pay support
   },
 };
 

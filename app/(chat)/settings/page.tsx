@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ApiKeysSection } from "./api-keys";
+import { LinkedWalletsSection } from "./linked-wallets";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
@@ -34,12 +35,16 @@ export default async function SettingsPage() {
         <div className="space-y-2 text-center">
           <h1 className="font-semibold text-3xl tracking-tight">Settings</h1>
           <p className="mx-auto max-w-lg text-muted-foreground text-sm">
-            Manage your API keys and model cost preferences.
+            Manage your API keys, model preferences, and portfolio wallets.
           </p>
         </div>
 
         <Suspense fallback={<SettingsSkeleton />}>
           <SettingsForm />
+        </Suspense>
+
+        <Suspense fallback={<SettingsSkeleton />}>
+          <LinkedWalletsSection />
         </Suspense>
 
         <Suspense fallback={<SettingsSkeleton />}>
