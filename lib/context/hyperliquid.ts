@@ -13,7 +13,7 @@ import type {
   HyperliquidOrder,
   HyperliquidSpotBalance,
   HyperliquidAccountSummary,
-} from "./index";
+} from "@ctxprotocol/sdk";
 
 const HL_API_URL = "https://api.hyperliquid.xyz/info";
 

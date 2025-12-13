@@ -11,7 +11,7 @@ import type {
   PolymarketContext,
   PolymarketPosition,
   PolymarketOrder,
-} from "./index";
+} from "@ctxprotocol/sdk";
 
 const CLOB_API_URL = "https://clob.polymarket.com";
 
