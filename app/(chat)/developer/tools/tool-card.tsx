@@ -28,7 +28,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { calculateRequiredStake } from "@/lib/constants";
-import { cn, formatPrice } from "@/lib/utils";
+import { useReadContextRouterGetStake } from "@/lib/generated";
+import { cn, formatPrice, uuidToUint256 } from "@/lib/utils";
 import {
   type EditToolState,
   editTool,
@@ -114,13 +115,30 @@ export function ToolCard({ tool }: { tool: Tool }) {
   // Trust metrics
   const successRate = Number.parseFloat(tool.successRate ?? "100");
   const uptimePercent = Number.parseFloat(tool.uptimePercent ?? "100");
-  const totalStaked = Number.parseFloat(tool.totalStaked ?? "0");
   const priceValue = Number.parseFloat(tool.pricePerQuery) || 0;
   const isProven = isToolProven(
     tool.totalQueries,
     tool.successRate,
     tool.uptimePercent
   );
+
+  // Read stake directly from contract (source of truth) instead of stale DB value
+  const toolIdBigInt = uuidToUint256(tool.id);
+  const routerAddress = process.env
+    .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
+  const { data: onChainStake } = useReadContextRouterGetStake({
+    args: [toolIdBigInt],
+    query: {
+      enabled: Boolean(routerAddress),
+    },
+  });
+
+  // Use on-chain stake if available, otherwise fall back to database value
+  const stakedFromDb = Number.parseFloat(tool.totalStaked ?? "0");
+  const stakedFromChain = onChainStake
+    ? Number(onChainStake) / 1_000_000
+    : null; // USDC has 6 decimals
+  const totalStaked = stakedFromChain ?? stakedFromDb;
 
   // Staking requirements - ALL tools require staking (minimum $1 or 100x price)
   const requiredStake = calculateRequiredStake(priceValue);

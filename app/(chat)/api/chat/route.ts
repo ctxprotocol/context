@@ -58,6 +58,7 @@ import { searchMarketplace } from "@/lib/ai/skills/marketplace";
 import { refreshMcpToolSchema } from "@/lib/ai/skills/mcp";
 import type { AllowedToolContext } from "@/lib/ai/skills/runtime";
 import { isProductionEnvironment } from "@/lib/constants";
+import { detectContextRequirementsForTools } from "@/lib/context/detection";
 import { decryptApiKey } from "@/lib/crypto";
 import {
   addAccumulatedModelCost,
@@ -77,6 +78,7 @@ import {
 } from "@/lib/db/queries";
 import type { AITool, BYOKProvider, DBMessage } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
+import { getLinkedWalletsForUser } from "@/lib/privy";
 import {
   verifyBatchPayment,
   verifyPayment,
@@ -859,6 +861,7 @@ export async function POST(request: Request) {
                 id: string;
                 name: string;
                 price: string;
+                mcpMethod?: string; // Which specific method the AI plans to use
                 reason?: string;
               }>;
               selectionReasoning?: string;
@@ -925,6 +928,7 @@ export async function POST(request: Request) {
                   description: fullTool.description,
                   price: fullTool.price,
                   mcpTools: fullTool.mcpTools,
+                  mcpMethod: selected.mcpMethod, // Which specific method AI plans to use
                   reason: selected.reason,
                 };
               })
@@ -934,6 +938,7 @@ export async function POST(request: Request) {
               description: string;
               price: string;
               mcpTools?: Array<{ name: string; description?: string }>;
+              mcpMethod?: string;
               reason?: string;
             }>;
 
@@ -1071,6 +1076,98 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                 result.toUIMessageStream({ sendReasoning: true })
               );
               return;
+            }
+
+            // ─────────────────────────────────────────────────────────────────
+            // WALLET LINKING CHECK
+            // Before proceeding to payment, check if selected tools require
+            // portfolio context and if the user has linked wallets.
+            // ─────────────────────────────────────────────────────────────────
+
+            // Debug: Log what we're checking for context requirements
+            console.log("[chat-api] Wallet linking check: inspecting tools", {
+              chatId: id,
+              toolCount: enrichedSelectedTools.length,
+              tools: enrichedSelectedTools.map((t) => ({
+                name: t.name,
+                mcpMethod: t.mcpMethod, // Which specific method AI plans to use
+                hasMcpTools: Boolean(t.mcpTools),
+                mcpToolCount: t.mcpTools?.length ?? 0,
+                // Show schema for the selected method only
+                selectedMethodSchema: t.mcpMethod
+                  ? (() => {
+                      const method = t.mcpTools?.find(
+                        (m) => m.name === t.mcpMethod
+                      );
+                      return {
+                        found: Boolean(method),
+                        hasInputSchema: Boolean((method as any)?.inputSchema),
+                        schemaKeys:
+                          (method as any)?.inputSchema?.properties &&
+                          Object.keys((method as any).inputSchema.properties),
+                      };
+                    })()
+                  : "no method specified - checking all",
+              })),
+            });
+
+            const contextRequirements = detectContextRequirementsForTools(
+              enrichedSelectedTools
+            );
+
+            console.log(
+              "[chat-api] Wallet linking check: context requirements",
+              {
+                chatId: id,
+                requirementsCount: contextRequirements.size,
+                requirements: Array.from(contextRequirements),
+              }
+            );
+
+            if (contextRequirements.size > 0) {
+              // Tools require portfolio context - check for linked wallets
+              const linkedWallets = await getLinkedWalletsForUser(
+                session.user.id
+              );
+
+              if (linkedWallets.length === 0) {
+                // User has no linked wallets - prompt them to link one
+                console.log("[chat-api] Auto Mode: wallet linking required", {
+                  chatId: id,
+                  requiredContext: Array.from(contextRequirements),
+                  toolCount: enrichedSelectedTools.length,
+                });
+
+                dataStream.write({
+                  type: "data-walletLinkingRequired",
+                  data: {
+                    requiredContext: Array.from(contextRequirements),
+                    selectedTools: enrichedSelectedTools.map((t) => ({
+                      id: t.id,
+                      name: t.name,
+                      price: t.price,
+                    })),
+                    originalQuery: userQuery,
+                  },
+                });
+
+                // Clear discovery UI and return early - wait for wallet linking
+                dataStream.write({
+                  type: "data-clearDiscovery",
+                  data: true,
+                });
+
+                return;
+              }
+
+              console.log(
+                "[chat-api] Auto Mode: user has linked wallets, proceeding",
+                {
+                  chatId: id,
+                  linkedWalletCount: linkedWallets.length,
+                  requiredContext: Array.from(contextRequirements),
+                }
+              );
             }
 
             // Tools were selected - calculate cost and await payment

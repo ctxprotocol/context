@@ -37,7 +37,11 @@ import { getEstimatedModelCost } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import { contextRouterAbi } from "@/lib/generated";
-import type { Attachment, ChatMessage } from "@/lib/types";
+import type {
+  Attachment,
+  ChatMessage,
+  WalletLinkingRequirement,
+} from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import {
   fetcher,
@@ -53,6 +57,7 @@ import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { AddFundsDialog } from "./tools/add-funds-dialog";
 import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
+import { WalletLinkingPrompt } from "./wallet-linking-prompt";
 
 /**
  * Throttle interval for streaming updates (ms)
@@ -182,6 +187,10 @@ export function Chat({
   const [pendingToolSelection, setPendingToolSelection] =
     useState<AutoModeToolSelection | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Wallet linking prompt state (shown when tools need portfolio context)
+  const [pendingWalletLinking, setPendingWalletLinking] =
+    useState<WalletLinkingRequirement | null>(null);
 
   // Auto Mode AddFundsDialog state (for insufficient balance)
   const [showAutoModeAddFunds, setShowAutoModeAddFunds] = useState(false);
@@ -669,6 +678,17 @@ export function Chat({
           break;
         }
 
+        // Wallet linking required: Tools need portfolio context but no wallets linked
+        case "data-walletLinkingRequired": {
+          if (typeof part.data === "object") {
+            console.log("[chat-client] Wallet linking required", part.data);
+            setPendingWalletLinking(part.data as WalletLinkingRequirement);
+            // Reset any payment stage since we're pausing for wallet linking
+            setStage("idle");
+          }
+          break;
+        }
+
         default:
           break;
       }
@@ -826,6 +846,46 @@ export function Chat({
             status={status}
             votes={votes}
           />
+
+          {/* Wallet Linking Prompt - shown when tools need portfolio context */}
+          {pendingWalletLinking && (
+            <div className="mx-auto w-full max-w-4xl px-2 md:px-4">
+              <WalletLinkingPrompt
+                onCancel={() => {
+                  // User cancelled - just dismiss the prompt
+                  setPendingWalletLinking(null);
+                }}
+                onSkip={() => {
+                  // Proceed without wallet - tool will handle gracefully
+                  // Re-send with a hint that user chose to skip
+                  const originalQuery = pendingWalletLinking.originalQuery;
+                  setPendingWalletLinking(null);
+                  sendMessage({
+                    role: "user" as const,
+                    parts: [
+                      {
+                        type: "text",
+                        text: `${originalQuery}\n\n(Note: User chose to proceed without linking a wallet. Provide general analysis without portfolio-specific data.)`,
+                      },
+                    ],
+                  });
+                }}
+                onWalletLinked={() => {
+                  // Small delay to allow Privy to sync the new wallet
+                  // then re-send the original query with wallet now linked
+                  const originalQuery = pendingWalletLinking.originalQuery;
+                  setPendingWalletLinking(null);
+                  setTimeout(() => {
+                    sendMessage({
+                      role: "user" as const,
+                      parts: [{ type: "text", text: originalQuery }],
+                    });
+                  }, 500);
+                }}
+                requiredContext={pendingWalletLinking.requiredContext}
+              />
+            </div>
+          )}
 
           <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
             <MultimodalInput

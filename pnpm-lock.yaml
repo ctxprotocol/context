@@ -45,8 +45,8 @@ importers:
         specifier: ^6.35.3
         version: 6.36.4
       '@ctxprotocol/sdk':
-        specifier: github:ctxprotocol/sdk
-        version: https://codeload.github.com/ctxprotocol/sdk/tar.gz/f739e9fc2b7ed6787ca3de83a662ff500eea6a9d
+        specifier: ^0.5.0
+        version: 0.5.0
       '@icons-pack/react-simple-icons':
         specifier: ^13.7.0
         version: 13.8.0(react@19.0.0-rc-45804af1-20241021)
@@ -557,9 +557,8 @@ packages:
   '@coinbase/wallet-sdk@4.3.6':
     resolution: {integrity: sha512-4q8BNG1ViL4mSAAvPAtpwlOs1gpC+67eQtgIwNvT3xyeyFFd+guwkc8bcX5rTmQhXpqnhzC4f0obACbP9CqMSA==}
 
-  '@ctxprotocol/sdk@https://codeload.github.com/ctxprotocol/sdk/tar.gz/f739e9fc2b7ed6787ca3de83a662ff500eea6a9d':
-    resolution: {tarball: https://codeload.github.com/ctxprotocol/sdk/tar.gz/f739e9fc2b7ed6787ca3de83a662ff500eea6a9d}
-    version: 0.4.0
+  '@ctxprotocol/sdk@0.5.0':
+    resolution: {integrity: sha512-fa+E61TOtv5YmhMQp+mF1mnZ6RAv97TraYWD+xIK1eQaBHpT25owKem1q6upuiSu/TTbCmt5jPSk1jMfQvws9Q==}
     engines: {node: '>=18.0.0'}
 
   '@drizzle-team/brocli@0.10.2':
@@ -7904,7 +7903,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@ctxprotocol/sdk@https://codeload.github.com/ctxprotocol/sdk/tar.gz/f739e9fc2b7ed6787ca3de83a662ff500eea6a9d': {}
+  '@ctxprotocol/sdk@0.5.0': {}
 
   '@drizzle-team/brocli@0.10.2': {}
 

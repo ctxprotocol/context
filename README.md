@@ -99,6 +99,55 @@ All value flows through `ContextRouter.sol` on Base. Payments are split instantl
 
 **Staking System:** All tools (including free) require a minimum $10 USDC stake, enforced on-chain. For paid tools, the stake is 100x the query price if higher. This creates accountability and enables slashing for fraud. Stakes are fully refundable with a 7-day withdrawal delay.
 
+### 4. Context Injection (Portfolio Data)
+
+For tools that analyze user portfolios (e.g., "Analyze my Polymarket positions"), Context uses a **Context Injection** pattern:
+
+| Step | Who | Action |
+|------|-----|--------|
+| 1 | User | Links external wallet in Settings > Portfolio Wallets |
+| 2 | Context App | Checks tool's `requirements.context` field |
+| 3 | Context App | Fetches positions from protocol APIs (client-side) |
+| 4 | Context App | Injects data as `portfolio` argument to tool |
+| 5 | MCP Tool | Receives ready-to-analyze data, returns insights |
+
+**Why this matters:**
+- **No Auth Required**: Blockchain data is public - we fetch by wallet address, no API keys needed
+- **Security**: MCP servers never see private keys or credentials
+- **Simplicity**: Tool developers receive structured data, no blockchain expertise needed
+
+**Currently Supported:**
+- Polymarket (prediction market positions)
+- Hyperliquid (perpetuals & spot balances)
+
+#### Declaring Context Requirements
+
+If your tool needs user portfolio data, declare it using the `requirements` field:
+
+```typescript
+{
+  name: "analyze_my_positions",
+  requirements: {
+    context: ["hyperliquid"]  // or "polymarket", "wallet"
+  },
+  inputSchema: {
+    type: "object",
+    properties: {
+      portfolio: { type: "object" }
+    },
+    required: ["portfolio"]
+  }
+}
+```
+
+| Context Type | Description | Injected Data |
+|--------------|-------------|---------------|
+| `"hyperliquid"` | Hyperliquid perpetuals & spot | Positions, balances, account summary |
+| `"polymarket"` | Polymarket prediction markets | Positions, orders, market data |
+| `"wallet"` | Generic EVM wallet | Address, token balances |
+
+> 📖 **For MCP developers**: See [SDK Update Guide](./docs/SDK-UPDATE.md) and [Detection Architecture](./docs/wallet-linking-detection-architecture.md) for details.
+
 ## 🚀 Getting Started
 
 ### Run the App Locally

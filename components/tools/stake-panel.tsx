@@ -9,6 +9,7 @@ import {
   Shield,
   X,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { encodeFunctionData, type Hex, parseUnits } from "viem";
@@ -188,6 +189,7 @@ function StakeToolRow({
   isConnected: boolean;
   walletAddress?: string;
 }) {
+  const router = useRouter();
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -256,6 +258,13 @@ function StakeToolRow({
   const required = calculateRequiredStake(price);
   const hasEnough = staked >= required;
   const shortfall = Math.max(0, required - staked);
+
+  // Prefill deposit amount with shortfall when dialog opens
+  useEffect(() => {
+    if (isDepositOpen && shortfall > 0 && depositAmount === "") {
+      setDepositAmount(formatPrice(shortfall));
+    }
+  }, [isDepositOpen, shortfall, depositAmount]);
 
   // Read withdrawal timelock status from contract (7-day delay)
   const { data: withdrawalStatus, refetch: refetchWithdrawalStatus } =
@@ -566,6 +575,9 @@ function StakeToolRow({
           })
           .catch(console.error);
       }
+
+      // Refresh the page to update the ToolCard badge with new stake amount
+      router.refresh();
     }
   }, [
     depositSuccess,
@@ -576,6 +588,7 @@ function StakeToolRow({
     tool.isActive,
     tool.id,
     refetchStake,
+    router,
   ]);
 
   useEffect(() => {

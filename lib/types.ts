@@ -46,7 +46,12 @@ export type CustomUIDataTypes = {
   debugCode: string;
   debugResult: string;
   toolStatus: { status: string };
-  executionProgress: { type: string; toolName: string; message: string; timestamp: number };
+  executionProgress: {
+    type: string;
+    toolName: string;
+    message: string;
+    timestamp: number;
+  };
 };
 
 export type ChatMessage = UIMessage<
@@ -60,3 +65,28 @@ export type Attachment = {
   url: string;
   contentType: string;
 };
+
+/**
+ * Wallet Linking Requirement
+ *
+ * Sent via data stream when a tool requires portfolio context
+ * but the user has no linked wallets. Triggers the in-chat
+ * wallet linking prompt flow.
+ */
+export type WalletLinkingRequirement = {
+  /** Context types needed by selected tools (e.g., "polymarket", "hyperliquid") */
+  requiredContext: ContextRequirementType[];
+  /** Summary of tools that were selected (for display purposes) */
+  selectedTools: Array<{ id: string; name: string; price: string }>;
+  /** Original user query to retry after wallet is linked */
+  originalQuery: string;
+};
+
+// =============================================================================
+// CONTEXT REQUIREMENTS (from @ctxprotocol/sdk - Single Source of Truth)
+// =============================================================================
+
+export type {
+  ContextRequirementType,
+  ToolRequirements,
+} from "@ctxprotocol/sdk";

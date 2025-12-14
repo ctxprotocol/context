@@ -633,12 +633,15 @@ Think through your selection, then output a JSON code block:
       "id": "tool-uuid-from-list",
       "name": "Tool Name",
       "price": "0.0001",
-      "reason": "Why this tool answers the question"
+      "mcpMethod": "method_name_from_available_methods",
+      "reason": "Why this tool and method answers the question"
     }
   ],
   "selectionReasoning": "Brief explanation of selection logic"
 }
 \`\`\`
+
+**IMPORTANT:** You MUST include "mcpMethod" - the specific method from "Available Methods" that you plan to use.
 
 ## Special Cases
 
@@ -654,7 +657,7 @@ Think through your selection, then output a JSON code block:
 
 **Multiple tools needed:**
 \`\`\`json
-{ "selectedTools": [{ "id": "...", "name": "Tool A", "price": "...", "reason": "..." }, { "id": "...", "name": "Tool B", "price": "...", "reason": "..." }], "selectionReasoning": "Different data types require different tools" }
+{ "selectedTools": [{ "id": "...", "name": "Tool A", "price": "...", "mcpMethod": "method_a", "reason": "..." }, { "id": "...", "name": "Tool B", "price": "...", "mcpMethod": "method_b", "reason": "..." }], "selectionReasoning": "Different data types require different tools" }
 \`\`\`
 `;
 

@@ -41,3 +41,39 @@ export async function getPrivyUser(userId: string) {
     return null;
   }
 }
+
+/**
+ * Get linked external wallets for a user.
+ *
+ * Returns wallet addresses that are linked for portfolio context (read-only).
+ * Excludes the embedded Privy wallet since that's for payments, not portfolio.
+ *
+ * Used by the wallet linking prompt flow to determine if user needs to link
+ * a wallet before tools requiring portfolio context can execute.
+ *
+ * @param userId - Privy user ID (e.g., "did:privy:...")
+ * @returns Array of wallet addresses (empty if none linked or on error)
+ */
+export async function getLinkedWalletsForUser(
+  userId: string
+): Promise<string[]> {
+  try {
+    const user = await privy.getUser(userId);
+
+    // Filter to external wallets only (exclude embedded Privy wallet)
+    const linkedWallets = user.linkedAccounts
+      .filter(
+        (account) =>
+          account.type === "wallet" && account.walletClientType !== "privy"
+      )
+      .map((account) => {
+        // Type assertion: wallet accounts have an address property
+        return (account as { address: string }).address;
+      });
+
+    return linkedWallets;
+  } catch (error) {
+    console.error("[privy] Failed to get linked wallets:", error);
+    return [];
+  }
+}
