@@ -403,9 +403,15 @@
           "icon": "mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-500",
           "text": "text-xs text-amber-600/90 leading-relaxed dark:text-amber-500/90",
           "code": "rounded bg-amber-600/20 px-1 dark:bg-amber-500/20"
+        },
+        "blue": {
+          "container": "bg-blue-500/10 dark:bg-blue-500/15",
+          "icon": "mt-0.5 size-3.5 shrink-0 text-blue-600 dark:text-blue-500",
+          "text": "text-xs text-blue-600/90 leading-relaxed dark:text-blue-500/90",
+          "code": "rounded bg-blue-600/20 px-1 dark:bg-blue-500/20"
         }
       },
-      "usage": "Use for inline warnings that require user attention but block a specific action (like staking, missing schema). No border for cleaner look. Use Shield icon for security/trust related warnings."
+      "usage": "Use for inline warnings (amber) or informational notes (blue). No border for cleaner look. Use Shield icon for security/trust related warnings."
     }
   },
   "patterns": {

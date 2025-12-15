@@ -6,12 +6,14 @@ import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, WalletLinkingRequirement } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
 import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
 import { OnboardingHero } from "./onboarding-hero";
+import { WalletLinkingPrompt } from "./wallet-linking-prompt";
+import { SparklesIcon } from "./icons";
 
 type MessagesProps = {
   chatId: string;
@@ -24,6 +26,12 @@ type MessagesProps = {
   isArtifactVisible: boolean;
   selectedModelId: string;
   isDebugMode: boolean;
+  walletLinking: {
+    pending: WalletLinkingRequirement | null;
+    onCancel: () => void;
+    onSkip: () => void;
+    onWalletLinked: () => void;
+  } | null;
 };
 
 function PureMessages({
@@ -38,6 +46,7 @@ function PureMessages({
   // but keep it in the signature for future use.
   selectedModelId: _selectedModelId,
   isDebugMode,
+  walletLinking,
 }: MessagesProps) {
   const {
     containerRef: messagesContainerRef,
@@ -103,6 +112,13 @@ function PureMessages({
       reset();
     }
   }, [reset, stage, status]);
+
+  // Scroll to bottom when wallet linking appears
+  useEffect(() => {
+    if (walletLinking?.pending) {
+      scrollToBottom("smooth");
+    }
+  }, [walletLinking?.pending, scrollToBottom]);
 
   const shouldShowThinking = status === "submitted" || stage !== "idle";
 
@@ -209,6 +225,23 @@ function PureMessages({
             )}
           </AnimatePresence>
 
+          {/* Wallet Linking Prompt - Rendered as an assistant message */}
+          {walletLinking?.pending && (
+            <div className="flex w-full items-start gap-2 md:gap-3">
+              <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+                <SparklesIcon size={14} />
+              </div>
+              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
+                <WalletLinkingPrompt
+                  onCancel={walletLinking.onCancel}
+                  onSkip={walletLinking.onSkip}
+                  onWalletLinked={walletLinking.onWalletLinked}
+                  requiredContext={walletLinking.pending.requiredContext}
+                />
+              </div>
+            </div>
+          )}
+
           <div
             className="min-h-[24px] min-w-[24px] shrink-0"
             ref={messagesEndRef}
@@ -251,6 +284,9 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
     return false;
   }
   if (!equal(prevProps.votes, nextProps.votes)) {
+    return false;
+  }
+  if (!equal(prevProps.walletLinking, nextProps.walletLinking)) {
     return false;
   }
 

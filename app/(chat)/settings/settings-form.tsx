@@ -652,6 +652,30 @@ export function SettingsForm() {
               );
             }
           )}
+
+          {/* Info Section */}
+          <div className="flex items-start gap-2 rounded-md bg-blue-500/10 p-2 dark:bg-blue-500/15">
+            <div className="mt-0.5 size-3.5 shrink-0 text-blue-600 dark:text-blue-500">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-full"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+              </svg>
+            </div>
+            <div className="text-xs text-blue-600/90 leading-relaxed dark:text-blue-500/90">
+              <span className="font-semibold">API Key Security:</span> Your keys
+              are encrypted at rest (AES-256-GCM) and never logged. You can
+              remove them at any time. We recommend using dedicated keys for this
+              app.
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -739,18 +763,7 @@ export function SettingsForm() {
         </CardContent>
       </Card>
 
-      {/* Info Section */}
-      <div className="rounded-lg border border-dashed p-4">
-        <div>
-          <h3 className="mb-2 font-medium text-sm">About API Key Security</h3>
-          <ul className="space-y-1 text-muted-foreground text-xs">
-            <li>• Your API keys are encrypted at rest using AES-256-GCM</li>
-            <li>• Keys are never logged or exposed in our systems</li>
-            <li>• You can remove your keys at any time</li>
-            <li>• We recommend using dedicated keys for this app</li>
-          </ul>
-        </div>
-      </div>
+      {/* Info Section - Removed */}
     </div>
   );
 }

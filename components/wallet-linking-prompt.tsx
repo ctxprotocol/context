@@ -86,74 +86,68 @@ export function WalletLinkingPrompt({
     .join(" and ");
 
   return (
-    <Card className="mx-auto my-4 max-w-md border-blue-500/20 bg-blue-500/5">
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Link2 className="size-5 text-blue-500" />
-          Link Your Wallet to Continue
-        </CardTitle>
-        <CardDescription>
-          Connect your wallet to access personalized analysis
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Info banner - matches linked-wallets.tsx pattern */}
-        <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-          <Info className="mt-0.5 size-4 shrink-0 text-blue-500" />
-          <p className="text-muted-foreground text-sm">
-            To analyze your <strong>{protocolNames}</strong> positions, I need
-            to read your wallet&apos;s public data. This is completely{" "}
-            <strong>read-only</strong> — I can never make transactions on your
-            behalf.
-          </p>
+    <div className="flex w-full flex-col gap-3 rounded-xl border bg-background p-4">
+      <div className="flex items-center gap-2">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-500">
+          <Link2 className="size-4" />
         </div>
-
-        {/* Action buttons */}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            className="flex-1"
-            disabled={isLinking || !ready}
-            onClick={handleLinkWallet}
-          >
-            {isLinking ? (
-              <>
-                <span className="animate-spin">
-                  <LoaderIcon size={16} />
-                </span>
-                Connecting...
-              </>
-            ) : (
-              <>
-                <Wallet className="size-4" />
-                Link Wallet
-              </>
-            )}
-          </Button>
-
-          <Button
-            className="flex-1"
-            disabled={isLinking}
-            onClick={onSkip}
-            variant="outline"
-          >
-            <SkipForward className="size-4" />
-            Skip (Limited Analysis)
-          </Button>
+        <div className="flex flex-col">
+          <span className="font-medium text-sm">Action Required</span>
+          <span className="text-muted-foreground text-xs">
+            Link wallet to continue
+          </span>
         </div>
+      </div>
 
-        {/* Cancel option - ghost style for less prominence */}
+      <p className="text-muted-foreground text-sm">
+        To analyze your <strong>{protocolNames}</strong> positions, I need to read
+        your wallet&apos;s public data. This is completely{" "}
+        <strong>read-only</strong>.
+      </p>
+
+      {/* Action buttons */}
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Button
-          className="w-full text-muted-foreground"
-          onClick={onCancel}
-          size="sm"
-          variant="ghost"
+          className="h-8 flex-1 text-xs"
+          disabled={isLinking || !ready}
+          onClick={handleLinkWallet}
         >
-          <X className="size-3" />
-          Cancel Request
+          {isLinking ? (
+            <>
+              <span className="animate-spin">
+                <LoaderIcon size={14} />
+              </span>
+              Connecting...
+            </>
+          ) : (
+            <>
+              <Wallet className="size-3.5" />
+              Link Wallet
+            </>
+          )}
         </Button>
-      </CardContent>
-    </Card>
+
+        <Button
+          className="h-8 flex-1 text-xs"
+          disabled={isLinking}
+          onClick={onSkip}
+          variant="outline"
+        >
+          <SkipForward className="size-3.5" />
+          Skip (Limited Analysis)
+        </Button>
+      </div>
+
+      {/* Cancel option */}
+      <Button
+        className="h-auto p-0 text-muted-foreground text-xs hover:bg-transparent hover:text-foreground"
+        onClick={onCancel}
+        size="sm"
+        variant="ghost"
+      >
+        Cancel Request
+      </Button>
+    </div>
   );
 }
 

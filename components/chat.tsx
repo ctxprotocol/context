@@ -845,47 +845,38 @@ export function Chat({
             setMessages={setMessages}
             status={status}
             votes={votes}
+            walletLinking={
+              pendingWalletLinking
+                ? {
+                    pending: pendingWalletLinking,
+                    onCancel: () => setPendingWalletLinking(null),
+                    onSkip: () => {
+                      const originalQuery = pendingWalletLinking.originalQuery;
+                      setPendingWalletLinking(null);
+                      sendMessage({
+                        role: "user" as const,
+                        parts: [
+                          {
+                            type: "text",
+                            text: `${originalQuery}\n\n(Note: User chose to proceed without linking a wallet. Provide general analysis without portfolio-specific data.)`,
+                          },
+                        ],
+                      });
+                    },
+                    onWalletLinked: () => {
+                      const originalQuery = pendingWalletLinking.originalQuery;
+                      setPendingWalletLinking(null);
+                      setTimeout(() => {
+                        sendMessage({
+                          role: "user" as const,
+                          parts: [{ type: "text", text: originalQuery }],
+                        });
+                      }, 500);
+                    },
+                  }
+                : null
+            }
           />
-
-          {/* Wallet Linking Prompt - shown when tools need portfolio context */}
-          {pendingWalletLinking && (
-            <div className="mx-auto w-full max-w-4xl px-2 md:px-4">
-              <WalletLinkingPrompt
-                onCancel={() => {
-                  // User cancelled - just dismiss the prompt
-                  setPendingWalletLinking(null);
-                }}
-                onSkip={() => {
-                  // Proceed without wallet - tool will handle gracefully
-                  // Re-send with a hint that user chose to skip
-                  const originalQuery = pendingWalletLinking.originalQuery;
-                  setPendingWalletLinking(null);
-                  sendMessage({
-                    role: "user" as const,
-                    parts: [
-                      {
-                        type: "text",
-                        text: `${originalQuery}\n\n(Note: User chose to proceed without linking a wallet. Provide general analysis without portfolio-specific data.)`,
-                      },
-                    ],
-                  });
-                }}
-                onWalletLinked={() => {
-                  // Small delay to allow Privy to sync the new wallet
-                  // then re-send the original query with wallet now linked
-                  const originalQuery = pendingWalletLinking.originalQuery;
-                  setPendingWalletLinking(null);
-                  setTimeout(() => {
-                    sendMessage({
-                      role: "user" as const,
-                      parts: [{ type: "text", text: originalQuery }],
-                    });
-                  }, 500);
-                }}
-                requiredContext={pendingWalletLinking.requiredContext}
-              />
-            </div>
-          )}
 
           <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
             <MultimodalInput

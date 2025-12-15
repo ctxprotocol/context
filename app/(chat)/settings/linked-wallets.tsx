@@ -71,22 +71,25 @@ export function LinkedWalletsSection() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Wallet className="size-5" />
-          Portfolio Wallets
-        </CardTitle>
-        <CardDescription>
-          Link wallets to analyze your positions across DeFi protocols. These
-          wallets are <strong>read-only</strong> — they cannot sign transactions
-          in this app.
-        </CardDescription>
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+            <Wallet className="size-5 text-primary" />
+          </div>
+          <div>
+            <CardTitle className="text-lg">Portfolio Wallets</CardTitle>
+            <CardDescription>
+              Link wallets to analyze your positions across DeFi protocols
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Info banner */}
-        <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-          <Info className="mt-0.5 size-4 shrink-0 text-blue-500" />
-          <p className="text-muted-foreground text-sm">
-            When you chat with tools like <strong>Polymarket Intelligence</strong>,
+        <div className="flex items-start gap-2 rounded-md bg-blue-500/10 p-2 dark:bg-blue-500/15">
+          <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600 dark:text-blue-500" />
+          <p className="text-xs text-blue-600/90 leading-relaxed dark:text-blue-500/90">
+            When you chat with tools like{" "}
+            <strong className="font-semibold">Polymarket Intelligence</strong>,
             we&apos;ll automatically fetch your positions from linked wallets to
             provide personalized analysis.
           </p>
