@@ -106,7 +106,7 @@ For tools that analyze user portfolios (e.g., "Analyze my Polymarket positions")
 | Step | Who | Action |
 |------|-----|--------|
 | 1 | User | Links external wallet in Settings > Portfolio Wallets |
-| 2 | Context App | Checks tool's `requirements.context` field |
+| 2 | Context App | Checks tool's `x-context-requirements` in inputSchema |
 | 3 | Context App | Fetches positions from protocol APIs (client-side) |
 | 4 | Context App | Injects data as `portfolio` argument to tool |
 | 5 | MCP Tool | Receives ready-to-analyze data, returns insights |
@@ -122,16 +122,14 @@ For tools that analyze user portfolios (e.g., "Analyze my Polymarket positions")
 
 #### Declaring Context Requirements
 
-If your tool needs user portfolio data, declare it using the `requirements` field:
+If your tool needs user portfolio data, declare it using the `x-context-requirements` extension in your `inputSchema`:
 
 ```typescript
 {
   name: "analyze_my_positions",
-  requirements: {
-    context: ["hyperliquid"]  // or "polymarket", "wallet"
-  },
   inputSchema: {
     type: "object",
+    "x-context-requirements": ["hyperliquid"],  // or "polymarket", "wallet"
     properties: {
       portfolio: { type: "object" }
     },
@@ -145,6 +143,8 @@ If your tool needs user portfolio data, declare it using the `requirements` fiel
 | `"hyperliquid"` | Hyperliquid perpetuals & spot | Positions, balances, account summary |
 | `"polymarket"` | Polymarket prediction markets | Positions, orders, market data |
 | `"wallet"` | Generic EVM wallet | Address, token balances |
+
+> **Why `x-context-requirements`?** The MCP protocol only transmits standard fields. Custom properties like `requirements` get stripped. JSON Schema's `x-` extension properties are preserved through transport.
 
 > 📖 **For MCP developers**: See [SDK Update Guide](./docs/SDK-UPDATE.md) and [Detection Architecture](./docs/wallet-linking-detection-architecture.md) for details.
 

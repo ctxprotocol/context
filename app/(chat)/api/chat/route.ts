@@ -937,7 +937,11 @@ export async function POST(request: Request) {
               name: string;
               description: string;
               price: string;
-              mcpTools?: Array<{ name: string; description?: string }>;
+              mcpTools?: Array<{
+                name: string;
+                description?: string;
+                inputSchema?: Record<string, unknown>;
+              }>;
               mcpMethod?: string;
               reason?: string;
             }>;

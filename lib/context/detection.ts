@@ -4,26 +4,22 @@
  * Detects what user context (wallet/portfolio data) is required for MCP tools.
  *
  * HOW IT WORKS:
- * Tools that need user portfolio data MUST declare it explicitly:
+ * Tools that need user portfolio data declare it in their inputSchema:
  *
  *   {
  *     name: "analyze_my_positions",
- *     requirements: { context: ["hyperliquid"] },
- *     inputSchema: { ... }
+ *     inputSchema: {
+ *       type: "object",
+ *       "x-context-requirements": ["hyperliquid"],  // ← Read from here
+ *       properties: { portfolio: { type: "object" } }
+ *     }
  *   }
  *
- * WHY EXPLICIT ONLY?
- * - If a tool needs context injection, the developer must read the docs
- * - The docs explain how to receive injected context data
- * - The docs tell them to add `requirements.context`
- * - Therefore: no tool that needs context will be missing the declaration
- *
- * This enables the "in-chat wallet linking prompt" flow:
- * 1. User asks about their portfolio
- * 2. AI selects tools that need portfolio context
- * 3. System checks `requirements.context` on selected tools
- * 4. If user has no linked wallets → show linking prompt
- * 5. After linking → retry with portfolio data
+ * WHY IN inputSchema?
+ * - MCP protocol only transmits: name, description, inputSchema, outputSchema
+ * - Custom fields like `requirements` get stripped by MCP SDK
+ * - JSON Schema allows custom "x-" extension properties
+ * - inputSchema is preserved end-to-end through MCP transport
  */
 
 import type { ContextRequirementType } from "@/lib/types";
@@ -32,13 +28,12 @@ import type { ContextRequirementType } from "@/lib/types";
 export type { ContextRequirementType as ContextRequirement } from "@/lib/types";
 
 /**
- * MCP tool info with requirements (from marketplace search results)
+ * MCP tool info with schema (from marketplace search results)
  */
 type McpToolInfo = {
   name: string;
   description?: string;
-  inputSchema?: unknown;
-  requirements?: { context?: ContextRequirementType[] };
+  inputSchema?: Record<string, unknown>;
 };
 
 /**
@@ -55,9 +50,32 @@ type ToolForDetection = {
 };
 
 /**
- * Detect what context a tool requires by checking explicit `requirements.context`.
+ * Extract context requirements from a tool's inputSchema.
+ * Looks for the "x-context-requirements" JSON Schema extension.
+ */
+function getContextRequirementsFromSchema(
+  inputSchema: Record<string, unknown> | undefined
+): ContextRequirementType[] {
+  if (!inputSchema) {
+    return [];
+  }
+
+  // Check for x-context-requirements extension
+  const requirements = inputSchema["x-context-requirements"];
+
+  if (Array.isArray(requirements)) {
+    return requirements.filter((r): r is ContextRequirementType => {
+      return r === "polymarket" || r === "hyperliquid" || r === "wallet";
+    });
+  }
+
+  return [];
+}
+
+/**
+ * Detect what context a tool requires by checking inputSchema["x-context-requirements"].
  *
- * @param tool - Tool metadata including mcpTools with their requirements
+ * @param tool - Tool metadata including mcpTools with their inputSchemas
  * @returns Array of context requirements (empty if none declared)
  *
  * @example
@@ -66,7 +84,10 @@ type ToolForDetection = {
  *   name: "Hyperliquid",
  *   mcpTools: [{
  *     name: "analyze_my_positions",
- *     requirements: { context: ["hyperliquid"] }
+ *     inputSchema: {
+ *       type: "object",
+ *       "x-context-requirements": ["hyperliquid"]
+ *     }
  *   }]
  * });
  * // Returns: ["hyperliquid"]
@@ -84,10 +105,11 @@ export function detectContextRequirements(
     : mcpTools;
 
   for (const method of methodsToCheck) {
-    if (method.requirements?.context) {
-      for (const req of method.requirements.context) {
-        requirements.add(req);
-      }
+    const schemaRequirements = getContextRequirementsFromSchema(
+      method.inputSchema
+    );
+    for (const req of schemaRequirements) {
+      requirements.add(req);
     }
   }
 

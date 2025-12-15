@@ -5,20 +5,23 @@
  * between the client app and MCP servers.
  *
  * =============================================================================
- * DECLARING CONTEXT REQUIREMENTS
+ * DECLARING CONTEXT REQUIREMENTS IN MCP TOOLS
  * =============================================================================
  *
- * If your MCP tool needs user portfolio data, you MUST declare it explicitly:
+ * Since the MCP protocol only transmits standard fields (name, description,
+ * inputSchema, outputSchema), context requirements must be embedded in the
+ * inputSchema using the "x-context-requirements" JSON Schema extension.
  *
  * @example
  * ```typescript
+ * // In your MCP server tool definition:
  * {
  *   name: "analyze_my_positions",
- *   requirements: { context: ["hyperliquid"] },  // REQUIRED
  *   inputSchema: {
  *     type: "object",
+ *     "x-context-requirements": ["hyperliquid"],  // ← REQUIRED for portfolio tools
  *     properties: {
- *       portfolio: { type: "object" }  // Receives HyperliquidContext
+ *       portfolio: { type: "object" }
  *     },
  *     required: ["portfolio"]
  *   }
@@ -29,8 +32,6 @@
  *   - "hyperliquid": User's Hyperliquid perp/spot positions
  *   - "polymarket": User's Polymarket prediction market positions
  *   - "wallet": Generic EVM wallet context (address, balances)
- *
- * See ToolRequirements in lib/types.ts for the full type definition.
  *
  * =============================================================================
  */

@@ -86,6 +86,19 @@ export type WalletLinkingRequirement = {
 // CONTEXT REQUIREMENTS (from @ctxprotocol/sdk - Single Source of Truth)
 // =============================================================================
 
+/**
+ * @deprecated The `requirements` field at tool level gets stripped by MCP SDK.
+ * Use `x-context-requirements` inside `inputSchema` instead.
+ *
+ * @example
+ * ```typescript
+ * // ❌ OLD (doesn't work - stripped by MCP transport)
+ * { requirements: { context: ["hyperliquid"] } }
+ *
+ * // ✅ NEW (works - preserved in inputSchema)
+ * { inputSchema: { "x-context-requirements": ["hyperliquid"], ... } }
+ * ```
+ */
 export type {
   ContextRequirementType,
   ToolRequirements,
