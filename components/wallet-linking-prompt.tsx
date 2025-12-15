@@ -86,8 +86,17 @@ export function WalletLinkingPrompt({
     .join(" and ");
 
   return (
-    <div className="flex w-full flex-col gap-3 rounded-xl border bg-background p-4">
-      <div className="flex items-center gap-2">
+    <div className="relative flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-background p-4 shadow-sm">
+      <Button
+        className="absolute top-2 right-2 size-6 text-muted-foreground hover:text-foreground"
+        onClick={onCancel}
+        size="icon"
+        variant="ghost"
+      >
+        <X className="size-3.5" />
+      </Button>
+
+      <div className="flex items-center gap-2 pr-6">
         <div className="flex size-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-500">
           <Link2 className="size-4" />
         </div>
@@ -99,7 +108,7 @@ export function WalletLinkingPrompt({
         </div>
       </div>
 
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-sm leading-relaxed">
         To analyze your <strong>{protocolNames}</strong> positions, I need to read
         your wallet&apos;s public data. This is completely{" "}
         <strong>read-only</strong>.
@@ -134,19 +143,9 @@ export function WalletLinkingPrompt({
           variant="outline"
         >
           <SkipForward className="size-3.5" />
-          Skip (Limited Analysis)
+          Skip
         </Button>
       </div>
-
-      {/* Cancel option */}
-      <Button
-        className="h-auto p-0 text-muted-foreground text-xs hover:bg-transparent hover:text-foreground"
-        onClick={onCancel}
-        size="sm"
-        variant="ghost"
-      >
-        Cancel Request
-      </Button>
     </div>
   );
 }

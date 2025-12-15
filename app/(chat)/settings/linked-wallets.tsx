@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useLinkAccount, usePrivy } from "@privy-io/react-auth";
+import { ExternalLink, Info, Loader2, Wallet, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,8 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Wallet, X, ExternalLink, Info, Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 export function LinkedWalletsSection() {
   const { user, unlinkWallet, ready } = usePrivy();
@@ -87,7 +87,7 @@ export function LinkedWalletsSection() {
         {/* Info banner */}
         <div className="flex items-start gap-2 rounded-md bg-blue-500/10 p-2 dark:bg-blue-500/15">
           <Info className="mt-0.5 size-3.5 shrink-0 text-blue-600 dark:text-blue-500" />
-          <p className="text-xs text-blue-600/90 leading-relaxed dark:text-blue-500/90">
+          <p className="text-blue-600/90 text-xs leading-relaxed dark:text-blue-500/90">
             When you chat with tools like{" "}
             <strong className="font-semibold">Polymarket Intelligence</strong>,
             we&apos;ll automatically fetch your positions from linked wallets to
@@ -100,8 +100,8 @@ export function LinkedWalletsSection() {
           <div className="space-y-2">
             {linkedExternalWallets.map((wallet) => (
               <div
-                key={wallet.address}
                 className="flex items-center justify-between rounded-lg bg-muted/50 p-3"
+                key={wallet.address}
               >
                 <div className="flex items-center gap-3">
                   <div className="size-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500" />
@@ -121,20 +121,20 @@ export function LinkedWalletsSection() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button asChild size="sm" variant="ghost">
                     <a
                       href={`https://polygonscan.com/address/${wallet.address}`}
-                      target="_blank"
                       rel="noopener noreferrer"
+                      target="_blank"
                     >
                       <ExternalLink className="size-4" />
                     </a>
                   </Button>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleUnlinkWallet(wallet.address)}
                     disabled={unlinkingAddress === wallet.address}
+                    onClick={() => handleUnlinkWallet(wallet.address)}
+                    size="sm"
+                    variant="ghost"
                   >
                     {unlinkingAddress === wallet.address ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -154,10 +154,10 @@ export function LinkedWalletsSection() {
 
         {/* Link wallet button */}
         <Button
-          onClick={handleLinkWallet}
-          disabled={isLinking}
-          variant="outline"
           className="w-full"
+          disabled={isLinking}
+          onClick={handleLinkWallet}
+          variant="outline"
         >
           {isLinking ? (
             <>
@@ -172,4 +172,3 @@ export function LinkedWalletsSection() {
     </Card>
   );
 }
-
