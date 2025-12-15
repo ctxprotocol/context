@@ -45,8 +45,8 @@ importers:
         specifier: ^6.35.3
         version: 6.36.4
       '@ctxprotocol/sdk':
-        specifier: ^0.5.0
-        version: 0.5.0
+        specifier: ^0.5.1
+        version: 0.5.1
       '@icons-pack/react-simple-icons':
         specifier: ^13.7.0
         version: 13.8.0(react@19.0.0-rc-45804af1-20241021)
@@ -557,8 +557,8 @@ packages:
   '@coinbase/wallet-sdk@4.3.6':
     resolution: {integrity: sha512-4q8BNG1ViL4mSAAvPAtpwlOs1gpC+67eQtgIwNvT3xyeyFFd+guwkc8bcX5rTmQhXpqnhzC4f0obACbP9CqMSA==}
 
-  '@ctxprotocol/sdk@0.5.0':
-    resolution: {integrity: sha512-fa+E61TOtv5YmhMQp+mF1mnZ6RAv97TraYWD+xIK1eQaBHpT25owKem1q6upuiSu/TTbCmt5jPSk1jMfQvws9Q==}
+  '@ctxprotocol/sdk@0.5.1':
+    resolution: {integrity: sha512-rVpeqYeE0vKMwddkKiG7N7AczjVytQqroSrhOkqLMpYwzjIKlTmTnoSsYbjPhdvIFWcX2GQOCYQb1xmSFjGBDA==}
     engines: {node: '>=18.0.0'}
 
   '@drizzle-team/brocli@0.10.2':
@@ -3625,6 +3625,9 @@ packages:
   '@types/node@22.19.0':
     resolution: {integrity: sha512-xpr/lmLPQEj+TUnHmR+Ab91/glhJvsqcjB+yY0Ix9GO70H6Lb4FHH5GeqdOE5btAx7eIMwuHkp4H2MSkLcqWbA==}
 
+  '@types/node@22.19.3':
+    resolution: {integrity: sha512-1N9SBnWYOJTrNZCdh/yJE+t910Y128BoyY+zBLWhL3r0TYzlTmFdXrPwHL9DyFZmlEXNQQolTZh3KHV31QDhyA==}
+
   '@types/omelette@0.4.5':
     resolution: {integrity: sha512-zUCJpVRwfMcZfkxSCGp73mgd3/xesvPz5tQJIORlfP/zkYEyp9KUfF7IP3RRjyZR3DwxkPs96/IFf70GmYZYHQ==}
 
@@ -6258,6 +6261,9 @@ packages:
   preact@10.27.2:
     resolution: {integrity: sha512-5SYSgFKSyhCbk6SrXyMpqjb5+MQBgfvEKE/OC+PujcY34sOpqtr+0AZQtPYx5IA6VxynQ7rUPCtKzyovpj9Bpg==}
 
+  preact@10.28.0:
+    resolution: {integrity: sha512-rytDAoiXr3+t6OIP3WGlDd0ouCUG1iCWzkcY3++Nreuoi17y6T5i/zRhe6uYfoVcxq6YU+sBtJouuRDsq8vvqA==}
+
   prettier@3.6.2:
     resolution: {integrity: sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==}
     engines: {node: '>=14'}
@@ -7871,7 +7877,7 @@ snapshots:
       eth-json-rpc-filters: 6.0.1
       eventemitter3: 5.0.1
       keccak: 3.0.4
-      preact: 10.27.2
+      preact: 10.28.0
       sha.js: 2.4.12
     transitivePeerDependencies:
       - supports-color
@@ -7903,7 +7909,7 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@ctxprotocol/sdk@0.5.0': {}
+  '@ctxprotocol/sdk@0.5.1': {}
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -11637,6 +11643,11 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/node@22.19.3':
+    dependencies:
+      undici-types: 6.21.0
+    optional: true
+
   '@types/omelette@0.4.5': {}
 
   '@types/papaparse@5.3.15':
@@ -11647,7 +11658,7 @@ snapshots:
 
   '@types/pg@8.11.6':
     dependencies:
-      '@types/node': 22.19.0
+      '@types/node': 22.19.3
       pg-protocol: 1.10.3
       pg-types: 4.1.0
     optional: true
@@ -15471,6 +15482,8 @@ snapshots:
   preact@10.24.2: {}
 
   preact@10.27.2: {}
+
+  preact@10.28.0: {}
 
   prettier@3.6.2: {}
 
