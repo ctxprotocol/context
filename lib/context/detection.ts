@@ -4,22 +4,21 @@
  * Detects what user context (wallet/portfolio data) is required for MCP tools.
  *
  * HOW IT WORKS:
- * Tools that need user portfolio data declare it in their inputSchema:
+ * Tools that need user portfolio data declare it in their _meta field:
  *
  *   {
  *     name: "analyze_my_positions",
- *     inputSchema: {
- *       type: "object",
- *       "x-context-requirements": ["hyperliquid"],  // ← Read from here
- *       properties: { portfolio: { type: "object" } }
- *     }
+ *     _meta: {
+ *       contextRequirements: ["hyperliquid"]  // ← Read from here
+ *     },
+ *     inputSchema: { ... }
  *   }
  *
- * WHY IN inputSchema?
- * - MCP protocol only transmits: name, description, inputSchema, outputSchema
- * - Custom fields like `requirements` get stripped by MCP SDK
- * - JSON Schema allows custom "x-" extension properties
- * - inputSchema is preserved end-to-end through MCP transport
+ * WHY _meta?
+ * - `_meta` is part of the MCP specification for arbitrary tool metadata
+ * - The MCP SDK preserves `_meta` through transport (unlike custom inputSchema fields)
+ * - JSON Schema extension properties like `x-*` get stripped by the SDK
+ * - `_meta` is the spec-compliant way to add custom tool metadata
  */
 
 import type { ContextRequirementType } from "@/lib/types";
@@ -28,12 +27,16 @@ import type { ContextRequirementType } from "@/lib/types";
 export type { ContextRequirementType as ContextRequirement } from "@/lib/types";
 
 /**
- * MCP tool info with schema (from marketplace search results)
+ * MCP tool info with _meta (from marketplace search results)
  */
 type McpToolInfo = {
   name: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  _meta?: {
+    contextRequirements?: string[];
+    [key: string]: unknown;
+  };
 };
 
 /**
@@ -43,25 +46,24 @@ type McpToolInfo = {
 type ToolForDetection = {
   name?: string;
   description?: string;
-  /** MCP tools contain the actual inputSchema for each method */
+  /** MCP tools contain the _meta field for each method */
   mcpTools?: McpToolInfo[];
   /** The specific MCP method the AI selected (if specified) */
   mcpMethod?: string;
 };
 
 /**
- * Extract context requirements from a tool's inputSchema.
- * Looks for the "x-context-requirements" JSON Schema extension.
+ * Extract context requirements from a tool's _meta field.
+ * Looks for the "contextRequirements" array in _meta.
  */
-function getContextRequirementsFromSchema(
-  inputSchema: Record<string, unknown> | undefined
+function getContextRequirementsFromMeta(
+  meta: McpToolInfo["_meta"]
 ): ContextRequirementType[] {
-  if (!inputSchema) {
+  if (!meta?.contextRequirements) {
     return [];
   }
 
-  // Check for x-context-requirements extension
-  const requirements = inputSchema["x-context-requirements"];
+  const requirements = meta.contextRequirements;
 
   if (Array.isArray(requirements)) {
     return requirements.filter((r): r is ContextRequirementType => {
@@ -73,9 +75,9 @@ function getContextRequirementsFromSchema(
 }
 
 /**
- * Detect what context a tool requires by checking inputSchema["x-context-requirements"].
+ * Detect what context a tool requires by checking _meta.contextRequirements.
  *
- * @param tool - Tool metadata including mcpTools with their inputSchemas
+ * @param tool - Tool metadata including mcpTools with their _meta
  * @returns Array of context requirements (empty if none declared)
  *
  * @example
@@ -84,9 +86,8 @@ function getContextRequirementsFromSchema(
  *   name: "Hyperliquid",
  *   mcpTools: [{
  *     name: "analyze_my_positions",
- *     inputSchema: {
- *       type: "object",
- *       "x-context-requirements": ["hyperliquid"]
+ *     _meta: {
+ *       contextRequirements: ["hyperliquid"]
  *     }
  *   }]
  * });
@@ -105,10 +106,8 @@ export function detectContextRequirements(
     : mcpTools;
 
   for (const method of methodsToCheck) {
-    const schemaRequirements = getContextRequirementsFromSchema(
-      method.inputSchema
-    );
-    for (const req of schemaRequirements) {
+    const metaRequirements = getContextRequirementsFromMeta(method._meta);
+    for (const req of metaRequirements) {
       requirements.add(req);
     }
   }

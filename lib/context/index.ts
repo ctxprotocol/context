@@ -8,18 +8,20 @@
  * DECLARING CONTEXT REQUIREMENTS IN MCP TOOLS
  * =============================================================================
  *
- * Since the MCP protocol only transmits standard fields (name, description,
- * inputSchema, outputSchema), context requirements must be embedded in the
- * inputSchema using the "x-context-requirements" JSON Schema extension.
+ * MCP tools that need user portfolio data MUST declare it using the
+ * `_meta.contextRequirements` field. This is the MCP spec-compliant way
+ * to add custom metadata to tools.
  *
  * @example
  * ```typescript
  * // In your MCP server tool definition:
  * {
  *   name: "analyze_my_positions",
+ *   _meta: {
+ *     contextRequirements: ["hyperliquid"]  // ← REQUIRED for portfolio tools
+ *   },
  *   inputSchema: {
  *     type: "object",
- *     "x-context-requirements": ["hyperliquid"],  // ← REQUIRED for portfolio tools
  *     properties: {
  *       portfolio: { type: "object" }
  *     },
@@ -32,6 +34,11 @@
  *   - "hyperliquid": User's Hyperliquid perp/spot positions
  *   - "polymarket": User's Polymarket prediction market positions
  *   - "wallet": Generic EVM wallet context (address, balances)
+ *
+ * WHY _meta?
+ *   - `_meta` is part of the MCP specification for arbitrary tool metadata
+ *   - The MCP SDK preserves `_meta` through transport
+ *   - Custom inputSchema fields (like x-context-requirements) get stripped
  *
  * =============================================================================
  */

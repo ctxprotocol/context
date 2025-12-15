@@ -122,14 +122,19 @@ For tools that analyze user portfolios (e.g., "Analyze my Polymarket positions")
 
 #### Declaring Context Requirements
 
-If your tool needs user portfolio data, declare it using the `x-context-requirements` extension in your `inputSchema`:
+If your tool needs user portfolio data, declare it using the `_meta.contextRequirements` field:
 
 ```typescript
 {
   name: "analyze_my_positions",
+  
+  // ✅ Use _meta for custom tool metadata (MCP spec)
+  _meta: {
+    contextRequirements: ["hyperliquid"]  // or "polymarket", "wallet"
+  },
+  
   inputSchema: {
     type: "object",
-    "x-context-requirements": ["hyperliquid"],  // or "polymarket", "wallet"
     properties: {
       portfolio: { type: "object" }
     },
@@ -144,7 +149,7 @@ If your tool needs user portfolio data, declare it using the `x-context-requirem
 | `"polymarket"` | Polymarket prediction markets | Positions, orders, market data |
 | `"wallet"` | Generic EVM wallet | Address, token balances |
 
-> **Why `x-context-requirements`?** The MCP protocol only transmits standard fields. Custom properties like `requirements` get stripped. JSON Schema's `x-` extension properties are preserved through transport.
+> **Why `_meta`?** The MCP SDK strips non-standard fields from tools. The `_meta` field is part of the MCP specification for arbitrary tool metadata and is preserved through transport.
 
 > 📖 **For MCP developers**: See [SDK Update Guide](./docs/SDK-UPDATE.md) and [Detection Architecture](./docs/wallet-linking-detection-architecture.md) for details.
 

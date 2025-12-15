@@ -18,8 +18,13 @@ import { aiTool } from "@/lib/db/schema";
 type McpToolInfo = {
   name: string;
   description?: string;
-  inputSchema?: unknown;
-  outputSchema?: unknown;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  /** MCP spec _meta field for arbitrary tool metadata (e.g., contextRequirements) */
+  _meta?: {
+    contextRequirements?: string[];
+    [key: string]: unknown;
+  };
 };
 
 /**
@@ -98,8 +103,12 @@ function getMcpTools(
     | Array<{
         name: string;
         description?: string;
-        inputSchema?: unknown;
-        outputSchema?: unknown;
+        inputSchema?: Record<string, unknown>;
+        outputSchema?: Record<string, unknown>;
+        _meta?: {
+          contextRequirements?: string[];
+          [key: string]: unknown;
+        };
       }>
     | undefined;
 
@@ -112,6 +121,7 @@ function getMcpTools(
     description: t.description,
     inputSchema: t.inputSchema,
     outputSchema: t.outputSchema,
+    _meta: t._meta,
   }));
 }
 

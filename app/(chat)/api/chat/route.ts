@@ -941,6 +941,10 @@ export async function POST(request: Request) {
                 name: string;
                 description?: string;
                 inputSchema?: Record<string, unknown>;
+                _meta?: {
+                  contextRequirements?: string[];
+                  [key: string]: unknown;
+                };
               }>;
               mcpMethod?: string;
               reason?: string;
@@ -1097,18 +1101,19 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                 mcpMethod: t.mcpMethod, // Which specific method AI plans to use
                 hasMcpTools: Boolean(t.mcpTools),
                 mcpToolCount: t.mcpTools?.length ?? 0,
-                // Show schema for the selected method only
-                selectedMethodSchema: t.mcpMethod
+                // Show _meta for the selected method (MCP spec field for custom metadata)
+                selectedMethodMeta: t.mcpMethod
                   ? (() => {
                       const method = t.mcpTools?.find(
                         (m) => m.name === t.mcpMethod
                       );
                       return {
                         found: Boolean(method),
-                        hasInputSchema: Boolean((method as any)?.inputSchema),
-                        schemaKeys:
-                          (method as any)?.inputSchema?.properties &&
-                          Object.keys((method as any).inputSchema.properties),
+                        hasMeta: Boolean((method as any)?._meta),
+                        // Show contextRequirements from _meta
+                        contextRequirements:
+                          (method as any)?._meta?.contextRequirements ??
+                          "NOT FOUND",
                       };
                     })()
                   : "no method specified - checking all",

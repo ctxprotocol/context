@@ -62,6 +62,11 @@ async function connectAndListTools(endpoint: string): Promise<{
     description?: string;
     inputSchema?: unknown;
     outputSchema?: unknown;
+    /** MCP spec _meta field for arbitrary tool metadata */
+    _meta?: {
+      contextRequirements?: string[];
+      [key: string]: unknown;
+    };
   }>;
 }> {
   const url = new URL(endpoint);
@@ -80,6 +85,23 @@ async function connectAndListTools(endpoint: string): Promise<{
   try {
     await client.connect(primaryTransport);
     const result = await client.listTools();
+
+    // Debug: Check if _meta.contextRequirements survives MCP SDK parsing
+    const analyzePos = result.tools.find(
+      (t) => t.name === "analyze_my_positions"
+    );
+    if (analyzePos) {
+      const meta = (analyzePos as any)._meta;
+      console.log(
+        "[MCP-DEBUG] analyze_my_positions _meta:",
+        meta ? JSON.stringify(meta) : "NOT FOUND"
+      );
+      console.log(
+        "[MCP-DEBUG] contextRequirements:",
+        meta?.contextRequirements ?? "NOT FOUND"
+      );
+    }
+
     return {
       client,
       tools: result.tools.map((t) => ({
@@ -87,6 +109,7 @@ async function connectAndListTools(endpoint: string): Promise<{
         description: t.description,
         inputSchema: t.inputSchema,
         outputSchema: t.outputSchema,
+        _meta: (t as any)._meta,
       })),
     };
   } catch (primaryError) {
@@ -98,6 +121,23 @@ async function connectAndListTools(endpoint: string): Promise<{
       const sseTransport = new SSEClientTransport(url);
       await fallbackClient.connect(sseTransport);
       const result = await fallbackClient.listTools();
+
+      // Debug: Check if _meta.contextRequirements survives MCP SDK parsing (SSE fallback)
+      const analyzePos = result.tools.find(
+        (t) => t.name === "analyze_my_positions"
+      );
+      if (analyzePos) {
+        const meta = (analyzePos as any)._meta;
+        console.log(
+          "[MCP-DEBUG-SSE] analyze_my_positions _meta:",
+          meta ? JSON.stringify(meta) : "NOT FOUND"
+        );
+        console.log(
+          "[MCP-DEBUG-SSE] contextRequirements:",
+          meta?.contextRequirements ?? "NOT FOUND"
+        );
+      }
+
       return {
         client: fallbackClient,
         tools: result.tools.map((t) => ({
@@ -105,6 +145,7 @@ async function connectAndListTools(endpoint: string): Promise<{
           description: t.description,
           inputSchema: t.inputSchema,
           outputSchema: t.outputSchema,
+          _meta: (t as any)._meta,
         })),
       };
     }

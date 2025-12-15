@@ -670,7 +670,17 @@ export type MarketplaceToolResult = {
   name: string;
   description: string;
   price: string;
-  mcpTools?: Array<{ name: string; description?: string }>;
+  mcpTools?: Array<{
+    name: string;
+    description?: string;
+    inputSchema?: Record<string, unknown>;
+    outputSchema?: Record<string, unknown>;
+    /** MCP spec _meta field for arbitrary tool metadata */
+    _meta?: {
+      contextRequirements?: string[];
+      [key: string]: unknown;
+    };
+  }>;
   // Trust metrics
   totalQueries?: number;
   successRate?: string;
