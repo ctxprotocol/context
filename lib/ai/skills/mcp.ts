@@ -3,6 +3,8 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { buildSearchText, generateEmbedding } from "@/lib/ai/embeddings";
 import { getSkillRuntime } from "@/lib/ai/skills/runtime";
+import { buildHyperliquidContext } from "@/lib/context/hyperliquid";
+import { buildPolymarketContext } from "@/lib/context/polymarket";
 import {
   getAIToolById,
   recordToolQuery,
@@ -10,6 +12,8 @@ import {
   updateAIToolSchema,
 } from "@/lib/db/queries";
 import type { AITool } from "@/lib/db/schema";
+import { getLinkedWalletsForUser } from "@/lib/privy";
+import type { ContextRequirementType } from "@/lib/types";
 
 /**
  * MCP Skill Module
@@ -45,6 +49,122 @@ type McpSkillResult = unknown;
 
 const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
+
+/**
+ * Get context requirements for a specific tool from the tool schema.
+ * Reads from _meta.contextRequirements in the MCP tool definition.
+ */
+function getToolContextRequirements(
+  toolSchema: Record<string, unknown> | null,
+  toolName: string
+): ContextRequirementType[] {
+  if (!toolSchema || toolSchema.kind !== "mcp") {
+    console.log("[mcp-skill] getToolContextRequirements: no valid schema", {
+      hasSchema: Boolean(toolSchema),
+      kind: toolSchema?.kind,
+    });
+    return [];
+  }
+
+  const tools = toolSchema.tools as
+    | Array<{
+        name: string;
+        _meta?: { contextRequirements?: string[] };
+      }>
+    | undefined;
+
+  if (!tools || !Array.isArray(tools)) {
+    console.log("[mcp-skill] getToolContextRequirements: no tools array");
+    return [];
+  }
+
+  const tool = tools.find((t) => t.name === toolName);
+  if (!tool) {
+    console.log("[mcp-skill] getToolContextRequirements: tool not found", {
+      toolName,
+      availableTools: tools.map((t) => t.name).slice(0, 5),
+    });
+    return [];
+  }
+
+  const requirements = tool._meta?.contextRequirements;
+  console.log("[mcp-skill] getToolContextRequirements: found tool", {
+    toolName,
+    hasMeta: Boolean(tool._meta),
+    requirements,
+  });
+
+  if (!Array.isArray(requirements)) {
+    return [];
+  }
+
+  return requirements.filter(
+    (r): r is ContextRequirementType =>
+      r === "polymarket" || r === "hyperliquid" || r === "wallet"
+  );
+}
+
+/**
+ * Inject portfolio context into tool arguments based on context requirements.
+ * Fetches the user's linked wallet data and builds the appropriate context.
+ */
+async function injectContextIfNeeded(
+  args: Record<string, unknown>,
+  requirements: ContextRequirementType[],
+  privyDid: string
+): Promise<Record<string, unknown>> {
+  if (requirements.length === 0) {
+    return args;
+  }
+
+  // Get user's linked wallets
+  const linkedWallets = await getLinkedWalletsForUser(privyDid);
+
+  if (linkedWallets.length === 0) {
+    console.log("[mcp-skill] Context injection: no linked wallets found");
+    return args;
+  }
+
+  console.log("[mcp-skill] Context injection: building context", {
+    requirements,
+    walletCount: linkedWallets.length,
+  });
+
+  // Build context based on requirements
+  const injectedArgs = { ...args };
+
+  for (const requirement of requirements) {
+    if (requirement === "polymarket") {
+      const polymarketContext = await buildPolymarketContext(linkedWallets);
+      injectedArgs.portfolio = polymarketContext;
+      console.log(
+        "[mcp-skill] Context injection: Polymarket context injected",
+        {
+          walletAddress: polymarketContext.walletAddress,
+          positionCount: polymarketContext.positions?.length ?? 0,
+        }
+      );
+    } else if (requirement === "hyperliquid") {
+      const hyperliquidContext = await buildHyperliquidContext(linkedWallets);
+      injectedArgs.portfolio = hyperliquidContext;
+      console.log(
+        "[mcp-skill] Context injection: Hyperliquid context injected",
+        {
+          walletAddress: hyperliquidContext.walletAddress,
+          positionCount: hyperliquidContext.perpPositions?.length ?? 0,
+        }
+      );
+    } else if (requirement === "wallet") {
+      // Generic wallet context - just pass the addresses
+      injectedArgs.walletAddresses = linkedWallets;
+      console.log("[mcp-skill] Context injection: wallet addresses injected", {
+        walletCount: linkedWallets.length,
+      });
+    }
+  }
+
+  return injectedArgs;
+}
 
 // Connection cache TTL - connections are reused within this window
 // Set to 2 minutes to outlast the MCP SDK's 60-second internal timeout
@@ -485,7 +605,30 @@ export async function callMcpSkill({
   toolName,
   args,
 }: CallMcpSkillParams): Promise<McpSkillResult> {
+  // Debug: Entry logging to confirm function is being called
+  console.log("[mcp-skill] ========== callMcpSkill ENTRY ==========");
+  console.log("[mcp-skill] toolId:", toolId);
+  console.log("[mcp-skill] toolName:", toolName);
+  console.log("[mcp-skill] args keys:", Object.keys(args ?? {}));
+  console.log(
+    "[mcp-skill] args.portfolio exists:",
+    Boolean((args as Record<string, unknown>)?.portfolio)
+  );
+
   const runtime = getSkillRuntime();
+
+  // Debug: Runtime state
+  console.log("[mcp-skill] runtime check:", {
+    hasRuntime: Boolean(runtime),
+    hasSession: Boolean(runtime?.session),
+    hasUser: Boolean(runtime?.session?.user),
+    userKeys: runtime?.session?.user ? Object.keys(runtime.session.user) : [],
+    privyDid: runtime?.session?.user?.privyDid
+      ? `${runtime.session.user.privyDid.slice(0, 25)}...`
+      : "UNDEFINED",
+    isAutoMode: runtime?.isAutoMode,
+    isDiscoveryPhase: runtime?.isDiscoveryPhase,
+  });
 
   // Look up the tool from the database
   const tool = await getAIToolById({ id: toolId });
@@ -585,11 +728,54 @@ export async function callMcpSkill({
   const endpoint = extractMcpEndpoint(tool);
   const chatId = runtime.chatId ?? runtime.requestId;
 
+  // Check for context requirements and inject portfolio data if needed
+  const contextRequirements = getToolContextRequirements(
+    tool.toolSchema as Record<string, unknown> | null,
+    toolName
+  );
+
+  // Debug: Log context injection decision
+  console.log("[mcp-skill] Context injection check:", {
+    toolName,
+    hasToolSchema: Boolean(tool.toolSchema),
+    contextRequirements,
+    hasPrivyDid: Boolean(runtime.session?.user?.privyDid),
+    privyDid: runtime.session?.user?.privyDid
+      ? `${runtime.session.user.privyDid.slice(0, 20)}...`
+      : "undefined",
+  });
+
+  let finalArgs = args;
+  if (contextRequirements.length > 0 && runtime.session?.user?.privyDid) {
+    console.log("[mcp-skill] Tool requires context injection:", {
+      toolName,
+      requirements: contextRequirements,
+    });
+
+    finalArgs = await injectContextIfNeeded(
+      args,
+      contextRequirements,
+      runtime.session.user.privyDid
+    );
+  } else if (contextRequirements.length > 0) {
+    console.warn(
+      "[mcp-skill] Context injection SKIPPED - no privyDid in session:",
+      {
+        toolName,
+        requirements: contextRequirements,
+        sessionUser: runtime.session?.user
+          ? Object.keys(runtime.session.user)
+          : "no user",
+      }
+    );
+  }
+
   console.log("[mcp-skill] Calling tool:", {
     toolId,
     toolName,
-    args,
+    args: finalArgs,
     endpoint,
+    contextInjected: contextRequirements.length > 0,
   });
 
   // Helper to emit execution progress to the UI
@@ -622,7 +808,7 @@ export async function callMcpSkill({
       console.log("[mcp-skill] Invoking client.callTool:", toolName);
       const result = await client.callTool({
         name: toolName,
-        arguments: args,
+        arguments: finalArgs,
       });
 
       clearTimeout(timeout);
@@ -648,7 +834,7 @@ export async function callMcpSkill({
       runtime.toolCallHistory.push({
         toolId,
         toolName,
-        args,
+        args: finalArgs,
         result: unwrappedContent,
         timestamp: Date.now(),
       });
@@ -666,7 +852,7 @@ export async function callMcpSkill({
         transactionHash: isFree
           ? "free-tool"
           : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
-        queryInput: { toolName, args },
+        queryInput: { toolName, args: finalArgs },
         queryOutput: unwrappedContent as Record<string, unknown>,
         status: result.isError ? "failed" : "completed",
       });
@@ -721,14 +907,17 @@ export async function callMcpSkill({
  *
  * @param endpoint - The MCP server endpoint URL
  */
-export async function listMcpTools(
-  endpoint: string
-): Promise<
+export async function listMcpTools(endpoint: string): Promise<
   {
     name: string;
     description?: string;
     inputSchema?: unknown;
     outputSchema?: unknown;
+    /** MCP spec _meta field for arbitrary tool metadata like contextRequirements */
+    _meta?: {
+      contextRequirements?: string[];
+      [key: string]: unknown;
+    };
   }[]
 > {
   const client = await getMcpClient(endpoint);
@@ -739,6 +928,13 @@ export async function listMcpTools(
     description: tool.description,
     inputSchema: tool.inputSchema,
     outputSchema: tool.outputSchema,
+    // CRITICAL: Include _meta field for context injection (e.g., contextRequirements: ["polymarket"])
+    // Without this, getToolContextRequirements() returns empty and portfolio data isn't injected
+    _meta: (
+      tool as {
+        _meta?: { contextRequirements?: string[]; [key: string]: unknown };
+      }
+    )._meta,
   }));
 }
 

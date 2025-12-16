@@ -14,6 +14,11 @@ export type EnabledToolSummary = {
     description?: string;
     inputSchema?: unknown;
     outputSchema?: unknown;
+    /** MCP spec _meta field for context requirements like ["polymarket"] */
+    _meta?: {
+      contextRequirements?: string[];
+      [key: string]: unknown;
+    };
   }[];
 };
 
@@ -349,6 +354,38 @@ Rules:
 - **CRITICAL: Do NOT wrap tool calls in try/catch blocks that swallow errors.** Let errors propagate naturally so the system can diagnose issues. If you must handle errors, re-throw them with context.
 - When handling numeric values from tool responses, preserve precision. Avoid parseInt() on values that may be decimals or scientific notation (e.g., 0.02, 1e-7). Use the raw number directly or parseFloat() if string parsing is needed.
 
+## Automatic Context Injection (CRITICAL)
+Some tools require user-specific data (portfolio positions, wallet balances, account info, etc.). These tools are marked with:
+\`⚡ AUTO-INJECTED CONTEXT: ["contextType"] (call with empty args - system provides this data)\`
+
+**The system automatically handles this at runtime.** When you see \`AUTO-INJECTED CONTEXT\` on a tool:
+1. You call \`callMcpSkill()\` with your args (can be empty \`{}\`)
+2. Inside our system, we detect \`_meta.contextRequirements\` on the tool
+3. We fetch the user's relevant data (linked wallets, portfolio, positions, etc.)
+4. We inject it into the args at runtime, BEFORE the MCP server receives the call
+
+**Your job**: Just call the tool. Pass any OTHER args you need, but don't worry about the auto-injected fields - even if inputSchema shows them as "required".
+
+\`\`\`ts
+// CORRECT: Call the tool - system injects context at runtime
+const result = await callMcpSkill({ toolId, toolName: "analyze_my_positions", args: {} });
+// Even though inputSchema shows "portfolio" as required, our system provides it
+\`\`\`
+
+**NEVER do this:**
+\`\`\`ts
+// WRONG: Don't check for or try to provide auto-injected context
+if (!userPortfolio) {
+  return { error: "Missing context data" }; // DON'T DO THIS - system handles it
+}
+// WRONG: Don't try to construct context data yourself
+const result = await callMcpSkill({ 
+  toolId, 
+  toolName: "analyze_my_positions", 
+  args: { portfolio: { /* don't construct this */ } } // DON'T DO THIS
+});
+\`\`\`
+
 ## Persistent Storage (Context Volume)
 You have access to persistent blob storage for saving large datasets that users may want to download or reference later.
 
@@ -490,6 +527,10 @@ function formatMcpToolDetails(t: {
   description?: string;
   inputSchema?: unknown;
   outputSchema?: unknown;
+  _meta?: {
+    contextRequirements?: string[];
+    [key: string]: unknown;
+  };
 }) {
   // Include full schema so the AI knows exact structure and possible values
   const inputSchemaStr = t.inputSchema
@@ -499,9 +540,14 @@ function formatMcpToolDetails(t: {
     ? JSON.stringify(t.outputSchema, null, 2)
     : "unknown";
 
+  // Show context requirements if present - this tells the AI the system auto-injects data
+  const contextReqStr = t._meta?.contextRequirements?.length
+    ? `\n        ⚡ AUTO-INJECTED CONTEXT: ${JSON.stringify(t._meta.contextRequirements)} (call with empty args - system provides this data)`
+    : "";
+
   return `      - ${t.name}: ${t.description || "No description"}
         inputSchema: ${inputSchemaStr}
-        outputSchema: ${outputSchemaStr}`;
+        outputSchema: ${outputSchemaStr}${contextReqStr}`;
 }
 
 function formatEnabledTool(tool: EnabledToolSummary, index: number) {

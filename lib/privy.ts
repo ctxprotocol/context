@@ -58,18 +58,43 @@ export async function getLinkedWalletsForUser(
   userId: string
 ): Promise<string[]> {
   try {
+    console.log("[privy] Looking up user:", userId);
     const user = await privy.getUser(userId);
 
+    // Debug: Log ALL linked accounts to understand what Privy returns
+    const allWalletAccounts = user.linkedAccounts.filter(
+      (account) => account.type === "wallet"
+    );
+
+    console.log("[privy] All wallet accounts:", {
+      totalAccounts: user.linkedAccounts.length,
+      walletAccounts: allWalletAccounts.length,
+      wallets: allWalletAccounts.map((w) => ({
+        type: w.type,
+        walletClientType: (w as any).walletClientType,
+        address: (w as any).address,
+        isEmbedded: (w as any).walletClientType === "privy",
+      })),
+    });
+
     // Filter to external wallets only (exclude embedded Privy wallet)
+    // The embedded wallet has walletClientType === "privy"
+    // External wallets have walletClientType like "metamask", "phantom", "coinbase_wallet", etc.
     const linkedWallets = user.linkedAccounts
       .filter(
         (account) =>
-          account.type === "wallet" && account.walletClientType !== "privy"
+          account.type === "wallet" &&
+          (account as any).walletClientType !== "privy"
       )
       .map((account) => {
         // Type assertion: wallet accounts have an address property
         return (account as { address: string }).address;
       });
+
+    console.log("[privy] Filtered external wallets:", {
+      count: linkedWallets.length,
+      addresses: linkedWallets,
+    });
 
     return linkedWallets;
   } catch (error) {

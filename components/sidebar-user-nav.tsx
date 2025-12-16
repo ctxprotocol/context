@@ -45,12 +45,14 @@ export function SidebarUserNav() {
   const [copied, setCopied] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [isAddingFunds, setIsAddingFunds] = useState(false);
-  const { activeWallet } = useWalletIdentity();
+  const { activeWallet, embeddedWallet } = useWalletIdentity();
   const { client: smartWalletClient } = useSmartWallets();
   const { fundWallet } = useFundWallet();
 
   const walletAddress = activeWallet?.address;
   const smartWalletAddress = smartWalletClient?.account?.address;
+  // The embedded Privy wallet is the EOA signer that controls the smart wallet
+  const embeddedWalletAddress = embeddedWallet?.address;
 
   // Use smart wallet address for balance if available, otherwise use active wallet
   const balanceCheckAddress = (smartWalletAddress || walletAddress) as
@@ -115,8 +117,9 @@ export function SidebarUserNav() {
 
   // The display address is the smart wallet (where funds are)
   const displayAddress = smartWalletAddress || walletAddress;
-  // The signer address is the EOA (what gets exported)
-  const signerAddress = walletAddress;
+  // The signer address is the embedded Privy EOA (what gets exported)
+  // This is NOT the linked external wallets (like Phantom) - those are for portfolio reading
+  const signerAddress = embeddedWalletAddress || walletAddress;
 
   const handleCopyAddress = async (
     address: string | undefined,

@@ -145,11 +145,23 @@ export function useWalletIdentity() {
     return user?.wallet ?? wallets[0];
   }, [user, wallets, preferenceKey]);
 
-  const embeddedWallet = useMemo(
-    () =>
-      wallets.find((wallet) => inferWalletClientType(wallet) === "embedded"),
-    [wallets]
-  );
+  const embeddedWallet = useMemo(() => {
+    // The embedded Privy wallet has walletClientType === "privy" (not "embedded")
+    // This is the EOA signer that controls the smart wallet
+    // First check the wallets array for a connected embedded wallet
+    const connectedEmbedded = wallets.find((wallet) => {
+      const clientType = inferWalletClientType(wallet);
+      return clientType === "embedded" || clientType === "privy";
+    });
+
+    if (connectedEmbedded) {
+      return connectedEmbedded;
+    }
+
+    // Fallback to user.wallet which is always the embedded Privy wallet
+    // even if it's not in the connected wallets list
+    return user?.wallet;
+  }, [wallets, user]);
 
   const walletClientType = inferWalletClientType(activeWallet);
   const isEmbeddedWallet =

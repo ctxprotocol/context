@@ -1135,8 +1135,9 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
 
             if (contextRequirements.size > 0) {
               // Tools require portfolio context - check for linked wallets
+              // Use privyDid (not database id) for Privy API calls
               const linkedWallets = await getLinkedWalletsForUser(
-                session.user.id
+                session.user.privyDid
               );
 
               if (linkedWallets.length === 0) {
@@ -1295,6 +1296,11 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                         description?: string;
                         inputSchema?: unknown;
                         outputSchema?: unknown;
+                        /** MCP spec _meta field for context requirements */
+                        _meta?: {
+                          contextRequirements?: string[];
+                          [key: string]: unknown;
+                        };
                       }>
                     | undefined;
 
@@ -1309,6 +1315,8 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
                       description: t.description,
                       inputSchema: t.inputSchema,
                       outputSchema: t.outputSchema,
+                      // CRITICAL: Include _meta for context injection (e.g., contextRequirements: ["polymarket"])
+                      _meta: t._meta,
                     })),
                   };
                 })

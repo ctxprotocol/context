@@ -1,8 +1,13 @@
 /**
  * Polymarket Context Builder
  *
- * Fetches portfolio data from Polymarket's public API.
+ * Fetches portfolio data from Polymarket's public APIs.
  * No authentication required - blockchain data is public.
+ *
+ * APIs:
+ * - Data API (data-api.polymarket.com): User positions, trades, analytics
+ * - CLOB API (clob.polymarket.com): Trading operations, orderbooks, prices
+ * - Gamma API (gamma-api.polymarket.com): Market discovery, events, search
  *
  * Chain: Polygon (Chain ID 137)
  */
@@ -13,18 +18,36 @@ import type {
   PolymarketOrder,
 } from "@ctxprotocol/sdk";
 
+// Data API for user positions and analytics
+const DATA_API_URL = "https://data-api.polymarket.com";
+// CLOB API for trading operations (orders, prices)
 const CLOB_API_URL = "https://clob.polymarket.com";
 
-// Type for raw API response
+// Type for Data API position response
+// See: https://data-api.polymarket.com/positions
 interface RawPosition {
-  market?: string;
-  condition_id?: string;
-  asset_id?: string;
-  token_id?: string;
-  outcome?: number;
-  size?: string | number;
-  avg_price?: string | number;
+  // Position identifiers
+  proxyWallet?: string;
+  asset?: string; // token_id
+  conditionId?: string;
+  // Position data
+  size?: number;
+  avgPrice?: number;
+  initialValue?: number;
+  currentValue?: number;
+  cashPnl?: number;
+  percentPnl?: number;
+  totalBought?: number;
+  realizedPnl?: number;
+  curPrice?: number;
+  // Market info
   title?: string;
+  outcome?: string; // "Yes" or "No"
+  outcomeIndex?: number; // 0 for Yes, 1 for No
+  endDate?: string;
+  // Status flags
+  redeemable?: boolean;
+  mergeable?: boolean;
 }
 
 interface RawOrder {
@@ -41,26 +64,45 @@ interface RawOrder {
 
 /**
  * Fetch Polymarket positions for a wallet address
- * This uses Polymarket's public API - no auth required
+ * Uses the Data API which handles both EOA and proxy wallet lookups
+ * See: https://data-api.polymarket.com/positions
  */
 export async function fetchPolymarketPositions(
   walletAddress: string
 ): Promise<PolymarketPosition[]> {
+  // Data API endpoint for user positions
+  // The API accepts EOA addresses and maps them to proxy wallets internally
+  const url = `${DATA_API_URL}/positions?user=${walletAddress.toLowerCase()}&sizeThreshold=0.01`;
+  console.log("[polymarket-context] Fetching positions from Data API:", {
+    url,
+    walletAddress: walletAddress.toLowerCase(),
+  });
+
   try {
-    const response = await fetch(
-      `${CLOB_API_URL}/positions?user=${walletAddress.toLowerCase()}`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-        // Cache for 30 seconds to avoid hammering the API
-        next: { revalidate: 30 },
-      }
-    );
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+      },
+      // Cache for 30 seconds to avoid hammering the API
+      next: { revalidate: 30 },
+    });
+
+    console.log("[polymarket-context] Data API response:", {
+      status: response.status,
+      statusText: response.statusText,
+    });
 
     if (!response.ok) {
+      // Try to get the response body for debugging
+      let errorBody = "";
+      try {
+        errorBody = await response.text();
+      } catch {
+        errorBody = "(could not read body)";
+      }
       console.warn(
-        `[polymarket-context] Failed to fetch positions: ${response.status}`
+        `[polymarket-context] Failed to fetch positions: ${response.status}`,
+        { errorBody: errorBody.slice(0, 500) }
       );
       return [];
     }
@@ -68,17 +110,32 @@ export async function fetchPolymarketPositions(
     const positions: RawPosition[] = await response.json();
 
     if (!Array.isArray(positions)) {
-      console.warn("[polymarket-context] Unexpected response format");
+      console.warn("[polymarket-context] Unexpected response format:", typeof positions);
       return [];
     }
 
+    console.log("[polymarket-context] Positions found:", {
+      count: positions.length,
+      preview: positions.slice(0, 2).map((p) => ({
+        title: p.title?.slice(0, 50),
+        outcome: p.outcome,
+        size: p.size,
+      })),
+    });
+
+    // Map Data API response format to our PolymarketPosition type
     return positions.map((p) => ({
-      conditionId: p.market || p.condition_id || "",
-      tokenId: p.asset_id || p.token_id || "",
-      outcome: p.outcome === 0 ? "YES" : "NO",
+      conditionId: p.conditionId || "",
+      tokenId: p.asset || "",
+      // Data API returns "Yes"/"No" as strings, normalize to uppercase
+      outcome: (p.outcome?.toUpperCase() || (p.outcomeIndex === 0 ? "YES" : "NO")) as "YES" | "NO",
       shares: Number(p.size || 0),
-      avgEntryPrice: Number(p.avg_price || 0),
+      avgEntryPrice: Number(p.avgPrice || 0),
       marketTitle: p.title,
+      // Include additional useful data from Data API
+      currentPrice: p.curPrice,
+      unrealizedPnL: p.cashPnl,
+      unrealizedPnLPercent: p.percentPnl,
     }));
   } catch (error) {
     console.error("[polymarket-context] Error fetching positions:", error);

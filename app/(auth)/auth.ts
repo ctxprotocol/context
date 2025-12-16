@@ -15,6 +15,7 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
+      privyDid: string; // Privy DID for server-side Privy API calls
       type: UserType;
       isDeveloper: boolean;
     } & DefaultSession["user"];
@@ -23,6 +24,7 @@ declare module "next-auth" {
   // biome-ignore lint/nursery/useConsistentTypeDefinitions: "Required"
   interface User {
     id?: string;
+    privyDid?: string;
     email?: string | null;
     type: UserType;
     isDeveloper?: boolean;
@@ -32,6 +34,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     id: string;
+    privyDid: string;
     type: UserType;
     isDeveloper: boolean;
   }
@@ -97,6 +100,7 @@ export const {
           // Return a user object that next-auth can use for the session
           return {
             id: dbUser.id,
+            privyDid, // Include Privy DID for server-side API calls
             email: dbUser.email,
             type: "regular", // Assign a default user type
             isDeveloper: dbUser.isDeveloper,
@@ -112,6 +116,7 @@ export const {
     jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
+        token.privyDid = user.privyDid as string;
         token.type = user.type;
         token.isDeveloper = user.isDeveloper ?? false;
       }
@@ -121,6 +126,7 @@ export const {
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id;
+        session.user.privyDid = token.privyDid;
         session.user.type = token.type;
         session.user.isDeveloper = token.isDeveloper;
       }
