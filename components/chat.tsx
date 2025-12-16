@@ -406,7 +406,7 @@ export function Chat({
 
         const hash = txHash as `0x${string}`;
         console.log("[chat-client] Auto Mode payment confirmed", { hash });
-        toast.success("Payment confirmed! Executing tools...");
+        // Success toast removed - too disruptive during agentic flow. Errors still shown.
 
         // Return payment info for execution phase
         return {

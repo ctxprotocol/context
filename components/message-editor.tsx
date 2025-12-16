@@ -12,6 +12,7 @@ import {
 import { deleteTrailingMessages } from "@/app/(chat)/actions";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessage } from "@/lib/utils";
+import { LoaderIcon } from "./icons";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -104,7 +105,16 @@ export function MessageEditor({
           }}
           variant="default"
         >
-          {isSubmitting ? "Sending..." : "Send"}
+          {isSubmitting ? (
+            <>
+              <span className="animate-spin">
+                <LoaderIcon size={16} />
+              </span>
+              Sending…
+            </>
+          ) : (
+            "Send"
+          )}
         </Button>
       </div>
     </div>

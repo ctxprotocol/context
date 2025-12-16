@@ -942,7 +942,7 @@ function PureMultimodalInput({
 
         // Mark as confirmed (Privy waits for confirmation before returning)
         setTransactionInfo({ status: "confirmed" });
-        toast.success("Payment processed automatically!");
+        // Success toast removed - too disruptive during agentic flow. Errors still shown.
 
         // Submit the form with the transaction hash (use outer toolNames)
         if (toolsToPay.length > 1) {
@@ -1097,7 +1097,7 @@ function PureMultimodalInput({
 
         // Mark as confirmed (Privy waits for confirmation before returning)
         setTransactionInfo({ status: "confirmed" });
-        toast.success("Payment confirmed!");
+        // Success toast removed - too disruptive during agentic flow. Errors still shown.
 
         // Submit the form with the transaction hash (use outer toolNames)
         if (toolsToPay.length > 1) {

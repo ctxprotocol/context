@@ -10,6 +10,10 @@
  * - Gamma API (gamma-api.polymarket.com): Market discovery, events, search
  *
  * Chain: Polygon (Chain ID 137)
+ *
+ * IMPORTANT: Polymarket uses proxy wallets! Positions are NOT on the user's
+ * main EOA wallet but on a proxy wallet controlled by the EOA. This module
+ * automatically discovers proxy wallets using on-chain factory queries.
  */
 
 import type {
@@ -17,6 +21,7 @@ import type {
   PolymarketPosition,
   PolymarketOrder,
 } from "@ctxprotocol/sdk";
+import { getWalletAddressesForProtocol } from "./proxy-discovery";
 
 // Data API for user positions and analytics
 const DATA_API_URL = "https://data-api.polymarket.com";
@@ -214,8 +219,15 @@ export async function buildPolymarketContextForWallet(
 }
 
 /**
- * Build complete Polymarket context for all linked wallets
- * Merges positions from multiple wallets into a single context
+ * Build complete Polymarket context for all linked wallets.
+ * 
+ * IMPORTANT: This function automatically discovers proxy wallets for each EOA.
+ * Polymarket positions are stored on proxy wallets, not the main EOA!
+ * 
+ * Flow:
+ * 1. For each linked EOA, discover its proxy wallet(s)
+ * 2. Fetch positions from all discovered addresses
+ * 3. Merge into a single context
  */
 export async function buildPolymarketContext(
   walletAddresses: string[]
@@ -230,15 +242,45 @@ export async function buildPolymarketContext(
     };
   }
 
-  // Fetch from all linked wallets in parallel
+  console.log("[polymarket-context] Building context for EOAs:", walletAddresses);
+
+  // Step 1: Discover proxy wallets for each EOA
+  // This queries on-chain factory contracts to find the actual wallet addresses
+  // where Polymarket positions are stored
+  const allAddressesToQuery: string[] = [];
+  
+  for (const eoa of walletAddresses) {
+    try {
+      const addresses = await getWalletAddressesForProtocol(eoa, "polymarket");
+      console.log("[polymarket-context] Discovered addresses for", eoa, ":", addresses);
+      allAddressesToQuery.push(...addresses);
+    } catch (error) {
+      console.warn("[polymarket-context] Proxy discovery failed for", eoa, error);
+      // Fallback to EOA if discovery fails
+      allAddressesToQuery.push(eoa);
+    }
+  }
+
+  // Dedupe addresses (in case EOA appears multiple times)
+  const uniqueAddresses = [...new Set(allAddressesToQuery.map(a => a.toLowerCase()))];
+  console.log("[polymarket-context] Querying unique addresses:", uniqueAddresses);
+
+  // Step 2: Fetch from all discovered wallets in parallel
   const contexts = await Promise.all(
-    walletAddresses.map((address) => buildPolymarketContextForWallet(address))
+    uniqueAddresses.map((address) => buildPolymarketContextForWallet(address))
   );
 
   // Merge all positions and orders
   const allPositions = contexts.flatMap((ctx) => ctx.positions);
   const allOrders = contexts.flatMap((ctx) => ctx.openOrders);
   const totalValue = contexts.reduce((sum, ctx) => sum + (ctx.totalValue || 0), 0);
+
+  console.log("[polymarket-context] Final context:", {
+    inputEoas: walletAddresses.length,
+    discoveredAddresses: uniqueAddresses.length,
+    totalPositions: allPositions.length,
+    totalOrders: allOrders.length,
+  });
 
   return {
     walletAddress: walletAddresses.join(","),

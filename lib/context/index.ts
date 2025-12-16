@@ -75,3 +75,15 @@ export {
   detectContextRequirements,
   detectContextRequirementsForTools,
 } from "./detection";
+
+// =============================================================================
+// PROXY WALLET DISCOVERY
+// =============================================================================
+
+export {
+  discoverProxyWallets,
+  getWalletAddressesForProtocol,
+  hasPolymarketProxy,
+  type DiscoveredProxy,
+  type ProxyDiscoveryResult,
+} from "./proxy-discovery";
