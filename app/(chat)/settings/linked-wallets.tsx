@@ -1,5 +1,6 @@
 "use client";
 
+import type { WalletWithMetadata } from "@privy-io/react-auth";
 import { useLinkAccount, usePrivy } from "@privy-io/react-auth";
 import { ExternalLink, Info, Loader2, Wallet, X } from "lucide-react";
 import { useState } from "react";
@@ -32,11 +33,10 @@ export function LinkedWalletsSection() {
   const [unlinkingAddress, setUnlinkingAddress] = useState<string | null>(null);
 
   // Get linked wallets (excluding embedded Privy wallet)
-  const linkedExternalWallets =
-    user?.linkedAccounts?.filter(
-      (account) =>
-        account.type === "wallet" && account.walletClientType !== "privy"
-    ) ?? [];
+  const linkedExternalWallets = (user?.linkedAccounts?.filter(
+    (account): account is WalletWithMetadata =>
+      account.type === "wallet" && account.walletClientType !== "privy"
+  ) ?? []) as WalletWithMetadata[];
 
   const handleLinkWallet = () => {
     setIsLinking(true);

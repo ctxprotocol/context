@@ -1,3 +1,7 @@
+import type {
+  ContextRequirementType,
+  ToolRequirements,
+} from "@ctxprotocol/sdk";
 import type { InferUITool, UIMessage } from "ai";
 import { z } from "zod";
 import type { ArtifactKind } from "@/components/artifact";
@@ -99,7 +103,4 @@ export type WalletLinkingRequirement = {
  * { inputSchema: { "x-context-requirements": ["hyperliquid"], ... } }
  * ```
  */
-export type {
-  ContextRequirementType,
-  ToolRequirements,
-} from "@ctxprotocol/sdk";
+export type { ContextRequirementType, ToolRequirements };
