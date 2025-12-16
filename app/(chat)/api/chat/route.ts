@@ -1745,12 +1745,14 @@ The user asked: "${message.parts
                 });
 
                 // Build mediator text with retry info for transparency
-                mediatorText = buildMediatorText(
+                // Pass toolCallHistory so we can detect filtered-to-empty patterns
+                mediatorText = buildMediatorText({
                   execution,
-                  agenticResult.attemptCount,
-                  Array.from(allowedModules),
-                  executionHasData
-                );
+                  attemptCount: agenticResult.attemptCount,
+                  allowedModules: Array.from(allowedModules),
+                  hasData: executionHasData,
+                  toolCallHistory: agenticResult.toolCallHistory,
+                });
 
                 // Add payment verification note for auto mode
                 if (execution.ok) {
@@ -1880,12 +1882,14 @@ The user asked: "${message.parts
                 }
 
                 // Build mediator text with retry info for transparency
-                mediatorText = buildMediatorText(
+                // Pass toolCallHistory so we can detect filtered-to-empty patterns
+                mediatorText = buildMediatorText({
                   execution,
-                  agenticResult.attemptCount,
-                  Array.from(allowedModules),
-                  executionHasData
-                );
+                  attemptCount: agenticResult.attemptCount,
+                  allowedModules: Array.from(allowedModules),
+                  hasData: executionHasData,
+                  toolCallHistory: agenticResult.toolCallHistory,
+                });
 
                 console.log("[chat-api] execution finished", {
                   chatId: id,
