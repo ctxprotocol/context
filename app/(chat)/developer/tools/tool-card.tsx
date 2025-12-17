@@ -638,7 +638,7 @@ export function ToolCard({ tool }: { tool: Tool }) {
                   >
                     {isEditing ? (
                       <>
-                        <span className="mr-2 animate-spin">
+                        <span className="animate-spin">
                           <LoaderIcon size={14} />
                         </span>
                         Saving...
