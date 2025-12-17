@@ -50,6 +50,147 @@ type McpSkillResult = unknown;
 const MCP_TIMEOUT_MS = 30_000;
 const MAX_CALLS_PER_TURN = 100;
 
+// Regex for stripping markdown code blocks (defined at top level for performance)
+const CODE_BLOCK_STRIP_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/;
+
+// =============================================================================
+// RATE LIMITING: Prevent AI-generated loops from hitting external rate limits
+// =============================================================================
+
+/**
+ * Minimum delay between calls to the same endpoint (per-endpoint throttling)
+ * This prevents AI-generated code from firing requests too fast in loops.
+ *
+ * Set to 200ms = max 5 requests/second per endpoint, which is safe for most APIs.
+ * Can be tuned per-endpoint if needed in the future.
+ */
+const MIN_CALL_INTERVAL_MS = 200;
+
+/**
+ * Track last call timestamp per endpoint for throttling
+ * Key: endpoint URL, Value: timestamp of last call
+ */
+const lastCallTimestamp = new Map<string, number>();
+
+/**
+ * Pending throttle promises per endpoint (to serialize calls)
+ * Prevents race conditions when multiple parallel calls try to throttle
+ */
+const pendingThrottles = new Map<string, Promise<void>>();
+
+/**
+ * Throttle calls to an endpoint to prevent rate limiting
+ * Uses a serialized queue approach - each call waits for the previous one's throttle
+ *
+ * @param endpoint - The MCP endpoint URL
+ * @returns Promise that resolves when it's safe to make the call
+ */
+async function throttleEndpointCall(endpoint: string): Promise<void> {
+  // Wait for any pending throttle on this endpoint first
+  const pending = pendingThrottles.get(endpoint);
+  if (pending) {
+    await pending;
+  }
+
+  const now = Date.now();
+  const lastCall = lastCallTimestamp.get(endpoint) ?? 0;
+  const elapsed = now - lastCall;
+  const waitTime = Math.max(0, MIN_CALL_INTERVAL_MS - elapsed);
+
+  if (waitTime > 0) {
+    console.log("[mcp-skill] Throttling call to prevent rate limit:", {
+      endpoint: endpoint.slice(0, 50),
+      waitMs: waitTime,
+      callsPerSecond: Math.round(1000 / MIN_CALL_INTERVAL_MS),
+    });
+
+    // Create a promise for this throttle and store it
+    const throttlePromise = sleep(waitTime);
+    pendingThrottles.set(endpoint, throttlePromise);
+
+    await throttlePromise;
+
+    // Clean up
+    pendingThrottles.delete(endpoint);
+  }
+
+  // Update timestamp BEFORE the call (optimistic)
+  lastCallTimestamp.set(endpoint, Date.now());
+}
+
+// Retry configuration for resilient API calls
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 500, // Start with 500ms delay
+  maxDelayMs: 10_000, // Cap at 10 seconds
+  retryableErrors: [
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "ENOTFOUND",
+    "ECONNREFUSED",
+    "EAI_AGAIN",
+    "socket hang up",
+    "network",
+    "timeout",
+  ],
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+};
+
+/**
+ * Check if an error is retryable (transient network/rate limit errors)
+ */
+function isRetryableError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+
+  // Check for known retryable error patterns
+  for (const pattern of RETRY_CONFIG.retryableErrors) {
+    if (message.includes(pattern.toLowerCase())) {
+      return true;
+    }
+  }
+
+  // Check for HTTP status codes in error message
+  for (const code of RETRY_CONFIG.retryableStatusCodes) {
+    if (message.includes(`${code}`) || message.includes(`status ${code}`)) {
+      return true;
+    }
+  }
+
+  // Rate limit specific patterns
+  if (
+    message.includes("rate limit") ||
+    message.includes("too many requests") ||
+    message.includes("throttl")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Calculate exponential backoff delay with jitter
+ */
+function calculateBackoffDelay(attempt: number): number {
+  // Exponential backoff: baseDelay * 2^attempt
+  const exponentialDelay = RETRY_CONFIG.baseDelayMs * 2 ** attempt;
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);
+  const delay = Math.min(exponentialDelay + jitter, RETRY_CONFIG.maxDelayMs);
+  return Math.round(delay);
+}
+
+/**
+ * Sleep for a specified duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Get context requirements for a specific tool from the tool schema.
  * Reads from _meta.contextRequirements in the MCP tool definition.
@@ -225,7 +366,7 @@ function unwrapMcpResult(result: McpCallToolResult): unknown {
  * Matches ```json ... ``` or just ``` ... ``` and returns the inner content
  */
 function stripCodeBlocks(text: string): string {
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  const match = CODE_BLOCK_STRIP_REGEX.exec(text);
   return match ? match[1] : text;
 }
 
@@ -698,9 +839,15 @@ export async function callMcpSkill({
         runtime.autoModeToolsUsed = new Map();
       }
 
-      // Track this tool usage
+      // Track this tool usage and enforce call limit
       const existing = runtime.autoModeToolsUsed.get(toolId);
       if (existing) {
+        // Enforce call limit to prevent runaway loops
+        if (existing.callCount >= MAX_CALLS_PER_TURN) {
+          throw new Error(
+            `Tool ${tool.name} has reached its limit of ${MAX_CALLS_PER_TURN} calls per turn. Consider batching your requests or using a different approach.`
+          );
+        }
         existing.callCount++;
         console.log(
           "[mcp-skill] Auto Mode Execution: tool call tracked (repeated)",
@@ -708,6 +855,7 @@ export async function callMcpSkill({
             toolId,
             toolName: tool.name,
             callCount: existing.callCount,
+            maxCalls: MAX_CALLS_PER_TURN,
           }
         );
       } else {
@@ -796,54 +944,160 @@ export async function callMcpSkill({
     Object.keys(args).length > 0 ? ` with ${Object.keys(args).join(", ")}` : "";
   emitProgress("query", `Querying ${toolName}${argsPreview}...`);
 
-  try {
-    // Get or create MCP client
-    const client = await getMcpClient(endpoint);
+  // Throttle calls to prevent AI-generated loops from hitting rate limits
+  // This ensures minimum delay between calls to the same endpoint
+  await throttleEndpointCall(endpoint);
 
-    // Call the tool with timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), MCP_TIMEOUT_MS);
+  // Retry loop for resilient API calls
+  let lastError: Error | null = null;
 
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      console.log("[mcp-skill] Invoking client.callTool:", toolName);
-      const result = await client.callTool({
-        name: toolName,
-        arguments: finalArgs,
-      });
+      // Get or create MCP client (may need fresh connection on retry)
+      const client = await getMcpClient(endpoint);
 
-      clearTimeout(timeout);
-      console.log(
-        "[mcp-skill] Raw MCP result:",
-        JSON.stringify(result).slice(0, 500)
-      );
+      // Call the tool with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), MCP_TIMEOUT_MS);
 
-      // Unwrap MCP result to return clean data to the agent
-      // MCP 2025-06-18 spec supports `structuredContent` for typed responses
-      // We prefer that over parsing the content array
-      const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
-      console.log(
-        "[mcp-skill] Unwrapped content:",
-        JSON.stringify(unwrappedContent).slice(0, 500)
-      );
+      try {
+        if (attempt > 0) {
+          console.log("[mcp-skill] Retry attempt:", {
+            toolName,
+            attempt,
+            maxRetries: RETRY_CONFIG.maxRetries,
+          });
+          emitProgress(
+            "query",
+            `Retrying ${toolName} (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries + 1})...`
+          );
+        }
 
-      // Record to tool call history for agentic reflection
-      // This allows the AI to see raw outputs if execution produces suspicious results
-      if (!runtime.toolCallHistory) {
-        runtime.toolCallHistory = [];
+        console.log("[mcp-skill] Invoking client.callTool:", toolName);
+        const result = await client.callTool({
+          name: toolName,
+          arguments: finalArgs,
+        });
+
+        clearTimeout(timeout);
+        console.log(
+          "[mcp-skill] Raw MCP result:",
+          JSON.stringify(result).slice(0, 500)
+        );
+
+        // Unwrap MCP result to return clean data to the agent
+        // MCP 2025-06-18 spec supports `structuredContent` for typed responses
+        // We prefer that over parsing the content array
+        const unwrappedContent = unwrapMcpResult(result as McpCallToolResult);
+        console.log(
+          "[mcp-skill] Unwrapped content:",
+          JSON.stringify(unwrappedContent).slice(0, 500)
+        );
+
+        // Record to tool call history for agentic reflection
+        // This allows the AI to see raw outputs if execution produces suspicious results
+        if (!runtime.toolCallHistory) {
+          runtime.toolCallHistory = [];
+        }
+        runtime.toolCallHistory.push({
+          toolId,
+          toolName,
+          args: finalArgs,
+          result: unwrappedContent,
+          timestamp: Date.now(),
+        });
+
+        // Emit result progress - show a preview of what was returned
+        const resultPreview = getResultPreview(unwrappedContent);
+        emitProgress("result", `${toolName} returned: ${resultPreview}`);
+
+        // Record the query for analytics
+        await recordToolQuery({
+          toolId,
+          userId: runtime.session.user.id,
+          chatId,
+          amountPaid: isFree ? "0" : tool.pricePerQuery,
+          transactionHash: isFree
+            ? "free-tool"
+            : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
+          queryInput: { toolName, args: finalArgs },
+          queryOutput: unwrappedContent as Record<string, unknown>,
+          status: result.isError ? "failed" : "completed",
+        });
+
+        // Return unwrapped content directly so agent code can access it naturally
+        // e.g., result.data.chains instead of result.content[0].text
+        if (result.isError) {
+          emitProgress(
+            "error",
+            `${toolName} failed: ${typeof unwrappedContent === "string" ? unwrappedContent : "Unknown error"}`
+          );
+          throw new Error(
+            typeof unwrappedContent === "string"
+              ? unwrappedContent
+              : JSON.stringify(unwrappedContent)
+          );
+        }
+
+        // Success! Log if this was a retry that worked
+        if (attempt > 0) {
+          console.log("[mcp-skill] Retry succeeded:", {
+            toolName,
+            attempt,
+          });
+        }
+
+        return unwrappedContent;
+      } finally {
+        clearTimeout(timeout);
       }
-      runtime.toolCallHistory.push({
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      console.error("[mcp-skill] Tool call failed:", {
         toolId,
         toolName,
-        args: finalArgs,
-        result: unwrappedContent,
-        timestamp: Date.now(),
+        attempt,
+        error: lastError.message,
+        isRetryable: isRetryableError(lastError),
       });
 
-      // Emit result progress - show a preview of what was returned
-      const resultPreview = getResultPreview(unwrappedContent);
-      emitProgress("result", `${toolName} returned: ${resultPreview}`);
+      // Check if we should retry
+      const canRetry =
+        attempt < RETRY_CONFIG.maxRetries && isRetryableError(lastError);
 
-      // Record the query for analytics
+      if (canRetry) {
+        const delay = calculateBackoffDelay(attempt);
+        console.log("[mcp-skill] Will retry after backoff:", {
+          toolName,
+          attempt,
+          delayMs: delay,
+          nextAttempt: attempt + 1,
+        });
+
+        // Clear potentially stale connection before retry
+        const cached = clientCache.get(endpoint);
+        if (cached) {
+          try {
+            await cached.client.close();
+          } catch {
+            // Ignore close errors
+          }
+          clientCache.delete(endpoint);
+        }
+
+        await sleep(delay);
+        continue; // Retry
+      }
+
+      // No more retries - emit error and record failure
+      const errorMessage = lastError.message;
+      emitProgress(
+        "error",
+        `${toolName} failed: ${errorMessage.slice(0, 100)}`
+      );
+
+      // Record failed query
       await recordToolQuery({
         toolId,
         userId: runtime.session.user.id,
@@ -852,53 +1106,16 @@ export async function callMcpSkill({
         transactionHash: isFree
           ? "free-tool"
           : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
-        queryInput: { toolName, args: finalArgs },
-        queryOutput: unwrappedContent as Record<string, unknown>,
-        status: result.isError ? "failed" : "completed",
+        queryInput: { toolName, args },
+        status: "failed",
       });
 
-      // Return unwrapped content directly so agent code can access it naturally
-      // e.g., result.data.chains instead of result.content[0].text
-      if (result.isError) {
-        emitProgress(
-          "error",
-          `${toolName} failed: ${typeof unwrappedContent === "string" ? unwrappedContent : "Unknown error"}`
-        );
-        throw new Error(
-          typeof unwrappedContent === "string"
-            ? unwrappedContent
-            : JSON.stringify(unwrappedContent)
-        );
-      }
-
-      return unwrappedContent;
-    } finally {
-      clearTimeout(timeout);
+      throw new Error(`MCP tool ${toolName} failed: ${errorMessage}`);
     }
-  } catch (error) {
-    console.error("[mcp-skill] Tool call failed:", { toolId, toolName, error });
-
-    // Emit error progress
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    emitProgress("error", `${toolName} failed: ${errorMessage.slice(0, 100)}`);
-
-    // Record failed query
-    await recordToolQuery({
-      toolId,
-      userId: runtime.session.user.id,
-      chatId,
-      amountPaid: isFree ? "0" : tool.pricePerQuery,
-      transactionHash: isFree
-        ? "free-tool"
-        : (runtime.allowedTools?.get(toolId)?.transactionHash ?? "unknown"),
-      queryInput: { toolName, args },
-      status: "failed",
-    });
-
-    const message = error instanceof Error ? error.message : "MCP call failed";
-    throw new Error(`MCP tool ${toolName} failed: ${message}`);
   }
+
+  // Should never reach here, but TypeScript needs this
+  throw lastError ?? new Error(`MCP tool ${toolName} failed after retries`);
 }
 
 /**
@@ -968,7 +1185,9 @@ const SCHEMA_REFRESH_TTL_MS = 60 * 60 * 1000;
  */
 function needsSchemaRefresh(toolId: string): boolean {
   const lastRefresh = schemaRefreshCache.get(toolId);
-  if (!lastRefresh) return true;
+  if (!lastRefresh) {
+    return true;
+  }
   return Date.now() - lastRefresh > SCHEMA_REFRESH_TTL_MS;
 }
 
