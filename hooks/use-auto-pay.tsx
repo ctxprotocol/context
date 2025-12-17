@@ -31,6 +31,10 @@ type AutoPayContextType = {
   recordSpend: (amount: number) => boolean; // Returns false if over budget
   resetSpentAmount: () => void;
   canAfford: (amount: number) => boolean;
+  // Auto mode enable request - used by components that need auto mode (e.g. suggested actions)
+  autoModeRequested: boolean;
+  requestAutoMode: () => void;
+  clearAutoModeRequest: () => void;
 };
 
 const STORAGE_KEYS = {
@@ -52,9 +56,14 @@ const AutoPayContext = createContext<AutoPayContextType | null>(null);
 
 export function AutoPayProvider({ children }: { children: ReactNode }) {
   const [isAutoPay, setIsAutoPayState] = useState(DEFAULT_VALUES.isAutoPay);
-  const [spendingCap, setSpendingCapState] = useState(DEFAULT_VALUES.spendingCap);
-  const [spentAmount, setSpentAmountState] = useState(DEFAULT_VALUES.spentAmount);
+  const [spendingCap, setSpendingCapState] = useState(
+    DEFAULT_VALUES.spendingCap
+  );
+  const [spentAmount, setSpentAmountState] = useState(
+    DEFAULT_VALUES.spentAmount
+  );
   const [isAutoMode, setIsAutoModeState] = useState(DEFAULT_VALUES.isAutoMode);
+  const [autoModeRequested, setAutoModeRequested] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -124,7 +133,9 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
 
   const canAfford = useCallback(
     (amount: number) => {
-      if (!isAutoPay) return false;
+      if (!isAutoPay) {
+        return false;
+      }
       return amount <= remainingBudget;
     },
     [isAutoPay, remainingBudget]
@@ -152,6 +163,18 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Request auto mode enablement - used by components that need auto mode
+  const requestAutoMode = useCallback(() => {
+    if (!isAutoMode) {
+      setAutoModeRequested(true);
+    }
+  }, [isAutoMode]);
+
+  // Clear the auto mode request (called after dialog is shown/handled)
+  const clearAutoModeRequest = useCallback(() => {
+    setAutoModeRequested(false);
+  }, []);
+
   const value = useMemo(
     () => ({
       isAutoPay,
@@ -166,6 +189,9 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
       recordSpend,
       resetSpentAmount,
       canAfford,
+      autoModeRequested,
+      requestAutoMode,
+      clearAutoModeRequest,
     }),
     [
       isAutoPay,
@@ -180,13 +206,14 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
       recordSpend,
       resetSpentAmount,
       canAfford,
+      autoModeRequested,
+      requestAutoMode,
+      clearAutoModeRequest,
     ]
   );
 
   return (
-    <AutoPayContext.Provider value={value}>
-      {children}
-    </AutoPayContext.Provider>
+    <AutoPayContext.Provider value={value}>{children}</AutoPayContext.Provider>
   );
 }
 
@@ -197,4 +224,3 @@ export function useAutoPay() {
   }
   return context;
 }
-

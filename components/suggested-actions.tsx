@@ -2,7 +2,8 @@
 
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { motion } from "framer-motion";
-import { memo } from "react";
+import { memo, useCallback } from "react";
+import { useAutoPay } from "@/hooks/use-auto-pay";
 import type { ChatMessage } from "@/lib/types";
 import { Suggestion } from "./elements/suggestion";
 import type { VisibilityType } from "./visibility-selector";
@@ -14,24 +15,58 @@ type SuggestedActionsProps = {
   isReadonly: boolean;
 };
 
+/**
+ * Mind-blowing questions that showcase Context's unique capabilities
+ * with Hyperliquid and Polymarket tools - things you can't ask ChatGPT
+ */
+const SUGGESTED_ACTIONS = [
+  // Hyperliquid: Real-time orderbook analysis with price impact simulation
+  "What's the slippage if I market sell $500K of HYPE right now? How long should I TWAP it?",
+  // Hyperliquid: Cross-exchange funding arbitrage
+  "Find funding arbitrage between Hyperliquid, Binance and Bybit - where can I get paid to hold?",
+  // Polymarket: Real arbitrage detection from actual orderbooks
+  "Are there any arbitrage opportunities on Polymarket where I can lock in guaranteed profit?",
+  // Polymarket: Smart money tracking
+  "What prediction markets are whales piling into? Show me the smart money flow.",
+];
+
 function PureSuggestedActions({
   chatId,
   sendMessage,
   isReadonly,
 }: SuggestedActionsProps) {
-  const suggestedActions = [
-    "What's the current price of ETH and BTC?",
-    "What are the gas prices on Ethereum right now?",
-    "Find the best DeFi yield opportunities on Base",
-    "Compare funding rates for BTC across exchanges",
-  ];
+  const { isAutoMode, requestAutoMode } = useAutoPay();
+
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      if (isReadonly) {
+        return;
+      }
+
+      // These advanced queries require Auto Mode for tool discovery
+      if (!isAutoMode) {
+        // Request auto mode enablement - this will trigger the approval dialog
+        requestAutoMode();
+        // Don't send yet - user needs to enable auto mode first
+        return;
+      }
+
+      // Auto mode is enabled, proceed with the query
+      window.history.replaceState({}, "", `/chat/${chatId}`);
+      sendMessage({
+        role: "user",
+        parts: [{ type: "text", text: suggestion }],
+      });
+    },
+    [isReadonly, isAutoMode, requestAutoMode, chatId, sendMessage]
+  );
 
   return (
     <div
       className="grid w-full gap-2 sm:grid-cols-2"
       data-testid="suggested-actions"
     >
-      {suggestedActions.map((suggestedAction, index) => (
+      {SUGGESTED_ACTIONS.map((suggestedAction, index) => (
         <motion.div
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
@@ -40,16 +75,9 @@ function PureSuggestedActions({
           transition={{ delay: 0.05 * index }}
         >
           <Suggestion
-            className="h-auto w-full whitespace-normal p-3 text-left"
+            className="h-auto w-full whitespace-normal rounded-xl p-3 text-left"
             disabled={isReadonly}
-            onClick={(suggestion) => {
-              if (isReadonly) return;
-              window.history.replaceState({}, "", `/chat/${chatId}`);
-              sendMessage({
-                role: "user",
-                parts: [{ type: "text", text: suggestion }],
-              });
-            }}
+            onClick={handleSuggestionClick}
             suggestion={suggestedAction}
           >
             {suggestedAction}

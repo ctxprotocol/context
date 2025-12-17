@@ -55,3 +55,4 @@ COMMENT ON COLUMN "EngagementEvent"."event_type" IS 'Categorized action type: MA
 COMMENT ON COLUMN "EngagementEvent"."metadata" IS 'Event-specific context data (search queries, referrer IDs, etc.)';
 
 
+

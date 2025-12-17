@@ -205,6 +205,8 @@ export function ContextSidebar({
     setSpendingCap,
     setIsAutoMode,
     resetSpentAmount,
+    autoModeRequested,
+    clearAutoModeRequest,
   } = useAutoPay();
 
   // State for showing the approval dialog
@@ -212,6 +214,28 @@ export function ContextSidebar({
   const [pendingCapChange, setPendingCapChange] = useState<number | null>(null);
   // Track if approval was triggered from Auto Mode toggle
   const [pendingAutoMode, setPendingAutoMode] = useState(false);
+
+  // Respond to external auto mode requests (e.g., from suggested actions)
+  useEffect(() => {
+    if (autoModeRequested && !isAutoMode) {
+      if (isAutoPay) {
+        // Auto Pay is ON, just enable Auto Mode
+        setIsAutoMode(true);
+        clearAutoModeRequest();
+      } else {
+        // Auto Pay is OFF, need to show approval dialog
+        setPendingAutoMode(true);
+        setShowApprovalDialog(true);
+        clearAutoModeRequest();
+      }
+    }
+  }, [
+    autoModeRequested,
+    isAutoMode,
+    isAutoPay,
+    setIsAutoMode,
+    clearAutoModeRequest,
+  ]);
 
   // Get addresses for allowance check
   const walletAddress = activeWallet?.address;
