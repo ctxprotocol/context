@@ -45,8 +45,8 @@ importers:
         specifier: ^6.35.3
         version: 6.36.4
       '@ctxprotocol/sdk':
-        specifier: ^0.5.1
-        version: 0.5.1
+        specifier: ^0.5.3
+        version: 0.5.3
       '@icons-pack/react-simple-icons':
         specifier: ^13.7.0
         version: 13.8.0(react@19.0.0-rc-45804af1-20241021)
@@ -557,8 +557,8 @@ packages:
   '@coinbase/wallet-sdk@4.3.6':
     resolution: {integrity: sha512-4q8BNG1ViL4mSAAvPAtpwlOs1gpC+67eQtgIwNvT3xyeyFFd+guwkc8bcX5rTmQhXpqnhzC4f0obACbP9CqMSA==}
 
-  '@ctxprotocol/sdk@0.5.1':
-    resolution: {integrity: sha512-rVpeqYeE0vKMwddkKiG7N7AczjVytQqroSrhOkqLMpYwzjIKlTmTnoSsYbjPhdvIFWcX2GQOCYQb1xmSFjGBDA==}
+  '@ctxprotocol/sdk@0.5.3':
+    resolution: {integrity: sha512-ZCtmsEIh4edQGEjoeU6Bc6wrnTui5bAeTOf3DS5biEEPH217GHOH0T9mZDnzLJrV+Fcdw7ciqqoeGXH2Q/3MLw==}
     engines: {node: '>=18.0.0'}
 
   '@drizzle-team/brocli@0.10.2':
@@ -5381,6 +5381,9 @@ packages:
   jose@6.1.2:
     resolution: {integrity: sha512-MpcPtHLE5EmztuFIqB0vzHAWJPpmN1E6L4oo+kze56LIs3MyXIj9ZHMDxqOvkP38gBR7K1v3jqd4WU2+nrfONQ==}
 
+  jose@6.1.3:
+    resolution: {integrity: sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==}
+
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
@@ -7909,7 +7912,9 @@ snapshots:
       - utf-8-validate
       - zod
 
-  '@ctxprotocol/sdk@0.5.1': {}
+  '@ctxprotocol/sdk@0.5.3':
+    dependencies:
+      jose: 6.1.3
 
   '@drizzle-team/brocli@0.10.2': {}
 
@@ -14341,6 +14346,8 @@ snapshots:
   jose@5.10.0: {}
 
   jose@6.1.2: {}
+
+  jose@6.1.3: {}
 
   joycon@3.1.1: {}
 

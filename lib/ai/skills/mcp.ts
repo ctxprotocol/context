@@ -3,6 +3,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { buildSearchText, generateEmbedding } from "@/lib/ai/embeddings";
 import { getSkillRuntime } from "@/lib/ai/skills/runtime";
+import { generateServiceToken } from "@/lib/auth/service-auth";
 import { buildHyperliquidContext } from "@/lib/context/hyperliquid";
 import { buildPolymarketContext } from "@/lib/context/polymarket";
 import {
@@ -518,21 +519,36 @@ function detectTransportType(endpoint: string): TransportType {
 }
 
 /**
+ * Headers to inject into MCP transport requests
+ */
+type McpTransportHeaders = Record<string, string>;
+
+/**
  * Create the appropriate MCP transport based on endpoint URL
+ * @param endpoint - The MCP server endpoint URL
+ * @param headers - Optional headers to inject (e.g., Authorization)
  */
 function createMcpTransport(
-  endpoint: string
+  endpoint: string,
+  headers?: McpTransportHeaders
 ): SSEClientTransport | StreamableHTTPClientTransport {
   const url = new URL(endpoint);
   const transportType = detectTransportType(endpoint);
 
   if (transportType === "sse") {
     console.log("[mcp-skill] Using SSE transport for:", endpoint);
-    return new SSEClientTransport(url);
+    // SSE transport: headers go in requestInit (for the initial HTTP request)
+    // eventSourceInit is for EventSource options like credentials, not headers
+    return new SSEClientTransport(url, {
+      requestInit: headers ? { headers } : undefined,
+    });
   }
 
   console.log("[mcp-skill] Using HTTP Streaming transport for:", endpoint);
-  return new StreamableHTTPClientTransport(url);
+  // HTTP Streaming transport accepts requestInit with headers
+  return new StreamableHTTPClientTransport(url, {
+    requestInit: headers ? { headers } : undefined,
+  });
 }
 
 /**
@@ -545,9 +561,29 @@ function createMcpTransport(
  * IMPORTANT: Uses a pending connection pattern to prevent race conditions.
  * When multiple parallel calls try to connect to the same endpoint simultaneously,
  * only the first call actually creates the connection - all others wait for it.
+ *
+ * SECURITY: When headers are provided (authenticated requests), caching is bypassed
+ * to ensure tokens are fresh for each request.
+ *
+ * @param endpoint - The MCP server endpoint URL
+ * @param headers - Optional headers to inject (bypasses cache when provided)
  */
-async function getMcpClient(endpoint: string): Promise<Client> {
+async function getMcpClient(
+  endpoint: string,
+  headers?: McpTransportHeaders
+): Promise<Client> {
   const now = Date.now();
+
+  // SECURITY: Skip caching for authenticated requests
+  // Tokens expire in 2 minutes, so we need fresh connections
+  if (headers) {
+    console.log(
+      "[mcp-skill] Creating fresh authenticated connection to:",
+      endpoint
+    );
+    return createMcpConnection(endpoint, now, headers);
+  }
+
   const cached = clientCache.get(endpoint);
 
   // Check if we have a valid cached connection
@@ -592,16 +628,22 @@ async function getMcpClient(endpoint: string): Promise<Client> {
 /**
  * Internal function to actually create the MCP connection
  * Separated from getMcpClient to enable the pending connection pattern
+ *
+ * @param endpoint - The MCP server endpoint URL
+ * @param timestamp - Timestamp for cache TTL tracking
+ * @param headers - Optional headers to inject (for authenticated requests)
  */
 async function createMcpConnection(
   endpoint: string,
-  timestamp: number
+  timestamp: number,
+  headers?: McpTransportHeaders
 ): Promise<Client> {
   console.log("[mcp-skill] Creating fresh MCP connection to:", endpoint);
   const transportType = detectTransportType(endpoint);
+  const isAuthenticated = Boolean(headers);
 
   try {
-    const transport = createMcpTransport(endpoint);
+    const transport = createMcpTransport(endpoint, headers);
     const client = new Client(
       {
         name: "context-protocol",
@@ -617,11 +659,15 @@ async function createMcpConnection(
       "[mcp-skill] Successfully connected via",
       transportType,
       "to:",
-      endpoint
+      endpoint,
+      isAuthenticated ? "(authenticated)" : ""
     );
 
-    // Cache the connection with timestamp
-    clientCache.set(endpoint, { client, createdAt: timestamp });
+    // Only cache unauthenticated connections
+    // Authenticated connections use short-lived tokens and should not be cached
+    if (!isAuthenticated) {
+      clientCache.set(endpoint, { client, createdAt: timestamp });
+    }
 
     return client;
   } catch (error) {
@@ -632,7 +678,9 @@ async function createMcpConnection(
         endpoint
       );
       try {
-        const sseTransport = new SSEClientTransport(new URL(endpoint));
+        const sseTransport = new SSEClientTransport(new URL(endpoint), {
+          requestInit: headers ? { headers } : undefined,
+        });
         const client = new Client(
           { name: "context-protocol", version: "1.0.0" },
           { capabilities: {} }
@@ -642,7 +690,9 @@ async function createMcpConnection(
           "[mcp-skill] Successfully connected via SSE fallback to:",
           endpoint
         );
-        clientCache.set(endpoint, { client, createdAt: timestamp });
+        if (!isAuthenticated) {
+          clientCache.set(endpoint, { client, createdAt: timestamp });
+        }
         return client;
       } catch (fallbackError) {
         console.error("[mcp-skill] SSE fallback also failed:", fallbackError);
@@ -948,13 +998,30 @@ export async function callMcpSkill({
   // This ensures minimum delay between calls to the same endpoint
   await throttleEndpointCall(endpoint);
 
+  // Generate service token for authentication (RS256 signed JWT)
+  // This authenticates the Context Platform to the MCP tool server
+  const serviceToken = await generateServiceToken(toolId, endpoint);
+  const authHeaders: McpTransportHeaders | undefined = serviceToken
+    ? {
+        Authorization: `Bearer ${serviceToken}`,
+        ...(runtime.requestId && { "X-Context-Request-Id": runtime.requestId }),
+      }
+    : undefined;
+
+  if (serviceToken) {
+    console.log(
+      "[mcp-skill] Service token generated for authenticated request"
+    );
+  }
+
   // Retry loop for resilient API calls
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
       // Get or create MCP client (may need fresh connection on retry)
-      const client = await getMcpClient(endpoint);
+      // Authenticated requests bypass caching for token freshness
+      const client = await getMcpClient(endpoint, authHeaders);
 
       // Call the tool with timeout
       const controller = new AbortController();

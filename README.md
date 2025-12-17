@@ -99,6 +99,36 @@ All value flows through `ContextRouter.sol` on Base. Payments are split instantl
 
 **Staking System:** All tools (including free) require a minimum $10 USDC stake, enforced on-chain. For paid tools, the stake is 100x the query price if higher. This creates accountability and enables slashing for fraud. Stakes are fully refundable with a 7-day withdrawal delay.
 
+### Security: Request Signing
+
+Context uses **RS256 asymmetric request signing** to authenticate the platform to MCP tool servers. This prevents unauthorized access and replay attacks.
+
+**How it works:**
+1. **Platform signs requests** with a private key (stored securely in environment)
+2. **Tool servers verify** requests using the public key (distributed via SDK)
+3. **Short-lived tokens** (2-minute expiration) prevent replay attacks
+
+**JWT Claims:**
+| Claim | Description |
+|-------|-------------|
+| `iss` | `https://ctxprotocol.com` (issuer) |
+| `aud` | Tool endpoint URL (audience) |
+| `toolId` | Database ID of the tool being called |
+| `iat` | Issue timestamp |
+| `exp` | Expiration (2 minutes from issue) |
+
+**For Platform Operators:**
+```bash
+# Generate a new key pair
+npx tsx scripts/generate-keys.ts
+
+# Add to .env.local (base64 encoded)
+CONTEXT_PROTOCOL_PRIVATE_KEY=<base64-encoded-private-key>
+```
+
+**For MCP Tool Developers:**
+Verify incoming requests using the `@ctxprotocol/sdk` or the public key directly. Requests include an `Authorization: Bearer <jwt>` header.
+
 ### 4. Context Injection (Portfolio Data)
 
 For tools that analyze user portfolios (e.g., "Analyze my Polymarket positions"), Context uses a **Context Injection** pattern:
