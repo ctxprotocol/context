@@ -86,6 +86,14 @@ type AutoModeToolSelection = {
   originalQuery?: string;
 };
 
+// Model-cost-only payment (Auto Mode, no tools, convenience tier)
+type ModelCostOnlyPaymentRequest = {
+  modelCost: string;
+  originalQuery?: string;
+  selectionReasoning?: string;
+  dataAlreadyAvailable?: boolean;
+};
+
 export function Chat({
   id,
   initialMessages,
@@ -186,6 +194,9 @@ export function Chat({
   // Auto Mode tool selection state (two-phase model)
   const [pendingToolSelection, setPendingToolSelection] =
     useState<AutoModeToolSelection | null>(null);
+  // Model-cost-only payment state (Auto Mode, no tools, convenience tier)
+  const [pendingModelCostPayment, setPendingModelCostPayment] =
+    useState<ModelCostOnlyPaymentRequest | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Wallet linking prompt state (shown when tools need portfolio context)
@@ -197,7 +208,9 @@ export function Chat({
   const [autoModeFundingRequest, setAutoModeFundingRequest] = useState<{
     amount: string;
     toolName: string;
-    toolSelection: AutoModeToolSelection;
+    // Either tool selection OR model-cost-only payment
+    toolSelection?: AutoModeToolSelection;
+    modelCostPayment?: ModelCostOnlyPaymentRequest;
   } | null>(null);
   const [isAutoModeFunding, setIsAutoModeFunding] = useState(false);
   const { fundWallet } = useFundWallet();
@@ -468,6 +481,148 @@ export function Chat({
   );
 
   /**
+   * Process model-cost-only payment (Auto Mode, no tools, convenience tier)
+   * After payment succeeds, returns the transaction hash for execution phase
+   */
+  const processModelCostOnlyPayment = useCallback(
+    async (
+      paymentRequest: ModelCostOnlyPaymentRequest
+    ): Promise<{ transactionHash: string; originalQuery?: string } | null> => {
+      if (isProcessingPayment || !smartWalletClient) {
+        return null;
+      }
+
+      setIsProcessingPayment(true);
+      console.log(
+        "[chat-client] Processing model-cost-only payment",
+        paymentRequest
+      );
+
+      try {
+        // Parse model cost from server
+        const modelCostUnits = parseUnits(paymentRequest.modelCost, 6);
+
+        // Check USDC balance FIRST
+        const { data: balanceData } = await refetchAutoModeBalance();
+        const balance = (balanceData as bigint | undefined) ?? 0n;
+
+        if (balance < modelCostUnits) {
+          console.log("[chat-client] Model cost only: insufficient balance", {
+            balance: Number(balance) / 1_000_000,
+            needed: Number(modelCostUnits) / 1_000_000,
+          });
+
+          if (isEmbeddedWallet) {
+            const amountStr = formatPrice(Number(modelCostUnits) / 1_000_000);
+            setAutoModeFundingRequest({
+              amount: amountStr,
+              toolName: "AI Model Cost",
+              // Store for retry after funding
+              modelCostPayment: paymentRequest,
+            });
+            setShowAutoModeAddFunds(true);
+          } else {
+            const amountStr = formatPrice(Number(modelCostUnits) / 1_000_000);
+            toast.error(
+              `Insufficient USDC balance. You need ${amountStr} USDC on Base mainnet.`
+            );
+          }
+          setIsProcessingPayment(false);
+          return null;
+        }
+
+        // Record spend against budget
+        const modelCostUSD = Number(modelCostUnits) / 1_000_000;
+        recordSpend(modelCostUSD);
+
+        console.log("[chat-client] Model cost only payment", {
+          modelCost: modelCostUSD,
+        });
+
+        // Encode payment transaction - use batch function with empty arrays
+        const txData = encodeFunctionData({
+          abi: contextRouterAbi,
+          functionName: "executeBatchQueryWithModelCost",
+          args: [
+            [], // No tool IDs
+            [], // No developer wallets
+            [], // No amounts
+            modelCostUnits, // Model cost (100% to platform)
+          ],
+        });
+
+        // Send via smart wallet with auto-signing
+        const txHash = await smartWalletClient.sendTransaction(
+          {
+            chain: base,
+            to: routerAddress,
+            data: txData,
+            value: BigInt(0),
+          },
+          {
+            uiOptions: {
+              showWalletUIs: false, // Auto-pay, no confirmation needed
+            },
+          }
+        );
+
+        if (!txHash) {
+          throw new Error("No transaction hash returned");
+        }
+
+        const hash = txHash as `0x${string}`;
+        console.log("[chat-client] Model cost only payment confirmed", {
+          hash,
+        });
+
+        return {
+          transactionHash: hash,
+          originalQuery: paymentRequest.originalQuery,
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        console.error("[chat-client] Model cost only payment failed", error);
+
+        if (
+          errorMessage.includes("insufficient") ||
+          errorMessage.includes("Insufficient") ||
+          errorMessage.includes("exceeds balance")
+        ) {
+          if (isEmbeddedWallet) {
+            setAutoModeFundingRequest({
+              amount: paymentRequest.modelCost,
+              toolName: "AI Model Cost",
+              modelCostPayment: paymentRequest,
+            });
+            setShowAutoModeAddFunds(true);
+          } else {
+            toast.error("Insufficient USDC balance.");
+          }
+        } else if (
+          errorMessage.includes("User rejected") ||
+          errorMessage.includes("user rejected")
+        ) {
+          toast.error("Payment cancelled.");
+        } else {
+          toast.error("Payment failed. Please try again.");
+        }
+        return null;
+      } finally {
+        setIsProcessingPayment(false);
+      }
+    },
+    [
+      isProcessingPayment,
+      smartWalletClient,
+      routerAddress,
+      recordSpend,
+      refetchAutoModeBalance,
+      isEmbeddedWallet,
+    ]
+  );
+
+  /**
    * Handle funding wallet for Auto Mode (when insufficient balance)
    */
   const handleAutoModeFundWallet = useCallback(async () => {
@@ -689,6 +844,20 @@ export function Chat({
           break;
         }
 
+        // Model-cost-only payment: Auto Mode found no tools, convenience tier must pay
+        case "data-modelCostOnlyPayment": {
+          if (typeof part.data === "object") {
+            console.log(
+              "[chat-client] Model-cost-only payment requested",
+              part.data
+            );
+            setPendingModelCostPayment(
+              part.data as ModelCostOnlyPaymentRequest
+            );
+          }
+          break;
+        }
+
         default:
           break;
       }
@@ -787,6 +956,73 @@ export function Chat({
     isProcessingPayment,
     status,
     processToolSelectionPayment,
+    sendMessage,
+    setStage,
+  ]);
+
+  /**
+   * Process model-cost-only payment and trigger execution phase
+   *
+   * Flow:
+   * 1. Discovery phase finds no tools, pendingModelCostPayment is set
+   * 2. This effect detects it when status is not streaming
+   * 3. Process model-cost-only payment via smart wallet
+   * 4. Send NEW message to server with modelCostPayment to trigger execution
+   * 5. Server generates response (no tools to execute)
+   */
+  useEffect(() => {
+    if (
+      pendingModelCostPayment &&
+      !isProcessingPayment &&
+      status !== "streaming"
+    ) {
+      const handleModelCostPaymentAndExecution = async () => {
+        // Show "Confirming payment..."
+        setStage("confirming-payment");
+
+        const paymentResult = await processModelCostOnlyPayment(
+          pendingModelCostPayment
+        );
+
+        if (paymentResult) {
+          console.log(
+            "[chat-client] Model cost payment confirmed, triggering execution phase"
+          );
+
+          // Clear pending payment
+          setPendingModelCostPayment(null);
+
+          // Send a continuation message to trigger execution phase
+          // Set "thinking" stage since there are no tools to plan/execute
+          setStage("thinking");
+
+          sendMessage(
+            {
+              role: "user" as const,
+              parts: [{ type: "text", text: "[Continue with response]" }],
+            },
+            {
+              body: {
+                modelCostPayment: {
+                  transactionHash: paymentResult.transactionHash,
+                  originalQuery: paymentResult.originalQuery,
+                },
+              },
+            }
+          );
+        } else {
+          // Payment failed - reset stage
+          setPendingModelCostPayment(null);
+          setStage("idle");
+        }
+      };
+      handleModelCostPaymentAndExecution();
+    }
+  }, [
+    pendingModelCostPayment,
+    isProcessingPayment,
+    status,
+    processModelCostOnlyPayment,
     sendMessage,
     setStage,
   ]);

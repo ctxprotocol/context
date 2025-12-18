@@ -38,6 +38,15 @@ const autoModePaymentSchema = z.object({
   originalQuery: z.string().optional(),
 });
 
+// Model-cost-only payment (convenience tier, no tools)
+// Used when Auto Mode discovery finds no tools needed
+const modelCostPaymentSchema = z.object({
+  // Transaction hash proving model cost payment
+  transactionHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  // Original query from discovery phase
+  originalQuery: z.string().optional(),
+});
+
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
   message: z.object({
@@ -62,8 +71,12 @@ export const postRequestBodySchema = z.object({
   // Auto Mode Execution Phase: Payment confirmation with selected tools
   // When present, this is the execution phase after discovery + payment
   autoModePayment: autoModePaymentSchema.optional(),
+  // Model-cost-only payment (convenience tier, Auto Mode, no tools found)
+  // When present, this is a response after discovery found no tools but model cost was paid
+  modelCostPayment: modelCostPaymentSchema.optional(),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;
 export type AutoModePayment = z.infer<typeof autoModePaymentSchema>;
 export type AutoModeSelectedTool = z.infer<typeof autoModeSelectedToolSchema>;
+export type ModelCostPayment = z.infer<typeof modelCostPaymentSchema>;

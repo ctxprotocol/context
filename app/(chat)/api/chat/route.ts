@@ -89,6 +89,7 @@ import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import {
   type AutoModePayment,
+  type ModelCostPayment,
   type PostRequestBody,
   postRequestBodySchema,
 } from "./schema";
@@ -283,6 +284,7 @@ export async function POST(request: Request) {
       isDebugMode = false,
       isAutoMode = false,
       autoModePayment,
+      modelCostPayment,
     }: {
       id: string;
       message: ChatMessage;
@@ -292,13 +294,17 @@ export async function POST(request: Request) {
       isDebugMode?: boolean;
       isAutoMode?: boolean;
       autoModePayment?: AutoModePayment;
+      modelCostPayment?: ModelCostPayment;
     } = requestBody;
 
     // Auto Mode: Determine which phase we're in
-    // - Discovery phase: isAutoMode=true, autoModePayment=undefined
-    // - Execution phase: isAutoMode=true, autoModePayment has payment proof
-    const isAutoModeDiscovery = isAutoMode && !autoModePayment;
+    // - Discovery phase: isAutoMode=true, autoModePayment=undefined, modelCostPayment=undefined
+    // - Execution phase (with tools): isAutoMode=true, autoModePayment has payment proof
+    // - Execution phase (model-cost-only): isAutoMode=true, modelCostPayment has payment proof
+    const isAutoModeDiscovery =
+      isAutoMode && !autoModePayment && !modelCostPayment;
     const isAutoModeExecution = isAutoMode && !!autoModePayment;
+    const isModelCostOnlyExecution = isAutoMode && !!modelCostPayment;
 
     if (process.env.NODE_ENV === "development") {
       console.log("[chat-api] request debug flags", {
@@ -530,6 +536,142 @@ export async function POST(request: Request) {
     const flowMultiplier =
       flowType === "auto_mode" ? 5.0 : flowType === "manual_tools" ? 3.0 : 1.0;
     const estimatedTotalCost = baseCostEstimate * flowMultiplier;
+
+    // Branch 0: Model-cost-only execution (Auto Mode, no tools, convenience tier paid)
+    // This is after discovery found no tools and client paid for model cost
+    if (isModelCostOnlyExecution && modelCostPayment) {
+      console.log("[chat-api] Model-cost-only execution phase", {
+        chatId: id,
+        transactionHash: modelCostPayment.transactionHash,
+        userTier,
+      });
+
+      // TODO: Verify payment transaction on-chain (optional but recommended)
+      // For now, trust the client since they have transaction hash
+
+      const systemInstructions = systemPrompt({
+        selectedChatModel,
+        requestHints,
+        isDebugMode,
+      });
+
+      const stream = createUIMessageStream({
+        execute: ({ writer: dataStream }) => {
+          // Signal thinking status
+          dataStream.write({
+            type: "data-toolStatus",
+            data: { status: "thinking" },
+          });
+
+          const result = streamText({
+            model: provider.languageModel(selectedChatModel),
+            system: systemInstructions,
+            messages: convertToModelMessages(uiMessages),
+            stopWhen: stepCountIs(5),
+            experimental_transform: smoothStream({ chunking: "word" }),
+            experimental_telemetry: {
+              isEnabled: isProductionEnvironment,
+              functionId: "stream-text-model-cost-only",
+            },
+            onFinish: async ({ usage }) => {
+              aiCallCount++;
+              try {
+                const providers = await getTokenlensCatalog();
+                const modelId =
+                  provider.languageModel(selectedChatModel).modelId;
+                if (modelId && providers) {
+                  const summary = getUsage({ modelId, usage, providers });
+                  finalMergedUsage = {
+                    ...usage,
+                    ...summary,
+                    modelId,
+                  } as AppUsage;
+                  if (finalMergedUsage.costUSD?.totalUSD) {
+                    totalActualCost += Number(
+                      finalMergedUsage.costUSD.totalUSD
+                    );
+                  }
+                } else {
+                  finalMergedUsage = usage;
+                }
+                dataStream.write({
+                  type: "data-usage",
+                  data: finalMergedUsage,
+                });
+              } catch (err) {
+                console.warn("TokenLens enrichment failed", err);
+                finalMergedUsage = usage;
+                dataStream.write({
+                  type: "data-usage",
+                  data: finalMergedUsage,
+                });
+              }
+            },
+          });
+
+          result.consumeStream();
+          dataStream.merge(
+            result.toUIMessageStream({
+              sendReasoning: true,
+            })
+          );
+        },
+        generateId: generateUUID,
+        onFinish: async ({ messages }) => {
+          await saveMessages({
+            messages: messages.map((currentMessage) => ({
+              id: currentMessage.id,
+              role: currentMessage.role,
+              parts: currentMessage.parts,
+              createdAt: new Date(),
+              attachments: [],
+              chatId: id,
+            })),
+          });
+
+          // Convenience tier: Track cost (already paid on-chain)
+          if (finalMergedUsage) {
+            try {
+              await updateChatLastContextById({
+                chatId: id,
+                context: finalMergedUsage,
+              });
+
+              // Record actual cost for dynamic estimation
+              const actualCost =
+                totalActualCost > 0
+                  ? totalActualCost
+                  : finalMergedUsage.costUSD?.totalUSD !== undefined
+                    ? Number(finalMergedUsage.costUSD.totalUSD)
+                    : 0;
+
+              if (actualCost > 0) {
+                await recordActualCost({
+                  userId: session.user.id,
+                  chatId: id,
+                  modelId: selectedChatModel,
+                  flowType: "manual_simple", // No tools = simple
+                  estimatedCost: baseCostEstimate,
+                  actualCost,
+                  aiCallCount,
+                });
+              }
+            } catch (err) {
+              console.warn(
+                "Unable to persist usage for model-cost-only chat",
+                id,
+                err
+              );
+            }
+          }
+        },
+        onError: () => {
+          return "Oops, an error occurred!";
+        },
+      });
+
+      return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
+    }
 
     // Branch 1: no paid tools selected AND Auto Mode is OFF → simple streaming chat.
     // When Auto Mode is ON, we need the agentic loop to execute searchMarketplace().
@@ -982,10 +1124,86 @@ export async function POST(request: Request) {
                 {
                   chatId: id,
                   dataAlreadyAvailable,
+                  userTier,
                   reason:
                     discoveryResult.error || discoveryResult.selectionReasoning,
                 }
               );
+
+              // ─────────────────────────────────────────────────────────────────
+              // CONVENIENCE TIER: Request model cost payment before generating
+              // ─────────────────────────────────────────────────────────────────
+              // Convenience tier users must pay for model costs even without tools.
+              // Send payment request to client and wait for payment confirmation.
+              if (userTier === "convenience") {
+                // Calculate estimated model cost for this response
+                // Use manual_simple multiplier (1x) since no tools involved
+                const modelCostEstimate =
+                  getEstimatedModelCost(selectedChatModel);
+
+                console.log(
+                  "[chat-api] Auto Mode Discovery: requesting model cost payment",
+                  {
+                    chatId: id,
+                    modelCost: modelCostEstimate,
+                    tier: userTier,
+                  }
+                );
+
+                // Clear discovery UI
+                dataStream.write({
+                  type: "data-clearDiscovery",
+                  data: true,
+                });
+
+                // Send model cost payment request to client
+                dataStream.write({
+                  type: "data-modelCostOnlyPayment",
+                  data: {
+                    modelCost: modelCostEstimate.toFixed(6),
+                    originalQuery: userQuery,
+                    selectionReasoning: discoveryResult.selectionReasoning,
+                    dataAlreadyAvailable,
+                  },
+                });
+
+                // Signal awaiting payment
+                dataStream.write({
+                  type: "data-toolStatus",
+                  data: { status: "awaiting-model-cost-payment" },
+                });
+
+                // Record discovery phase cost before returning
+                if (totalActualCost > 0) {
+                  try {
+                    await addAccumulatedModelCost(
+                      session.user.id,
+                      totalActualCost
+                    );
+                    await recordActualCost({
+                      userId: session.user.id,
+                      chatId: id,
+                      modelId: selectedChatModel,
+                      flowType: "auto_mode",
+                      estimatedCost: estimatedTotalCost,
+                      actualCost: totalActualCost,
+                      aiCallCount,
+                    });
+                  } catch (err) {
+                    console.warn(
+                      "[chat-api] Auto Mode Discovery: failed to record discovery cost",
+                      err
+                    );
+                  }
+                }
+
+                // Return early - wait for client to pay and come back
+                return;
+              }
+
+              // ─────────────────────────────────────────────────────────────────
+              // FREE/BYOK TIER: Proceed directly (no model cost payment needed)
+              // ─────────────────────────────────────────────────────────────────
 
               // Clear discovery content before transitioning
               dataStream.write({

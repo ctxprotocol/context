@@ -381,12 +381,17 @@ function PureMultimodalInput({
       const trimmedInput = input.trim();
       const hasText = trimmedInput.length > 0;
 
+      // Check if convenience tier needs to pay model costs (even without tools)
+      const isConvenienceTier = settings.tier === "convenience";
+      const hasToolsSelected = selectedTool || activeTools.length > 0;
+
       // In Auto Mode, ignore manually selected tools - let auto mode discover tools itself
+      // For convenience tier, also enter this block to handle model-cost-only payments
       if (
         !toolInvocation &&
         !isReadonly &&
         !isAutoMode &&
-        (selectedTool || activeTools.length > 0)
+        (hasToolsSelected || isConvenienceTier)
       ) {
         // Calculate total cost - tool fees + model cost (only for convenience tier)
         const toolsToPay = selectedTool ? [selectedTool] : activeTools;
@@ -403,12 +408,11 @@ function PureMultimodalInput({
         const baseCost = getEstimatedModelCost(selectedModelId);
         const hasTools = toolsToPay.length > 0;
         const flowMultiplier = hasTools ? 3.0 : 1.0; // manual_tools vs manual_simple
-        const modelCost =
-          settings.tier === "convenience" ? baseCost * flowMultiplier : 0;
+        const modelCost = isConvenienceTier ? baseCost * flowMultiplier : 0;
         const totalCost = toolCost + modelCost;
 
-        // If there are paid tools, handle payment (model cost alone doesn't require payment for non-convenience tiers)
-        const needsPayment = paidTools.length > 0;
+        // Payment needed if: paid tools exist OR convenience tier has model cost to pay
+        const needsPayment = paidTools.length > 0 || modelCost > 0;
 
         if (needsPayment) {
           // If Auto Pay is enabled and within budget, trigger auto-payment
@@ -758,9 +762,14 @@ function PureMultimodalInput({
     // Determine which tools to pay for
     const toolsToPay = selectedTool ? [selectedTool] : activeTools;
 
+    // Check if this is a model-cost-only payment (convenience tier, no tools)
+    const isConvenienceTier = settings.tier === "convenience";
+    const isModelCostOnly = toolsToPay.length === 0 && isConvenienceTier;
+
     // Use smart wallet address for checks (same as balance/allowance)
+    // Allow model-cost-only payments for convenience tier (no tools required)
     if (
-      toolsToPay.length === 0 ||
+      (toolsToPay.length === 0 && !isModelCostOnly) ||
       !effectiveWalletAddress ||
       !routerAddress ||
       !usdcAddress
@@ -857,7 +866,20 @@ function PureMultimodalInput({
         const hasModelCost =
           settings.tier === "convenience" && modelCostUnits > 0n;
 
-        if (toolsToPay.length === 1) {
+        if (toolsToPay.length === 0 && hasModelCost) {
+          // MODEL-COST-ONLY: Convenience tier, no tools selected
+          // Use batch function with empty arrays - contract allows this when modelCost > 0
+          txData = encodeFunctionData({
+            abi: contextRouterAbi,
+            functionName: "executeBatchQueryWithModelCost",
+            args: [
+              [], // No tool IDs
+              [], // No developer wallets
+              [], // No amounts
+              modelCostUnits, // Model cost (100% to platform)
+            ],
+          });
+        } else if (toolsToPay.length === 1) {
           const tool = toolsToPay[0];
           setExecutingTool(tool);
 
@@ -962,6 +984,38 @@ function PureMultimodalInput({
             transactionHash: hash,
             fallbackText: `Using ${tool.name}`,
           });
+        } else {
+          // MODEL-COST-ONLY: No tools, just model cost payment completed
+          // Submit form without tool invocations - server will proceed with simple chat
+          setStage("thinking", "");
+          // Call submitForm with a special marker to bypass payment checks
+          // Since we're in confirmPayment, we need to directly send the message
+          window.history.pushState({}, "", `/chat/${chatId}`);
+          const trimmedInput = input.trim();
+          if (trimmedInput || attachments.length > 0) {
+            sendMessage(
+              {
+                role: "user",
+                parts: [
+                  ...attachments.map((attachment) => ({
+                    type: "file" as const,
+                    url: attachment.url,
+                    name: attachment.name,
+                    mediaType: attachment.contentType,
+                  })),
+                  { type: "text" as const, text: trimmedInput },
+                ],
+              },
+              {
+                body: {
+                  // Pass the model cost transaction hash for verification/tracking
+                  modelCostTransactionHash: hash,
+                },
+              }
+            );
+            setAttachments([]);
+            setInput("");
+          }
         }
 
         cleanupPaymentState();
@@ -1021,7 +1075,20 @@ function PureMultimodalInput({
       const hasModelCost =
         settings.tier === "convenience" && modelCostUnits > 0n;
 
-      if (toolsToPay.length === 1) {
+      if (toolsToPay.length === 0 && hasModelCost) {
+        // MODEL-COST-ONLY: Convenience tier, no tools selected
+        // Use batch function with empty arrays - contract allows this when modelCost > 0
+        txData = encodeFunctionData({
+          abi: contextRouterAbi,
+          functionName: "executeBatchQueryWithModelCost",
+          args: [
+            [], // No tool IDs
+            [], // No developer wallets
+            [], // No amounts
+            modelCostUnits, // Model cost (100% to platform)
+          ],
+        });
+      } else if (toolsToPay.length === 1) {
         const tool = toolsToPay[0];
         setExecutingTool(tool);
 
@@ -1117,6 +1184,36 @@ function PureMultimodalInput({
             transactionHash: hash,
             fallbackText: `Using ${singleTool.name}`,
           });
+        } else {
+          // MODEL-COST-ONLY: No tools, just model cost payment completed
+          // Submit form without tool invocations - server will proceed with simple chat
+          setStage("thinking", "");
+          window.history.pushState({}, "", `/chat/${chatId}`);
+          const trimmedInput = input.trim();
+          if (trimmedInput || attachments.length > 0) {
+            sendMessage(
+              {
+                role: "user",
+                parts: [
+                  ...attachments.map((attachment) => ({
+                    type: "file" as const,
+                    url: attachment.url,
+                    name: attachment.name,
+                    mediaType: attachment.contentType,
+                  })),
+                  { type: "text" as const, text: trimmedInput },
+                ],
+              },
+              {
+                body: {
+                  // Pass the model cost transaction hash for verification/tracking
+                  modelCostTransactionHash: hash,
+                },
+              }
+            );
+            setAttachments([]);
+            setInput("");
+          }
         }
       }
 
@@ -1179,6 +1276,13 @@ function PureMultimodalInput({
     submitForm,
     selectedModelId,
     settings.tier, // Needed to determine if model cost applies (convenience tier only)
+    // Dependencies for model-cost-only path (sendMessage directly)
+    chatId,
+    input,
+    attachments,
+    sendMessage,
+    setAttachments,
+    setInput,
   ]);
 
   // Auto-execute payment when Auto Pay is enabled and triggered
@@ -1358,7 +1462,8 @@ function PureMultimodalInput({
           })()}
         </PromptInputToolbar>
       </PromptInput>
-      {selectedTool || activeTools.length > 0
+      {/* Payment dialog: show for tools OR for convenience tier model-cost-only */}
+      {selectedTool || activeTools.length > 0 || settings.tier === "convenience"
         ? (() => {
             // Calculate cost breakdown for payment dialog
             const toolsToPay = selectedTool ? [selectedTool] : activeTools;
@@ -1367,7 +1472,7 @@ function PureMultimodalInput({
               0
             );
             // Model cost only shown for convenience tier users
-            // Apply flow multiplier: manual_tools = 3x (planning + self-healing + final)
+            // Apply flow multiplier: manual_tools = 3x (planning + self-healing + final), manual_simple = 1x
             const baseModelCost = getEstimatedModelCost(selectedModelId);
             const dialogFlowMultiplier = toolsToPay.length > 0 ? 3.0 : 1.0;
             const modelCost =
@@ -1403,7 +1508,9 @@ function PureMultimodalInput({
                     ? selectedTool.name
                     : activeTools.length === 1
                       ? activeTools[0].name
-                      : `${activeTools.length} tools`
+                      : activeTools.length > 1
+                        ? `${activeTools.length} tools`
+                        : "AI Model Cost" // Model-cost-only case
                 }
               />
             );
