@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getDisputes } from "@/lib/db/queries";
+import { AdminNav } from "../admin-nav";
 import { DisputeRow } from "./dispute-row";
 
 const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
@@ -47,6 +48,7 @@ export default async function AdminDisputesPage({
   return (
     <div className="flex min-h-svh flex-col items-center bg-background px-4 py-8">
       <div className="w-full max-w-6xl space-y-6">
+        <AdminNav />
         <div className="flex items-end justify-between space-y-2">
           <div>
             <h1 className="font-semibold text-3xl tracking-tight">

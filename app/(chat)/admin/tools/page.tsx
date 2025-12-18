@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getActiveAIToolsFull } from "@/lib/db/queries";
+import { AdminNav } from "../admin-nav";
 import { VerifyButton } from "./verify-button";
 
 const ADMIN_EMAILS = ["alex.r.macleod@gmail.com"];
@@ -28,6 +29,7 @@ export default async function AdminToolsPage() {
   return (
     <div className="flex min-h-svh flex-col items-center bg-background px-4 py-8">
       <div className="w-full max-w-5xl space-y-6">
+        <AdminNav />
         <div className="space-y-2">
           <h1 className="font-semibold text-3xl tracking-tight">
             Tool Administration
