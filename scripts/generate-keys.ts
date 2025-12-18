@@ -17,7 +17,9 @@ import { exportPKCS8, exportSPKI, generateKeyPair } from "jose";
 async function main() {
   console.log("Generating RS256 Key Pair for Context Protocol...\n");
 
-  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const { privateKey, publicKey } = await generateKeyPair("RS256", {
+    extractable: true,
+  });
 
   const privatePem = await exportPKCS8(privateKey);
   const publicPem = await exportSPKI(publicKey);
