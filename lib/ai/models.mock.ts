@@ -32,6 +32,7 @@ const createMockModel = (): LanguageModel => {
   } as unknown as LanguageModel;
 };
 
+export const geminiFlashModel = createMockModel();
 export const chatModel = createMockModel();
 export const reasoningModel = createMockModel();
 export const titleModel = createMockModel();

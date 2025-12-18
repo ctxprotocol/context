@@ -28,10 +28,12 @@ const platformKimi = createOpenAI({
   apiKey: process.env.KIMI_API_KEY,
 });
 
-// Platform's Gemini provider (for Convenience tier)
-// Uses platform's API key - cost passed through to user
-const platformGemini = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
+// Platform's OpenRouter provider for Gemini models
+// Uses OpenRouter as a proxy to avoid needing Google Cloud billing
+// OpenRouter uses OpenAI-compatible API format
+const platformOpenRouter = createOpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
 });
 
 /**
@@ -70,11 +72,18 @@ const PROVIDER_MODELS = {
     title: "kimi-k2-turbo-preview",
     artifact: "kimi-k2-turbo-preview",
   },
+  // Direct Google Gemini API model IDs (for BYOK users)
   gemini: {
     chat: "gemini-3-pro-preview",
+    flash: "gemini-3-flash-preview",
     reasoning: "gemini-3-pro-preview",
     title: "gemini-2.5-flash",
     artifact: "gemini-2.5-flash",
+  },
+  // OpenRouter model IDs (for platform users - different format)
+  openrouter: {
+    flash: "google/gemini-3-flash-preview",
+    pro: "google/gemini-3-pro-preview",
   },
   anthropic: {
     chat: "claude-sonnet-4-5-20250929",
@@ -98,7 +107,7 @@ export type BYOKConfig = {
  */
 export function getProviderForUser(byokConfig?: BYOKConfig) {
   // No BYOK config - use platform's default providers
-  // Includes Kimi (default) + Gemini (for Convenience tier)
+  // Includes Kimi + Gemini models via OpenRouter
   if (!byokConfig) {
     return customProvider({
       languageModels: {
@@ -110,9 +119,13 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
         }),
         "title-model": platformKimi.chat(PROVIDER_MODELS.kimi.title),
         "artifact-model": platformKimi.chat(PROVIDER_MODELS.kimi.artifact),
-        // Gemini model (Convenience tier only - filtered in UI)
+        // Gemini Flash model via OpenRouter (Free + Convenience tier default)
+        "gemini-flash-model": platformOpenRouter.chat(
+          PROVIDER_MODELS.openrouter.flash
+        ),
+        // Gemini Pro model via OpenRouter (Convenience tier only)
         "gemini-model": wrapLanguageModel({
-          model: platformGemini(PROVIDER_MODELS.gemini.chat),
+          model: platformOpenRouter.chat(PROVIDER_MODELS.openrouter.pro),
           middleware: extractReasoningMiddleware({ tagName: "thinking" }),
         }),
       },
@@ -146,6 +159,8 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
             model: gemini(PROVIDER_MODELS.gemini.reasoning),
             middleware: extractReasoningMiddleware({ tagName: "thinking" }),
           }),
+          // BYOK Gemini users also get Flash model
+          "gemini-flash-model": gemini(PROVIDER_MODELS.gemini.flash),
           "title-model": gemini(PROVIDER_MODELS.gemini.title),
           "artifact-model": gemini(PROVIDER_MODELS.gemini.artifact),
         },
@@ -258,9 +273,11 @@ export const myProvider = isTestEnvironment
         chatModel,
         reasoningModel,
         titleModel,
+        geminiFlashModel,
       } = require("./models.mock");
       return customProvider({
         languageModels: {
+          "gemini-flash-model": geminiFlashModel,
           "chat-model": chatModel,
           "chat-model-reasoning": reasoningModel,
           "title-model": titleModel,

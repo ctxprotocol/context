@@ -55,9 +55,10 @@ export const postRequestBodySchema = z.object({
     parts: z.array(partSchema),
   }),
   selectedChatModel: z.enum([
+    "gemini-flash-model",
+    "gemini-model",
     "chat-model",
     "chat-model-reasoning",
-    "gemini-model",
   ]),
   selectedVisibilityType: z.enum(["public", "private"]),
   toolInvocations: z.array(toolInvocationSchema).max(5).optional(),

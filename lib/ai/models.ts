@@ -1,6 +1,7 @@
 import type { BYOKProvider } from "../db/schema";
 
-export const DEFAULT_CHAT_MODEL: string = "chat-model-reasoning";
+// Default to Gemini 3 Flash for all users (fast, free-tier friendly)
+export const DEFAULT_CHAT_MODEL: string = "gemini-flash-model";
 
 export type ChatModel = {
   id: string;
@@ -65,10 +66,30 @@ export const PROVIDER_MODEL_INFO: Record<
 
 /**
  * Base chat models (platform defaults)
+ * Order: Gemini models first (Flash default, then Pro), then Kimi models
+ * - Gemini Flash: Available to all tiers (via OpenRouter) - DEFAULT
+ * - Gemini Pro: Convenience tier only (via OpenRouter)
  * - Kimi models: Available to all tiers
- * - Gemini model: Convenience tier only (uses platform's API key)
  */
 export const chatModels: ChatModel[] = [
+  {
+    id: "gemini-flash-model",
+    name: "Gemini 3 Flash",
+    description: "Fast and efficient model for everyday tasks",
+    // Gemini 3 Flash pricing via OpenRouter: ~$0.50/1M input, ~$1.50/1M output
+    // Average ~2000 input + ~500 output = ~$0.00175 avg
+    estimatedCostPerQuery: 0.002,
+    supportsBYOK: false, // Platform model via OpenRouter
+  },
+  {
+    id: "gemini-model",
+    name: "Gemini 3 Pro",
+    description: "Google's advanced reasoning model with thinking capabilities",
+    // Gemini 3 Pro pricing via OpenRouter: ~$1.25/1M input, ~$10/1M output
+    // Average ~2000 input + ~500 output = ~$0.0075 avg
+    estimatedCostPerQuery: 0.0075,
+    supportsBYOK: false, // Platform model via OpenRouter
+  },
   {
     id: "chat-model",
     name: PROVIDER_MODEL_INFO.kimi.chat.name,
@@ -86,15 +107,6 @@ export const chatModels: ChatModel[] = [
     // ~3000 input + ~2000 output + ~1000 reasoning = ~$0.008 avg
     estimatedCostPerQuery: 0.008,
     supportsBYOK: true,
-  },
-  {
-    id: "gemini-model",
-    name: "Gemini 3 Pro",
-    description: "Google's advanced reasoning model with thinking capabilities",
-    // Gemini 3 Pro pricing: ~$1.25/1M input, ~$10/1M output
-    // Average ~2000 input + ~500 output = ~$0.0075 avg
-    estimatedCostPerQuery: 0.0075,
-    supportsBYOK: false, // Platform-only model for Convenience tier
   },
 ];
 
@@ -129,9 +141,25 @@ export function getChatModelsForProvider(
   }
 
   // Platform mode (Free/Convenience tier) - return all platform models
-  // Filtering by tier (hiding Gemini from Free tier) happens in model-selector
+  // Order: Gemini models first (Flash default, then Pro), then Kimi models
+  // Filtering by tier happens in model-selector
   const kimiInfo = PROVIDER_MODEL_INFO.kimi;
   return [
+    {
+      id: "gemini-flash-model",
+      name: "Gemini 3 Flash",
+      description: "Fast and efficient model for everyday tasks",
+      estimatedCostPerQuery: 0.002,
+      supportsBYOK: false,
+    },
+    {
+      id: "gemini-model",
+      name: "Gemini 3 Pro",
+      description:
+        "Google's advanced reasoning model with thinking capabilities",
+      estimatedCostPerQuery: 0.0075,
+      supportsBYOK: false,
+    },
     {
       id: "chat-model",
       name: kimiInfo.chat.name,
@@ -145,14 +173,6 @@ export function getChatModelsForProvider(
       description: kimiInfo.reasoning.description,
       estimatedCostPerQuery: 0.008,
       supportsBYOK: true,
-    },
-    {
-      id: "gemini-model",
-      name: "Gemini 3 Pro",
-      description:
-        "Google's advanced reasoning model with thinking capabilities",
-      estimatedCostPerQuery: 0.0075,
-      supportsBYOK: false,
     },
   ];
 }
