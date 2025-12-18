@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
-import { calculateRequiredStake, MINIMUM_STAKE_USDC } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { submitTool } from "./actions";
 import { contributeFormInitialState } from "./schema";
@@ -50,11 +49,9 @@ export function ContributeForm() {
     }
   }, [state.status, router]);
 
-  // Track price for staking requirement display
-  // ALL tools require staking (minimum $10.00, or 100x query price if higher)
+  // Track price for dynamic helper text (Free vs Paid)
   const [price, setPrice] = useState(state.payload?.price || "0.00");
   const priceValue = Number.parseFloat(price) || 0;
-  const requiredStake = calculateRequiredStake(priceValue);
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -199,6 +196,28 @@ Agent tips:
                 query (up to 4 decimals, e.g. $0.001). Users pay{" "}
                 <strong>once per chat turn</strong>.
               </p>
+              {priceValue > 0 ? (
+                <p className="text-emerald-600 text-xs leading-relaxed dark:text-emerald-500">
+                  <strong>Business in a Box</strong> — Add{" "}
+                  <code className="rounded bg-emerald-500/10 px-1 py-0.5">
+                    createContextMiddleware()
+                  </code>{" "}
+                  to enable payments. We handle billing and users.{" "}
+                  <a
+                    className="underline"
+                    href="https://github.com/ctxprotocol/sdk#-securing-your-tool"
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    1-line setup →
+                  </a>
+                </p>
+              ) : (
+                <p className="text-muted-foreground/70 text-xs leading-relaxed">
+                  Free tools work out of the box. Add middleware later to
+                  monetize.
+                </p>
+              )}
               <FieldError message={priceError} />
             </div>
           </div>
@@ -240,10 +259,11 @@ Agent tips:
               type="url"
             />
             <p className="text-muted-foreground text-xs">
-              Your MCP server endpoint. We support both{" "}
-              <strong>HTTP Streaming</strong> (<code>/mcp</code>) and{" "}
-              <strong>SSE</strong> (<code>/sse</code>) transports. We&apos;ll
-              auto-discover your skills via <code>listTools()</code>. See{" "}
+              Your MCP server endpoint (<strong>HTTPS required</strong>). We
+              support both <strong>HTTP Streaming</strong> (<code>/mcp</code>)
+              and <strong>SSE</strong> (<code>/sse</code>) transports.
+              We&apos;ll auto-discover your skills via <code>listTools()</code>.
+              See{" "}
               <a
                 className="underline"
                 href="https://github.com/ctxprotocol/context/tree/main/examples/blocknative-contributor"

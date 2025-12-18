@@ -99,9 +99,19 @@ All value flows through `ContextRouter.sol` on Base. Payments are split instantl
 
 **Staking System:** All tools (including free) require a minimum $10 USDC stake, enforced on-chain. For paid tools, the stake is 100x the query price if higher. This creates accountability and enables slashing for fraud. Stakes are fully refundable with a 7-day withdrawal delay.
 
-### Security: Request Signing
+### Security: Financial Protocol Architecture
 
-Context uses **RS256 asymmetric request signing** to authenticate the platform to MCP tool servers. This prevents unauthorized access and replay attacks.
+We use **Asymmetric Request Signing (RS256)** to secure the marketplace. This is not just "auth" - it's the foundation of a financial protocol.
+
+**Why this matters:**
+
+| Approach | Result |
+|----------|--------|
+| **Without Auth** | A toy - anyone can curl your endpoint |
+| **With Shared Secrets** | A security liability - secrets can leak |
+| **With Asymmetric Signing** | Professional infrastructure (like Stripe/Visa) |
+
+The Platform holds a **Private Key**. Tool Developers hold the **Public Key** (via the SDK). This ensures zero-trust communication where tools can mathematically verify that a request effectively "contains money".
 
 **How it works:**
 1. **Platform signs requests** with a private key (stored securely in environment)
@@ -127,7 +137,15 @@ CONTEXT_PROTOCOL_PRIVATE_KEY=<base64-encoded-private-key>
 ```
 
 **For MCP Tool Developers:**
-Verify incoming requests using the `@ctxprotocol/sdk` or the public key directly. Requests include an `Authorization: Bearer <jwt>` header.
+```typescript
+import { createContextMiddleware } from "@ctxprotocol/sdk";
+
+// 1 line to secure your endpoint
+app.use("/mcp", createContextMiddleware());
+```
+
+Or use the lower-level `verifyContextRequest` for more control. See [@ctxprotocol/sdk](https://github.com/ctxprotocol/sdk) for details.
+
 
 ### 4. Context Injection (Portfolio Data)
 

@@ -14,7 +14,25 @@ export const contributeFormSchema = z.object({
   endpoint: z
     .string()
     .min(1, "MCP endpoint URL is required")
-    .url("Must be a valid URL"),
+    .url("Must be a valid URL")
+    .refine(
+      (url) => {
+        // Allow http://localhost in development for testing
+        if (process.env.NODE_ENV === "development") {
+          const isLocalhost =
+            url.startsWith("http://localhost") ||
+            url.startsWith("http://127.0.0.1");
+          if (isLocalhost) {
+            return true;
+          }
+        }
+        // Otherwise, require HTTPS
+        return url.startsWith("https://");
+      },
+      {
+        message: "Endpoint must use HTTPS for security",
+      }
+    ),
   price: z
     .string()
     .regex(/^\d+\.?\d{0,4}$/, "Max 4 decimal places allowed")
