@@ -813,6 +813,10 @@ export async function getActiveAITools({
         averageRating: aiTool.averageRating,
         toolSchema: aiTool.toolSchema, // Needed to determine tool type (native/MCP)
         developerWallet: aiTool.developerWallet, // Needed for payment execution
+        // Trust metrics for user decision-making
+        successRate: aiTool.successRate,
+        uptimePercent: aiTool.uptimePercent,
+        totalStaked: aiTool.totalStaked,
       })
       .from(aiTool)
       .where(whereConditions)
@@ -1321,7 +1325,7 @@ async function searchAIToolsVector({
   // The <=> operator computes cosine distance (1 - cosine_similarity)
   // We filter by similarity threshold to avoid returning irrelevant results
   const results = await db.execute(sql`
-    SELECT 
+    SELECT
       id,
       name,
       description,
@@ -1337,6 +1341,9 @@ async function searchAIToolsVector({
       developer_wallet as "developerWallet",
       api_endpoint as "apiEndpoint",
       created_at as "createdAt",
+      success_rate as "successRate",
+      uptime_percent as "uptimePercent",
+      total_staked as "totalStaked",
       1 - (embedding <=> ${embeddingStr}::vector) as similarity
     FROM "AITool"
     WHERE is_active = true
@@ -1380,6 +1387,10 @@ async function searchAIToolsVector({
     apiEndpoint: tool.apiEndpoint as string,
     createdAt: tool.createdAt as Date,
     similarity: tool.similarity as number,
+    // Trust metrics
+    successRate: tool.successRate as string | null,
+    uptimePercent: tool.uptimePercent as string | null,
+    totalStaked: tool.totalStaked as string | null,
   }));
 }
 
@@ -1411,7 +1422,10 @@ async function searchAIToolsFallback({
       developer_id as "developerId",
       developer_wallet as "developerWallet",
       api_endpoint as "apiEndpoint",
-      created_at as "createdAt"
+      created_at as "createdAt",
+      success_rate as "successRate",
+      uptime_percent as "uptimePercent",
+      total_staked as "totalStaked"
     FROM "AITool"
     WHERE is_active = true
       AND (
@@ -1446,6 +1460,10 @@ async function searchAIToolsFallback({
     apiEndpoint: tool.apiEndpoint as string,
     createdAt: tool.createdAt as Date,
     similarity: null,
+    // Trust metrics
+    successRate: tool.successRate as string | null,
+    uptimePercent: tool.uptimePercent as string | null,
+    totalStaked: tool.totalStaked as string | null,
   }));
 }
 
@@ -1499,28 +1517,49 @@ export async function getToolQueryByTransactionHash({
 }
 
 /**
- * Verify an AI tool (admin function)
- * Marks the tool as verified and records who verified it
+ * Feature an AI tool (admin function)
+ * Marks the tool as featured (shows in featured list) and records who featured it
+ * Note: This is curation/promotion, NOT gatekeeping - all tools are permissionless
  */
-export async function verifyAITool({
+export async function featureAITool({
   toolId,
-  verifiedBy,
+  featuredBy,
 }: {
   toolId: string;
-  verifiedBy: string;
+  featuredBy: string;
 }) {
   try {
     return await db
       .update(aiTool)
       .set({
-        isVerified: true,
-        verifiedBy,
+        isVerified: true, // Using existing isVerified field for "featured" status
+        verifiedBy: featuredBy,
         verifiedAt: new Date(),
       })
       .where(eq(aiTool.id, toolId));
   } catch (error) {
-    console.error("Failed to verify tool:", error);
-    throw new ChatSDKError("bad_request:database", "Failed to verify tool");
+    console.error("Failed to feature tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to feature tool");
+  }
+}
+
+/**
+ * Unfeature an AI tool (admin function)
+ * Removes the tool from the featured list
+ */
+export async function unfeatureAITool({ toolId }: { toolId: string }) {
+  try {
+    return await db
+      .update(aiTool)
+      .set({
+        isVerified: false,
+        verifiedBy: null,
+        verifiedAt: null,
+      })
+      .where(eq(aiTool.id, toolId));
+  } catch (error) {
+    console.error("Failed to unfeature tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to unfeature tool");
   }
 }
 

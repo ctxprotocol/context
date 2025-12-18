@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+
 const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
 import { createAITool, getActiveAITools } from "@/lib/db/queries";
@@ -22,10 +24,7 @@ export async function GET(request: Request) {
       Math.max(1, Number.parseInt(limitParam ?? "", 10) || DEFAULT_PAGE_SIZE),
       MAX_PAGE_SIZE
     );
-    const offset = Math.max(
-      0,
-      Number.parseInt(offsetParam ?? "", 10) || 0
-    );
+    const offset = Math.max(0, Number.parseInt(offsetParam ?? "", 10) || 0);
 
     const result = await getActiveAITools({
       limit,
@@ -35,16 +34,15 @@ export async function GET(request: Request) {
     });
 
     // Handle both paginated (with count) and simple responses
-    const responseData = includeCount
-      ? result
-      : { tools: result };
+    const responseData = includeCount ? result : { tools: result };
 
     const response = NextResponse.json(responseData);
 
-    // Add caching headers - cache for 60 seconds in production, revalidate in background
+    // Add caching headers - shorter cache to keep trust metrics fresh
+    // s-maxage=30 for 30 second edge cache, stale-while-revalidate=60 for background refresh
     response.headers.set(
       "Cache-Control",
-      "public, s-maxage=60, stale-while-revalidate=120"
+      "public, s-maxage=30, stale-while-revalidate=60"
     );
 
     return response;

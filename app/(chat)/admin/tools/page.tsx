@@ -32,16 +32,19 @@ export default async function AdminToolsPage() {
         <AdminNav />
         <div className="space-y-2">
           <h1 className="font-semibold text-3xl tracking-tight">
-            Tool Administration
+            Featured Tools
           </h1>
           <p className="text-muted-foreground text-sm">
-            Verify, monitor, and manage marketplace submissions.
+            Curate which tools appear in the featured section. All tools are
+            permissionless — featuring is optional promotion, not gatekeeping.
           </p>
         </div>
 
         <Card>
           <CardHeader className="border-b px-6 py-4">
-            <CardTitle className="font-medium text-base">Submissions</CardTitle>
+            <CardTitle className="font-medium text-base">
+              All Active Tools
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -75,10 +78,10 @@ export default async function AdminToolsPage() {
                             className="border-transparent bg-emerald-600 text-white shadow-sm hover:bg-emerald-600/90"
                             variant="default"
                           >
-                            Verified
+                            Featured
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">Pending</Badge>
+                          <Badge variant="secondary">—</Badge>
                         )}
                       </TableCell>
                       <TableCell className="font-medium text-foreground text-sm">

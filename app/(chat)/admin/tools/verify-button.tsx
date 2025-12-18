@@ -1,41 +1,75 @@
 "use client";
 
+import { StarIcon, StarOffIcon } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { verifyToolAction } from "./actions";
 import { toast } from "sonner";
+import { LoaderIcon } from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import { featureToolAction, unfeatureToolAction } from "./actions";
 
-export function VerifyButton({ toolId, isVerified }: { toolId: string; isVerified: boolean }) {
+export function VerifyButton({
+  toolId,
+  isVerified,
+}: {
+  toolId: string;
+  isVerified: boolean;
+}) {
   const [loading, setLoading] = useState(false);
+  const [isFeatured, setIsFeatured] = useState(isVerified);
 
-  const handleVerify = async () => {
+  const handleToggleFeature = async () => {
     setLoading(true);
     try {
-      const result = await verifyToolAction(toolId);
-      if (result.success) {
-        toast.success("Tool verified successfully");
+      if (isFeatured) {
+        const result = await unfeatureToolAction(toolId);
+        if (result.success) {
+          setIsFeatured(false);
+          toast.success("Tool removed from featured");
+        } else {
+          toast.error("Failed to unfeature tool");
+        }
       } else {
-        toast.error("Failed to verify tool");
+        const result = await featureToolAction(toolId);
+        if (result.success) {
+          setIsFeatured(true);
+          toast.success("Tool added to featured");
+        } else {
+          toast.error("Failed to feature tool");
+        }
       }
     } catch {
-      toast.error("Error verifying tool");
+      toast.error("Error updating tool");
     } finally {
       setLoading(false);
     }
   };
 
-  if (isVerified) return null;
-
   return (
-    <Button 
-      size="sm" 
-      variant="default" 
-      onClick={handleVerify} 
+    <Button
+      className="h-8 gap-1.5 shadow-sm"
       disabled={loading}
-      className="h-8 shadow-sm"
+      onClick={handleToggleFeature}
+      size="sm"
+      variant={isFeatured ? "outline" : "default"}
     >
-      {loading ? "Verifying..." : "Verify"}
+      {loading ? (
+        <>
+          <span className="animate-spin">
+            <LoaderIcon size={14} />
+          </span>
+          {isFeatured ? "Removing..." : "Featuring..."}
+        </>
+      ) : isFeatured ? (
+        <>
+          <StarOffIcon className="size-3.5" />
+          Unfeature
+        </>
+      ) : (
+        <>
+          <StarIcon className="size-3.5" />
+          Feature
+        </>
+      )}
     </Button>
   );
 }
-

@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  AlertTriangleIcon,
-  DollarSignIcon,
-  ShieldCheckIcon,
-} from "lucide-react";
+import { AlertTriangleIcon, DollarSignIcon, StarIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -18,8 +14,8 @@ const navItems = [
   },
   {
     href: "/admin/tools",
-    label: "Tool Verification",
-    icon: ShieldCheckIcon,
+    label: "Featured Tools",
+    icon: StarIcon,
   },
   {
     href: "/admin/earnings",

@@ -16,6 +16,10 @@ export type ToolListItem = Pick<
   | "averageRating"
   | "toolSchema"
   | "developerWallet" // Needed for payment execution
+  // Trust metrics for user decision-making
+  | "successRate"
+  | "uptimePercent"
+  | "totalStaked"
 >;
 
 const PAGE_SIZE = 30;
