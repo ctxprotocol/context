@@ -21,30 +21,30 @@ type SuggestedActionsProps = {
  * and Polymarket (prediction markets) - impossible to ask ChatGPT
  */
 const ALL_SUGGESTED_ACTIONS = [
-  // Exa + Polymarket: Real-time news → prediction market mispricing
-  "Search for breaking crypto news from the last hour and find Polymarket bets that are mispriced based on this news",
-  // Exa + Hyperliquid: Deep research → trading signal
-  "Research the next major token unlocks this week and calculate the price impact if teams dump on Hyperliquid",
-  // Polymarket + Hyperliquid: Cross-market alpha
-  "Find funding arbitrage on Hyperliquid and show me which prediction markets have whale divergence from retail",
-  // Exa + Polymarket + Hyperliquid: Full intelligence stack
-  "What's the smart money saying about ETH? Show me whale flow on Polymarket, funding rates on Hyperliquid, and latest analyst reports",
-  // Hyperliquid: Large order simulation
-  "What's the slippage if I market sell $500K of HYPE right now? How long should I TWAP it to minimize impact?",
-  // Polymarket + Exa: Political intelligence
-  "Who are the top SEC chair candidates? Cross-reference their recent statements with current Polymarket odds",
-  // Hyperliquid + Polymarket: Sentiment correlation
-  "Compare BTC funding rates on Hyperliquid with crypto prediction market sentiment - is there a divergence?",
-  // Exa + Hyperliquid: Rumor validation
-  "Search for 'Binance listing rumors' and check for unusual volume or open interest spikes on Hyperliquid perps",
-  // Polymarket + Exa: Controversy analysis
+  // Polymarket → Exa: Find markets, then validate pricing
+  "Find the highest volume Polymarket markets right now and research if the odds are correctly priced",
+  // Hyperliquid → Exa: Extreme funding → research why
+  "Which Hyperliquid perps have the most extreme funding rates? Research why and if it's justified",
+  // Polymarket → Exa: Ending soon → news impact
   "Find the most controversial prediction markets ending this week and research the latest news impacting results",
-  // Hyperliquid + Polymarket: Crash prediction
-  "Identify perps with negative funding and see if prediction markets are pricing in a crash for those assets",
-  // Exa + Hyperliquid + Polymarket: Macro strategy
-  "Analyze the current macro outlook, check BTC funding rates, and find hedging opportunities on prediction markets",
-  // Exa + Polymarket: Election analytics
-  "Search for real-time election polls and compare them against the current implied probabilities on Polymarket",
+  // Hyperliquid: Large order simulation (pure tool showcase)
+  "What's the slippage if I market sell $500K of HYPE right now? How long should I TWAP it to minimize impact?",
+  // Hyperliquid → Exa: OI spikes → find catalyst
+  "Which Hyperliquid perps have unusual open interest spikes today? Search for news that explains the positioning",
+  // Polymarket: Arbitrage detection (pure tool showcase)
+  "Are there any arbitrage opportunities on Polymarket where I can lock in guaranteed profit right now?",
+  // Hyperliquid → Polymarket: Negative funding → crash sentiment
+  "Identify perps with negative funding on Hyperliquid and check if prediction markets are pricing in a crash",
+  // Polymarket → Exa: Whale flow → validate thesis
+  "Show me where whales are positioning on Polymarket and research if the smart money thesis is correct",
+  // Hyperliquid + Polymarket: Cross-market divergence
+  "Find funding arbitrage on Hyperliquid and show me which prediction markets have whale divergence from retail",
+  // Hyperliquid → Exa: Top movers → news correlation
+  "What are the top 5 movers on Hyperliquid perps today? Research what's driving each one",
+  // Polymarket → Exa: Low liquidity gems
+  "Find low liquidity Polymarket markets with upcoming catalysts and research if they're mispriced",
+  // Hyperliquid: Position analysis (pure tool showcase)
+  "Analyze my open positions on Hyperliquid - what's my liquidation risk and should I adjust leverage?",
 ];
 
 function PureSuggestedActions({
