@@ -29,6 +29,7 @@ import {
 import {
   determineFlowType,
   type FlowType,
+  getFlowMultiplier,
   recordActualCost,
 } from "@/lib/ai/cost-estimation";
 import {
@@ -536,11 +537,14 @@ export async function POST(request: Request) {
     );
     let aiCallCount = 0;
     let totalActualCost = 0;
-    // Get estimated cost upfront (base cost * flow multiplier)
-    // Multipliers account for self-healing retries (up to 2 per execution)
+    // Get estimated cost upfront (base cost * learned flow multiplier)
+    // Multipliers are learned from historical data via EMA and adapt over time
+    // Falls back to conservative defaults (5x auto, 3x tools, 1x simple) for new models
     const baseCostEstimate = getEstimatedModelCost(selectedChatModel);
-    const flowMultiplier =
-      flowType === "auto_mode" ? 5.0 : flowType === "manual_tools" ? 3.0 : 1.0;
+    const { multiplier: flowMultiplier } = await getFlowMultiplier(
+      selectedChatModel,
+      flowType
+    );
     const estimatedTotalCost = baseCostEstimate * flowMultiplier;
 
     // Branch 0: Model-cost-only execution (Auto Mode, no tools, convenience tier paid)
