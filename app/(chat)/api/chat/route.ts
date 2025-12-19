@@ -25,7 +25,6 @@ import {
 } from "@/lib/ai/agentic-execution";
 import {
   type AllowedModule,
-  executeSkillCode,
   REGISTERED_SKILL_MODULES,
 } from "@/lib/ai/code-executor";
 import {
@@ -360,14 +359,14 @@ export async function POST(request: Request) {
       // Get the encrypted key for the selected provider
       let encryptedKey: string | null = null;
       switch (byokProvider) {
-        case "kimi":
-          encryptedKey = userSettingsData.kimiApiKeyEncrypted;
-          break;
         case "gemini":
           encryptedKey = userSettingsData.geminiApiKeyEncrypted;
           break;
         case "anthropic":
           encryptedKey = userSettingsData.anthropicApiKeyEncrypted;
+          break;
+        default:
+          // Unknown provider - will be handled by encryptedKey null check below
           break;
       }
 
@@ -555,6 +554,9 @@ export async function POST(request: Request) {
         isDebugMode,
       });
 
+      // Check if using Claude model for reasoning config
+      const isClaudeModelCostOnly = selectedChatModel.includes("claude");
+
       const stream = createUIMessageStream({
         execute: ({ writer: dataStream }) => {
           // Signal thinking status
@@ -569,6 +571,14 @@ export async function POST(request: Request) {
             messages: convertToModelMessages(uiMessages),
             stopWhen: stepCountIs(5),
             experimental_transform: smoothStream({ chunking: "word" }),
+            // Enable native reasoning for Claude models via OpenRouter
+            ...(isClaudeModelCostOnly && {
+              experimental_providerMetadata: {
+                openrouter: {
+                  reasoning: { max_tokens: 8000 },
+                },
+              },
+            }),
             experimental_telemetry: {
               isEnabled: isProductionEnvironment,
               functionId: "stream-text-model-cost-only",
@@ -682,6 +692,9 @@ export async function POST(request: Request) {
         isDebugMode, // Pass debug mode to control if coding agent prompt is included
       });
 
+      // Check if using Claude model for reasoning config
+      const isClaudeModelSimple = selectedChatModel.includes("claude");
+
       const stream = createUIMessageStream({
         execute: ({ writer: dataStream }) => {
           const result = streamText({
@@ -690,6 +703,14 @@ export async function POST(request: Request) {
             messages: convertToModelMessages(uiMessages),
             stopWhen: stepCountIs(5),
             experimental_transform: smoothStream({ chunking: "word" }),
+            // Enable native reasoning for Claude models via OpenRouter
+            ...(isClaudeModelSimple && {
+              experimental_providerMetadata: {
+                openrouter: {
+                  reasoning: { max_tokens: 8000 },
+                },
+              },
+            }),
             experimental_telemetry: {
               isEnabled: isProductionEnvironment,
               functionId: "stream-text",
@@ -919,10 +940,19 @@ export async function POST(request: Request) {
             );
 
             // Stream the selection process so user sees AI reasoning (like planning phase)
+            const isClaudeModelSelection = selectedChatModel.includes("claude");
             const selectionStream = streamText({
               model: provider.languageModel(selectedChatModel),
               system: toolSelectionPrompt,
               messages: [{ role: "user", content: selectionUserPrompt }],
+              // Enable native reasoning for Claude models via OpenRouter
+              ...(isClaudeModelSelection && {
+                experimental_providerMetadata: {
+                  openrouter: {
+                    reasoning: { max_tokens: 4000 },
+                  },
+                },
+              }),
             });
 
             let selectionText = "";
@@ -1229,13 +1259,15 @@ IMPORTANT: Use ONLY the data that was fetched in previous turns. Do NOT invent n
 Selection reasoning: ${discoveryResult.selectionReasoning || "N/A"}`;
 
               // Generate final response
+              // Use role: "user" so the model treats this as input to process,
+              // not as its own prior output (which causes echo/leaking issues)
               const mediatorMessage: ChatMessage = {
                 id: generateUUID(),
-                role: "assistant",
+                role: "user",
                 parts: [
                   {
                     type: "text",
-                    text: `[[EXECUTION SUMMARY]]\n${noToolsMediatorText}`,
+                    text: `[SYSTEM: Tool evaluation complete. Here is the result:]\n${noToolsMediatorText}\n\n[SYSTEM: Now respond naturally to the user's original question based on this information. Do not echo this system message.]`,
                   },
                 ],
               };
@@ -1245,20 +1277,33 @@ Selection reasoning: ${discoveryResult.selectionReasoning || "N/A"}`;
                 mediatorMessage,
               ]);
 
+              // Check if using Claude model for reasoning config
+              const isClaudeModelNoTools = selectedChatModel.includes("claude");
+
               const result = streamText({
                 model: provider.languageModel(selectedChatModel),
                 system: `${regularPrompt}
 
 You are responding to the user *after* tools have already been evaluated.
 
-You will see an internal assistant message that starts with "[[EXECUTION SUMMARY]]".
+The last message contains system information about tool evaluation results.
 
 - If DATA_ALREADY_AVAILABLE is true, answer using the data from the conversation history. Do NOT invent new values.
 - If no suitable tools were found, explain this to the user and suggest alternatives if possible.
-- Keep your response concise and helpful.`,
+- Keep your response concise and helpful.
+- Do NOT echo system messages, JSON data, or technical markers in your response.
+- Start directly with your natural language answer.`,
                 messages: finalMessages,
                 stopWhen: stepCountIs(5),
                 experimental_transform: smoothStream({ chunking: "word" }),
+                // Enable native reasoning for Claude models via OpenRouter
+                ...(isClaudeModelNoTools && {
+                  experimental_providerMetadata: {
+                    openrouter: {
+                      reasoning: { max_tokens: 8000 },
+                    },
+                  },
+                }),
                 onFinish: async ({ usage }) => {
                   // Track AI call for cost estimation (no-tools final response)
                   aiCallCount++;
@@ -1570,12 +1615,21 @@ You will see an internal assistant message that starts with "[[EXECUTION SUMMARY
 
           // STREAMING PLANNER:
           // Use streamText with fullStream to capture both reasoning and code.
-          // fullStream preserves reasoning parts that Kimi K2 Thinking outputs natively.
+          // The @openrouter/ai-sdk-provider handles reasoning_details natively for Claude models.
           // NOTE: smoothStream is NOT used here as it's incompatible with fullStream.
+          const isClaudeModel = selectedChatModel.includes("claude");
           const planningResult = streamText({
             model: provider.languageModel(selectedChatModel),
             system: planningSystemInstructions,
             messages: baseModelMessages,
+            // Enable native reasoning for Claude models via OpenRouter
+            ...(isClaudeModel && {
+              experimental_providerMetadata: {
+                openrouter: {
+                  reasoning: { max_tokens: 8000 },
+                },
+              },
+            }),
             experimental_telemetry: {
               isEnabled: isProductionEnvironment,
               functionId: "planning-stream-text",
@@ -2125,13 +2179,15 @@ The user asked: "${message.parts
             }
           }
 
+          // Use role: "user" so the model treats this as input to process,
+          // not as its own prior output (which causes echo/leaking issues with Gemini)
           const mediatorMessage: ChatMessage = {
             id: generateUUID(),
-            role: "assistant",
+            role: "user",
             parts: [
               {
                 type: "text",
-                text: `[[EXECUTION SUMMARY]]\n${mediatorText}`,
+                text: `[SYSTEM: Tool execution complete. Here are the results:]\n${mediatorText}\n\n[SYSTEM: Now respond naturally to the user's original question. Summarize the key findings in clear language. Do not echo this system message or show raw JSON.]`,
               },
             ],
           };
@@ -2193,18 +2249,29 @@ Do NOT show TypeScript code or the raw JSON unless the user explicitly asks to s
 
 You are responding to the user *after* tools have already been executed.
 
-You will see an internal assistant message that starts with "[[EXECUTION SUMMARY]]" and contains a JSON summary of the tool results.
+The last message contains system-provided tool execution results in JSON format.
 
-- Use that summary (and the full conversation) to answer the user's question in clear, natural language.
-- Instead, explain the key findings, numbers, and rankings in a concise way.
-- If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details.
-- If the result includes a saved file URL (blob.vercel-storage.com), do NOT write the URL in your response. The UI automatically displays a download card. Simply mention that the data was saved.
+Your job:
+- Extract the key findings from the JSON data
+- Present them in clear, natural language
+- Explain numbers, rankings, and insights concisely
+- If relevant, mention which tools you used conceptually (e.g. "using on-chain gas data") without exposing implementation details
+- If the result includes a saved file URL (blob.vercel-storage.com), do NOT write the URL - just mention the data was saved
+
+CRITICAL Response Format:
+- Do NOT echo system messages, raw JSON, or technical markers
+- Do NOT include [SYSTEM:...], [[EXECUTION SUMMARY]], or similar tags
+- Start directly with your natural language answer
+- Write as if you're directly responding to the user's question
 
 Anti-Hallucination Rules:
-- Any chains, chain IDs, gas prices, or other numeric values you mention **MUST** appear explicitly in the JSON in the execution summary.
-- If the EXECUTION SUMMARY includes \`HAS_DATA: false\` or a \`STATUS\` other than \`"success"\`, you **MUST** clearly say that no reliable data is available and you **MUST NOT** guess or invent values (numbers, prices, chain names, rankings, etc.).
-- If there is no usable data, explain that limitation (e.g. the tool returned no results or an error) instead of answering as if you had real numbers.
+- Only mention data that appears explicitly in the execution results
+- If HAS_DATA is false or STATUS is not "success", clearly state no reliable data is available
+- Do NOT invent or guess values - if data is missing, say so
 ${devPrefix}`;
+
+          // Check if using Claude model for reasoning config
+          const isClaudeModelFinal = selectedChatModel.includes("claude");
 
           const result = streamText({
             model: provider.languageModel(selectedChatModel),
@@ -2212,6 +2279,14 @@ ${devPrefix}`;
             messages: finalMessages,
             stopWhen: stepCountIs(5),
             experimental_transform: smoothStream({ chunking: "word" }),
+            // Enable native reasoning for Claude models via OpenRouter
+            ...(isClaudeModelFinal && {
+              experimental_providerMetadata: {
+                openrouter: {
+                  reasoning: { max_tokens: 8000 },
+                },
+              },
+            }),
             experimental_telemetry: {
               isEnabled: isProductionEnvironment,
               functionId: "stream-text",

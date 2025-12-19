@@ -38,8 +38,8 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
     availableChatModelIds: [
       "gemini-flash-model",
       "gemini-model",
-      "chat-model",
-      "chat-model-reasoning",
+      "claude-sonnet-model",
+      "claude-opus-model",
     ],
   },
 
@@ -82,16 +82,16 @@ export function canMakeQuery(tier: UserTier, usedToday: number): boolean {
  * Model IDs available by tier (for non-BYOK users).
  * BYOK users get their provider's models instead.
  *
- * - Free tier: Gemini Flash + Kimi models (via OpenRouter)
- * - Convenience tier: All models including Gemini Pro (via OpenRouter)
+ * - Free tier: Gemini Flash only (via OpenRouter)
+ * - Convenience tier: All models including Claude (via OpenRouter)
  */
 export const modelIdsByTier: Record<Exclude<UserTier, "byok">, string[]> = {
-  free: ["gemini-flash-model", "chat-model", "chat-model-reasoning"],
+  free: ["gemini-flash-model"],
   convenience: [
     "gemini-flash-model",
     "gemini-model",
-    "chat-model",
-    "chat-model-reasoning",
+    "claude-sonnet-model",
+    "claude-opus-model",
   ],
 };
 

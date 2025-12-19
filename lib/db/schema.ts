@@ -31,7 +31,8 @@ export const user = pgTable("User", {
 export type User = InferSelectModel<typeof user>;
 
 // Supported BYOK providers (explicitly NO OpenAI)
-export type BYOKProvider = "kimi" | "gemini" | "anthropic";
+// Note: Kimi/Moonshot support was removed in favor of OpenRouter
+export type BYOKProvider = "gemini" | "anthropic";
 
 // User Settings for BYOK and tier management
 export const userSettings = pgTable("UserSettings", {

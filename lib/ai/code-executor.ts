@@ -104,12 +104,22 @@ function transformImports(
 function stripExports(code: string) {
   return (
     code
-      // export async function main() {}
-      .replace(/export\s+async\s+function\s+main/gi, "async function main")
-      // export function main() {}
-      .replace(/export\s+function\s+main/gi, "function main")
-      // export const main = async () => {}
-      .replace(/export\s+const\s+main\s*=/gi, "const main =")
+      // export default ... -> remove entirely (default exports become just the value)
+      .replace(/export\s+default\s+/gi, "")
+      // export async function name() {} -> async function name() {}
+      .replace(/export\s+async\s+function\s+/gi, "async function ")
+      // export function name() {} -> function name() {}
+      .replace(/export\s+function\s+/gi, "function ")
+      // export const name = ... -> const name = ...
+      .replace(/export\s+const\s+/gi, "const ")
+      // export let name = ... -> let name = ...
+      .replace(/export\s+let\s+/gi, "let ")
+      // export var name = ... -> var name = ...
+      .replace(/export\s+var\s+/gi, "var ")
+      // export class Name {} -> class Name {}
+      .replace(/export\s+class\s+/gi, "class ")
+      // export { name } or export { name as alias } -> remove entirely
+      .replace(/export\s*\{[^}]*\}\s*;?/gi, "")
   );
 }
 

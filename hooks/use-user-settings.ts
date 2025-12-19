@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
 import type { UserTier } from "@/lib/ai/entitlements";
 
-type BYOKProvider = "kimi" | "gemini" | "anthropic" | null;
+type BYOKProvider = "gemini" | "anthropic" | null;
 
 export type UserSettings = {
   tier: UserTier;
   useBYOK: boolean;
   byokProvider: BYOKProvider;
-  configuredProviders: ("kimi" | "gemini" | "anthropic")[];
+  configuredProviders: ("gemini" | "anthropic")[];
   freeQueriesUsedToday: number;
   freeQueriesDailyLimit: number;
 };

@@ -422,18 +422,10 @@ export type RequestHints = {
   country: Geo["country"];
 };
 
-export const reasoningPrompt = `
-You are an advanced reasoning assistant.
-
-When you answer, follow this strict format:
-- First, think step-by-step inside <think>...</think> tags. Put all analysis, planning, and intermediate reasoning only inside these tags.
-- After the </think> tag, write a clear, concise final answer for the user without mentioning the tags or your internal reasoning.
-
-Guidelines:
-- The content inside <think>...</think> can be as detailed as needed, but it is for internal reasoning only.
-- The content after </think> should be short, direct, and focused on the user-facing answer.
-- Never tell the user that you are using <think> tags or exposing internal thought processes.
-`;
+// NOTE: XML reasoning prompts (<think> tags) have been removed.
+// Native reasoning is now handled via OpenRouter's reasoning_details for Claude models.
+// The @openrouter/ai-sdk-provider automatically transforms reasoning_details
+// into AI SDK's expected format for real-time streaming.
 
 export const getRequestPromptFromHints = (requestHints: RequestHints) => `\
 About the origin of user's request:
@@ -448,24 +440,17 @@ About the origin of user's request:
  * Used when Auto Mode needs to search and select tools before execution
  */
 export const autoModeDiscoveryPrompt = ({
-  selectedChatModel,
   requestHints,
 }: {
   selectedChatModel: string;
   requestHints: RequestHints;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
-  const basePrompt = `${regularPrompt}\n\n${discoveryPrompt}\n\n${requestPrompt}`;
-
-  if (selectedChatModel === "chat-model-reasoning") {
-    return `${basePrompt}\n\n${reasoningPrompt}`;
-  }
-
-  return basePrompt;
+  // Native reasoning is handled via OpenRouter's reasoning_details for Claude models
+  return `${regularPrompt}\n\n${discoveryPrompt}\n\n${requestPrompt}`;
 };
 
 export const systemPrompt = ({
-  selectedChatModel,
   requestHints,
   enabledTools = [],
   isDebugMode = false,
@@ -488,12 +473,8 @@ export const systemPrompt = ({
 
   if (!shouldUseCodingAgent) {
     // Normal chat mode - no code generation, just helpful responses
-    const basePrompt = `${regularPrompt}\n\n${requestPrompt}`;
-
-    if (selectedChatModel === "chat-model-reasoning") {
-      return `${basePrompt}\n\n${reasoningPrompt}`;
-    }
-    return basePrompt;
+    // Native reasoning is handled via OpenRouter's reasoning_details for Claude models
+    return `${regularPrompt}\n\n${requestPrompt}`;
   }
 
   // Developer Mode, tools enabled, or Auto Mode execution - include coding agent
@@ -513,13 +494,8 @@ ${enabledTools.map((tool, index) => formatEnabledTool(tool, index)).join("\n")}
 Focus on using these tools to answer the user's question.${isAutoModeExecution ? " Do NOT search for additional tools." : ""}`;
   }
 
-  const basePrompt = `${regularPrompt}\n\n${codingAgentPrompt}\n\n${toolsPrompt}\n\n${requestPrompt}`;
-
-  if (selectedChatModel === "chat-model-reasoning") {
-    return `${basePrompt}\n\n${reasoningPrompt}`;
-  }
-
-  return basePrompt;
+  // Native reasoning is handled via OpenRouter's reasoning_details for Claude models
+  return `${regularPrompt}\n\n${codingAgentPrompt}\n\n${toolsPrompt}\n\n${requestPrompt}`;
 };
 
 function formatMcpToolDetails(t: {

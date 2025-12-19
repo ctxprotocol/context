@@ -23,7 +23,6 @@ import { CheckCircleFillIcon, ChevronDownIcon } from "./icons";
 
 // Provider display info
 const PROVIDER_INFO: Record<BYOKProvider, { label: string; badge: string }> = {
-  kimi: { label: "Moonshot", badge: "BYOK" },
   gemini: { label: "Google", badge: "BYOK" },
   anthropic: { label: "Anthropic", badge: "BYOK" },
 };

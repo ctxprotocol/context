@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   Key,
-  Moon,
   Sparkles,
   Trash2,
   Zap,
@@ -30,7 +29,7 @@ import { Label } from "@/components/ui/label";
 import type { UserTier } from "@/lib/ai/entitlements";
 import { cn } from "@/lib/utils";
 
-type BYOKProvider = "kimi" | "gemini" | "anthropic";
+type BYOKProvider = "gemini" | "anthropic";
 
 type SettingsData = {
   tier: UserTier;
@@ -76,15 +75,6 @@ const PROVIDER_CONFIG: Record<
     icon: React.ElementType;
   }
 > = {
-  kimi: {
-    name: "Moonshot Kimi",
-    description: "Great value, 128K context, fast responses",
-    placeholder: "sk-...",
-    helpUrl: "https://platform.moonshot.cn/console/api-keys",
-    helpText: "Get your API key from Moonshot Console",
-    color: "from-violet-500 to-purple-600",
-    icon: Moon,
-  },
   gemini: {
     name: "Google Gemini",
     description: "2M context, multimodal, competitive pricing",
@@ -110,12 +100,10 @@ export function SettingsForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [apiKeys, setApiKeys] = useState<Record<BYOKProvider, string>>({
-    kimi: "",
     gemini: "",
     anthropic: "",
   });
   const [showKeys, setShowKeys] = useState<Record<BYOKProvider, boolean>>({
-    kimi: false,
     gemini: false,
     anthropic: false,
   });
@@ -487,193 +475,189 @@ export function SettingsForm() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Provider List */}
-          {(["kimi", "gemini", "anthropic"] as BYOKProvider[]).map(
-            (provider) => {
-              const config = PROVIDER_CONFIG[provider];
-              const isConfigured =
-                settings.configuredProviders.includes(provider);
-              const isActive = settings.byokProvider === provider;
-              const isExpanded = expandedProvider === provider;
-              const ProviderIcon = config.icon;
+          {(["gemini", "anthropic"] as BYOKProvider[]).map((provider) => {
+            const config = PROVIDER_CONFIG[provider];
+            const isConfigured =
+              settings.configuredProviders.includes(provider);
+            const isActive = settings.byokProvider === provider;
+            const isExpanded = expandedProvider === provider;
+            const ProviderIcon = config.icon;
 
-              return (
+            return (
+              <div
+                className={cn(
+                  "rounded-lg border transition-all",
+                  isActive && "border-primary bg-primary/5",
+                  isExpanded && "ring-2 ring-primary/20"
+                )}
+                key={provider}
+              >
+                {/* Provider Header */}
                 <div
-                  className={cn(
-                    "rounded-lg border transition-all",
-                    isActive && "border-primary bg-primary/5",
-                    isExpanded && "ring-2 ring-primary/20"
-                  )}
-                  key={provider}
+                  className="flex cursor-pointer items-center gap-3 p-4"
+                  onClick={() =>
+                    setExpandedProvider(isExpanded ? null : provider)
+                  }
                 >
-                  {/* Provider Header */}
                   <div
-                    className="flex cursor-pointer items-center gap-3 p-4"
-                    onClick={() =>
-                      setExpandedProvider(isExpanded ? null : provider)
-                    }
-                  >
-                    <div
-                      className={cn(
-                        "flex size-10 items-center justify-center rounded-lg bg-gradient-to-br text-white",
-                        config.color
-                      )}
-                    >
-                      <ProviderIcon className="size-5" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{config.name}</span>
-                        {isConfigured && (
-                          <Badge variant={isActive ? "default" : "secondary"}>
-                            {isActive ? "Active" : "Configured"}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground text-sm">
-                        {config.description}
-                      </p>
-                    </div>
-                    {isConfigured && !isActive && (
-                      <Button
-                        disabled={saving}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectProvider(provider);
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Use This
-                      </Button>
+                    className={cn(
+                      "flex size-10 items-center justify-center rounded-lg bg-gradient-to-br text-white",
+                      config.color
                     )}
+                  >
+                    <ProviderIcon className="size-5" />
                   </div>
-
-                  {/* Expanded Content */}
-                  {isExpanded && (
-                    <div className="space-y-4 border-t px-4 pt-3 pb-4">
-                      {isConfigured ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-                            <Key className="size-4 text-muted-foreground" />
-                            <span className="flex-1 font-mono text-muted-foreground text-sm">
-                              {config.placeholder.slice(0, 6)}••••••••••••
-                            </span>
-                            <Badge variant="secondary">Configured</Badge>
-                          </div>
-                          <div className="flex gap-2">
-                            {!isActive && (
-                              <Button
-                                className="flex-1"
-                                disabled={saving}
-                                onClick={() => handleSelectProvider(provider)}
-                              >
-                                Switch to {config.name}
-                              </Button>
-                            )}
-                            <Button
-                              disabled={saving}
-                              onClick={() => handleRemoveApiKey(provider)}
-                              size="icon"
-                              variant="destructive"
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="space-y-3">
-                            <Label htmlFor={`apiKey-${provider}`}>
-                              API Key
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                autoComplete="off"
-                                className="pr-10 font-mono"
-                                id={`apiKey-${provider}`}
-                                onChange={(e) =>
-                                  setApiKeys((prev) => ({
-                                    ...prev,
-                                    [provider]: e.target.value,
-                                  }))
-                                }
-                                placeholder={config.placeholder}
-                                type={showKeys[provider] ? "text" : "password"}
-                                value={apiKeys[provider]}
-                              />
-                              <Button
-                                className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
-                                onClick={() =>
-                                  setShowKeys((prev) => ({
-                                    ...prev,
-                                    [provider]: !prev[provider],
-                                  }))
-                                }
-                                size="sm"
-                                type="button"
-                                variant="ghost"
-                              >
-                                {showKeys[provider] ? (
-                                  <EyeOff className="size-4 text-muted-foreground" />
-                                ) : (
-                                  <Eye className="size-4 text-muted-foreground" />
-                                )}
-                              </Button>
-                            </div>
-                            <p className="text-muted-foreground text-xs">
-                              {config.helpText}:{" "}
-                              <a
-                                className="text-primary hover:underline"
-                                href={config.helpUrl}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                              >
-                                Get API Key →
-                              </a>
-                            </p>
-                          </div>
-                          <Button
-                            className="w-full"
-                            disabled={saving || !apiKeys[provider].trim()}
-                            onClick={() => handleSaveApiKey(provider)}
-                          >
-                            {saving ? (
-                              <span className="mr-2 animate-spin">
-                                <LoaderIcon size={16} />
-                              </span>
-                            ) : null}
-                            Save & Activate
-                          </Button>
-                        </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{config.name}</span>
+                      {isConfigured && (
+                        <Badge variant={isActive ? "default" : "secondary"}>
+                          {isActive ? "Active" : "Configured"}
+                        </Badge>
                       )}
                     </div>
+                    <p className="text-muted-foreground text-sm">
+                      {config.description}
+                    </p>
+                  </div>
+                  {isConfigured && !isActive && (
+                    <Button
+                      disabled={saving}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectProvider(provider);
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Use This
+                    </Button>
                   )}
                 </div>
-              );
-            }
-          )}
+
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div className="space-y-4 border-t px-4 pt-3 pb-4">
+                    {isConfigured ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+                          <Key className="size-4 text-muted-foreground" />
+                          <span className="flex-1 font-mono text-muted-foreground text-sm">
+                            {config.placeholder.slice(0, 6)}••••••••••••
+                          </span>
+                          <Badge variant="secondary">Configured</Badge>
+                        </div>
+                        <div className="flex gap-2">
+                          {!isActive && (
+                            <Button
+                              className="flex-1"
+                              disabled={saving}
+                              onClick={() => handleSelectProvider(provider)}
+                            >
+                              Switch to {config.name}
+                            </Button>
+                          )}
+                          <Button
+                            disabled={saving}
+                            onClick={() => handleRemoveApiKey(provider)}
+                            size="icon"
+                            variant="destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="space-y-3">
+                          <Label htmlFor={`apiKey-${provider}`}>API Key</Label>
+                          <div className="relative">
+                            <Input
+                              autoComplete="off"
+                              className="pr-10 font-mono"
+                              id={`apiKey-${provider}`}
+                              onChange={(e) =>
+                                setApiKeys((prev) => ({
+                                  ...prev,
+                                  [provider]: e.target.value,
+                                }))
+                              }
+                              placeholder={config.placeholder}
+                              type={showKeys[provider] ? "text" : "password"}
+                              value={apiKeys[provider]}
+                            />
+                            <Button
+                              className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
+                              onClick={() =>
+                                setShowKeys((prev) => ({
+                                  ...prev,
+                                  [provider]: !prev[provider],
+                                }))
+                              }
+                              size="sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              {showKeys[provider] ? (
+                                <EyeOff className="size-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="size-4 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-muted-foreground text-xs">
+                            {config.helpText}:{" "}
+                            <a
+                              className="text-primary hover:underline"
+                              href={config.helpUrl}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                            >
+                              Get API Key →
+                            </a>
+                          </p>
+                        </div>
+                        <Button
+                          className="w-full"
+                          disabled={saving || !apiKeys[provider].trim()}
+                          onClick={() => handleSaveApiKey(provider)}
+                        >
+                          {saving ? (
+                            <span className="mr-2 animate-spin">
+                              <LoaderIcon size={16} />
+                            </span>
+                          ) : null}
+                          Save & Activate
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {/* Info Section */}
           <div className="flex items-start gap-2 rounded-md bg-blue-500/10 p-2 dark:bg-blue-500/15">
             <div className="mt-0.5 size-3.5 shrink-0 text-blue-600 dark:text-blue-500">
               <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
+                className="size-full"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="size-full"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
               >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
               </svg>
             </div>
-            <div className="text-xs text-blue-600/90 leading-relaxed dark:text-blue-500/90">
+            <div className="text-blue-600/90 text-xs leading-relaxed dark:text-blue-500/90">
               <span className="font-semibold">API Key Security:</span> Your keys
               are encrypted at rest (AES-256-GCM) and never logged. You can
-              remove them at any time. We recommend using dedicated keys for this
-              app.
+              remove them at any time. We recommend using dedicated keys for
+              this app.
             </div>
           </div>
         </CardContent>

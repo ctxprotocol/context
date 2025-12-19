@@ -5,18 +5,18 @@ import {
   getProviderDisplayName,
   validateProviderApiKey,
 } from "@/lib/ai/providers";
-import { decryptApiKey, encryptApiKey } from "@/lib/crypto";
-import type { BYOKProvider } from "@/lib/db/schema";
+import { encryptApiKey } from "@/lib/crypto";
 import {
   getFreeQueriesUsedToday,
   getUserSettings,
   upsertUserSettings,
 } from "@/lib/db/queries";
+import type { BYOKProvider } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 
 // Provider key field mapping
+// Note: Kimi/Moonshot support was removed in favor of OpenRouter
 const PROVIDER_KEY_FIELDS = {
-  kimi: "kimiApiKeyEncrypted",
   gemini: "geminiApiKeyEncrypted",
   anthropic: "anthropicApiKeyEncrypted",
 } as const;
@@ -37,7 +37,6 @@ export async function GET() {
 
   // Build configured providers list
   const configuredProviders: BYOKProvider[] = [];
-  if (settings?.kimiApiKeyEncrypted) configuredProviders.push("kimi");
   if (settings?.geminiApiKeyEncrypted) configuredProviders.push("gemini");
   if (settings?.anthropicApiKeyEncrypted) configuredProviders.push("anthropic");
 
@@ -84,11 +83,11 @@ export async function POST(request: Request) {
 
   // Handle provider selection (switch active BYOK provider)
   if (selectProvider !== undefined) {
-    if (!["kimi", "gemini", "anthropic"].includes(selectProvider)) {
+    if (!["gemini", "anthropic"].includes(selectProvider)) {
       return Response.json(
         {
           error:
-            "Invalid provider. Supported: kimi, gemini, anthropic. Note: OpenAI is not supported.",
+            "Invalid provider. Supported: gemini, anthropic. Note: OpenAI is not supported.",
         },
         { status: 400 }
       );
@@ -135,11 +134,11 @@ export async function POST(request: Request) {
 
   // Handle API key update for a specific provider
   if (provider !== undefined && apiKey !== undefined) {
-    if (!["kimi", "gemini", "anthropic"].includes(provider)) {
+    if (!["gemini", "anthropic"].includes(provider)) {
       return Response.json(
         {
           error:
-            "Invalid provider. Supported: kimi, gemini, anthropic. Note: OpenAI is not supported due to their API usage tracking practices.",
+            "Invalid provider. Supported: gemini, anthropic. Note: OpenAI is not supported due to their API usage tracking practices.",
         },
         { status: 400 }
       );
@@ -229,7 +228,7 @@ export async function DELETE(request: Request) {
   const provider = url.searchParams.get("provider") as BYOKProvider | null;
 
   if (provider) {
-    if (!["kimi", "gemini", "anthropic"].includes(provider)) {
+    if (!["gemini", "anthropic"].includes(provider)) {
       return Response.json({ error: "Invalid provider" }, { status: 400 });
     }
 
@@ -240,7 +239,7 @@ export async function DELETE(request: Request) {
     const currentSettings = await getUserSettings(session.user.id);
     if (currentSettings?.byokProvider === provider) {
       // Try to switch to another configured provider
-      const otherProviders: BYOKProvider[] = ["kimi", "gemini", "anthropic"];
+      const otherProviders: BYOKProvider[] = ["gemini", "anthropic"];
       let newProvider: BYOKProvider | null = null;
 
       for (const p of otherProviders) {

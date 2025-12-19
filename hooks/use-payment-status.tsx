@@ -28,7 +28,11 @@ export type ExecutionLogEntry = {
   timestamp: number;
 };
 
-export type TransactionStatus = "pending" | "submitted" | "confirmed" | "failed";
+export type TransactionStatus =
+  | "pending"
+  | "submitted"
+  | "confirmed"
+  | "failed";
 
 export type TransactionInfo = {
   hash: string | null;
@@ -43,7 +47,7 @@ type PaymentStatusContextType = {
   streamingCode: string | null;
   debugResult: string | null;
   executionLogs: ExecutionLogEntry[];
-  // Reasoning/thinking support for models like Kimi K2, DeepSeek, etc.
+  // Reasoning/thinking support for models like Claude (via OpenRouter), DeepSeek, etc.
   streamingReasoning: string | null;
   isReasoningComplete: boolean;
   // Transaction tracking for blockchain payments
@@ -212,9 +216,7 @@ export function getPaymentStatusMessage(
     case "discovering-tools":
       return "Discovering tools...";
     case "awaiting-tool-approval":
-      return toolName
-        ? `Found: ${toolName}`
-        : "Selecting tools...";
+      return toolName ? `Found: ${toolName}` : "Selecting tools...";
     case "querying-tool":
       return toolName ? `Querying ${toolName}...` : "Querying tool...";
     case "executing":

@@ -22,6 +22,7 @@ export type ChatModel = {
 
 /**
  * Provider-specific model display names and descriptions
+ * Used for BYOK users to show provider-appropriate model names
  */
 export const PROVIDER_MODEL_INFO: Record<
   BYOKProvider,
@@ -30,25 +31,16 @@ export const PROVIDER_MODEL_INFO: Record<
     reasoning: { name: string; description: string };
   }
 > = {
-  kimi: {
-    chat: {
-      name: "Kimi K2",
-      description: "Advanced multimodal model with long context understanding",
-    },
-    reasoning: {
-      name: "Kimi K2 Thinking",
-      description:
-        "Uses advanced chain-of-thought reasoning with extended thinking process",
-    },
-  },
   gemini: {
     chat: {
-      name: "Gemini 3 Pro Thinking",
-      description: "Fast responses with low thinking level for everyday tasks",
+      name: "Gemini 3 Pro",
+      description:
+        "Fast responses with advanced capabilities for everyday tasks",
     },
     reasoning: {
-      name: "Gemini 3 Pro Thinking+",
-      description: "Deep reasoning with high thinking level for complex tasks",
+      name: "Gemini 3 Pro Thinking",
+      description:
+        "Deep reasoning with thinking capabilities for complex tasks",
     },
   },
   anthropic: {
@@ -65,11 +57,12 @@ export const PROVIDER_MODEL_INFO: Record<
 };
 
 /**
- * Base chat models (platform defaults)
- * Order: Gemini models first (Flash default, then Pro), then Kimi models
- * - Gemini Flash: Available to all tiers (via OpenRouter) - DEFAULT
- * - Gemini Pro: Convenience tier only (via OpenRouter)
- * - Kimi models: Available to all tiers
+ * Base chat models (platform defaults via OpenRouter)
+ * Order: Gemini models first (Flash default, then Pro), then Claude models
+ * - Gemini Flash: Available to free tier - DEFAULT
+ * - Gemini Pro: Convenience tier only
+ * - Claude Sonnet 4.5: Convenience tier only
+ * - Claude Opus 4.5: Convenience tier only
  */
 export const chatModels: ChatModel[] = [
   {
@@ -91,22 +84,24 @@ export const chatModels: ChatModel[] = [
     supportsBYOK: false, // Platform model via OpenRouter
   },
   {
-    id: "chat-model",
-    name: PROVIDER_MODEL_INFO.kimi.chat.name,
-    description: PROVIDER_MODEL_INFO.kimi.chat.description,
-    // Average ~2000 input + ~500 output tokens per query
-    // Kimi K2 pricing: ~$0.001/1K input, ~$0.002/1K output = ~$0.003 avg
-    estimatedCostPerQuery: 0.003,
-    supportsBYOK: true,
+    id: "claude-sonnet-model",
+    name: "Claude Sonnet 4.5",
+    description: "Fast, intelligent Claude with extended thinking",
+    // Claude Sonnet 4.5 pricing via OpenRouter: ~$3/1M input, ~$15/1M output
+    // Average ~2000 input + ~500 output = ~$0.0135 avg
+    // With reasoning tokens (~1000): ~$0.021 avg
+    estimatedCostPerQuery: 0.021,
+    supportsBYOK: false, // Platform model via OpenRouter
   },
   {
-    id: "chat-model-reasoning",
-    name: PROVIDER_MODEL_INFO.kimi.reasoning.name,
-    description: PROVIDER_MODEL_INFO.kimi.reasoning.description,
-    // Reasoning models use more tokens due to thinking process
-    // ~3000 input + ~2000 output + ~1000 reasoning = ~$0.008 avg
-    estimatedCostPerQuery: 0.008,
-    supportsBYOK: true,
+    id: "claude-opus-model",
+    name: "Claude Opus 4.5",
+    description: "Most capable model with superior reasoning",
+    // Claude Opus 4.5 pricing via OpenRouter: ~$15/1M input, ~$75/1M output
+    // Average ~2000 input + ~500 output = ~$0.0675 avg
+    // With reasoning tokens (~1000): ~$0.105 avg
+    estimatedCostPerQuery: 0.105,
+    supportsBYOK: false, // Platform model via OpenRouter
   },
 ];
 
@@ -114,7 +109,7 @@ export const chatModels: ChatModel[] = [
  * Get chat models with provider-specific names
  * @param provider - The BYOK provider (or null for platform default)
  * @returns Array of chat models. For BYOK, returns provider-specific models.
- *          For platform (null), returns all platform models including Gemini.
+ *          For platform (null), returns all platform models.
  */
 export function getChatModelsForProvider(
   provider: BYOKProvider | null
@@ -127,6 +122,7 @@ export function getChatModelsForProvider(
         id: "chat-model",
         name: providerInfo.chat.name,
         description: providerInfo.chat.description,
+        // BYOK users pay their own API costs, so we use minimal estimate
         estimatedCostPerQuery: 0.003,
         supportsBYOK: true,
       },
@@ -134,6 +130,7 @@ export function getChatModelsForProvider(
         id: "chat-model-reasoning",
         name: providerInfo.reasoning.name,
         description: providerInfo.reasoning.description,
+        // Reasoning models use more tokens
         estimatedCostPerQuery: 0.008,
         supportsBYOK: true,
       },
@@ -141,9 +138,7 @@ export function getChatModelsForProvider(
   }
 
   // Platform mode (Free/Convenience tier) - return all platform models
-  // Order: Gemini models first (Flash default, then Pro), then Kimi models
-  // Filtering by tier happens in model-selector
-  const kimiInfo = PROVIDER_MODEL_INFO.kimi;
+  // Filtering by tier happens in model-selector based on entitlements
   return [
     {
       id: "gemini-flash-model",
@@ -161,18 +156,18 @@ export function getChatModelsForProvider(
       supportsBYOK: false,
     },
     {
-      id: "chat-model",
-      name: kimiInfo.chat.name,
-      description: kimiInfo.chat.description,
-      estimatedCostPerQuery: 0.003,
-      supportsBYOK: true,
+      id: "claude-sonnet-model",
+      name: "Claude Sonnet 4.5",
+      description: "Fast, intelligent Claude with extended thinking",
+      estimatedCostPerQuery: 0.021,
+      supportsBYOK: false,
     },
     {
-      id: "chat-model-reasoning",
-      name: kimiInfo.reasoning.name,
-      description: kimiInfo.reasoning.description,
-      estimatedCostPerQuery: 0.008,
-      supportsBYOK: true,
+      id: "claude-opus-model",
+      name: "Claude Opus 4.5",
+      description: "Most capable model with superior reasoning",
+      estimatedCostPerQuery: 0.105,
+      supportsBYOK: false,
     },
   ];
 }
