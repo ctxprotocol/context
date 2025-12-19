@@ -312,6 +312,10 @@ async function injectContextIfNeeded(
 // Set to 2 minutes to outlast the MCP SDK's 60-second internal timeout
 const CONNECTION_CACHE_TTL_MS = 120_000; // 2 minutes
 
+// Authenticated connection cache TTL - shorter to account for token expiry
+// Service tokens expire in 2 minutes, so we use 90 seconds to be safe
+const AUTH_CONNECTION_CACHE_TTL_MS = 90_000; // 90 seconds
+
 // Cache MCP clients per endpoint with TTL to avoid reconnecting on every call
 type CachedClient = {
   client: Client;
@@ -319,10 +323,16 @@ type CachedClient = {
 };
 const clientCache = new Map<string, CachedClient>();
 
+// Separate cache for authenticated connections (prevents token/connection mismatch)
+const authClientCache = new Map<string, CachedClient>();
+
 // Pending connection promises to prevent race conditions
 // When multiple parallel calls try to connect to the same endpoint simultaneously,
 // the first call creates the connection and all others wait for the same promise
 const pendingConnections = new Map<string, Promise<Client>>();
+
+// Separate pending connections for authenticated requests
+const pendingAuthConnections = new Map<string, Promise<Client>>();
 
 /**
  * MCP Tool Result type (from MCP spec 2025-06-18)
@@ -553,7 +563,7 @@ function createMcpTransport(
 
 /**
  * Get or create an MCP client for the given endpoint
- * Uses TTL-based caching (2 minutes) to reuse connections within a code execution
+ * Uses TTL-based caching to reuse connections within a code execution
  * while still ensuring connections don't become stale across requests.
  *
  * Auto-detects transport type (SSE vs HTTP Streaming) based on endpoint URL.
@@ -562,11 +572,12 @@ function createMcpTransport(
  * When multiple parallel calls try to connect to the same endpoint simultaneously,
  * only the first call actually creates the connection - all others wait for it.
  *
- * SECURITY: When headers are provided (authenticated requests), caching is bypassed
- * to ensure tokens are fresh for each request.
+ * PERFORMANCE: Authenticated connections are now cached (90s TTL) to prevent
+ * overwhelming MCP servers with connection requests. Service tokens are valid
+ * for 2 minutes, so 90s cache is safe.
  *
  * @param endpoint - The MCP server endpoint URL
- * @param headers - Optional headers to inject (bypasses cache when provided)
+ * @param headers - Optional headers to inject (uses separate cache with shorter TTL)
  */
 async function getMcpClient(
   endpoint: string,
@@ -574,16 +585,59 @@ async function getMcpClient(
 ): Promise<Client> {
   const now = Date.now();
 
-  // SECURITY: Skip caching for authenticated requests
-  // Tokens expire in 2 minutes, so we need fresh connections
+  // Authenticated requests: use separate cache with shorter TTL
   if (headers) {
-    console.log(
-      "[mcp-skill] Creating fresh authenticated connection to:",
-      endpoint
-    );
-    return createMcpConnection(endpoint, now, headers);
+    const authCached = authClientCache.get(endpoint);
+
+    // Check if we have a valid cached authenticated connection
+    if (
+      authCached &&
+      now - authCached.createdAt < AUTH_CONNECTION_CACHE_TTL_MS
+    ) {
+      console.log(
+        "[mcp-skill] Reusing cached authenticated connection to:",
+        endpoint
+      );
+      return authCached.client;
+    }
+
+    // Check if there's already an authenticated connection in progress
+    const pendingAuth = pendingAuthConnections.get(endpoint);
+    if (pendingAuth) {
+      console.log(
+        "[mcp-skill] Waiting for in-progress authenticated connection to:",
+        endpoint
+      );
+      return pendingAuth;
+    }
+
+    // Clean up stale authenticated connection if exists
+    if (authCached) {
+      console.log(
+        "[mcp-skill] Authenticated connection expired, creating fresh one"
+      );
+      try {
+        await authCached.client.close();
+      } catch {
+        // Ignore close errors
+      }
+      authClientCache.delete(endpoint);
+    }
+
+    // Create authenticated connection with pending pattern
+    console.log("[mcp-skill] Creating authenticated connection to:", endpoint);
+    const authConnectionPromise = createMcpConnection(endpoint, now, headers);
+    pendingAuthConnections.set(endpoint, authConnectionPromise);
+
+    try {
+      const client = await authConnectionPromise;
+      return client;
+    } finally {
+      pendingAuthConnections.delete(endpoint);
+    }
   }
 
+  // Unauthenticated requests: use main cache
   const cached = clientCache.get(endpoint);
 
   // Check if we have a valid cached connection
@@ -663,9 +717,12 @@ async function createMcpConnection(
       isAuthenticated ? "(authenticated)" : ""
     );
 
-    // Only cache unauthenticated connections
-    // Authenticated connections use short-lived tokens and should not be cached
-    if (!isAuthenticated) {
+    // Cache the connection in the appropriate cache
+    if (isAuthenticated) {
+      // Cache authenticated connections with shorter TTL (90s)
+      authClientCache.set(endpoint, { client, createdAt: timestamp });
+    } else {
+      // Cache unauthenticated connections with standard TTL (2 min)
       clientCache.set(endpoint, { client, createdAt: timestamp });
     }
 

@@ -326,20 +326,26 @@ const result = await callMcpSkill({ toolId: "...", toolName: "...", args: { ... 
 - The result matches the tool's \`outputSchema\` - **always check outputSchema to know the exact property names**
 - Example: if outputSchema is \`{ chains: [...], fetchedAt: "..." }\`, access \`result.chains\` and \`result.fetchedAt\`
 - You can call this skill up to 100 times per tool payment within a single chat turn
-- **Performance tip**: Use \`Promise.all()\` for parallel execution when fetching multiple independent items:
+- **Concurrency guidance**: External APIs have varying rate limits. Use **limited parallelism** (2-3 concurrent calls max):
 \`\`\`ts
-// Good: Parallel execution (fast)
-const [result1, result2, result3] = await Promise.all([
+// BEST: Limited parallelism (2-3 concurrent calls) - balances speed and reliability
+const [result1, result2] = await Promise.all([
   callMcpSkill({ toolId, toolName: "get_data", args: { id: 1 } }),
   callMcpSkill({ toolId, toolName: "get_data", args: { id: 2 } }),
+]);
+const [result3, result4] = await Promise.all([
   callMcpSkill({ toolId, toolName: "get_data", args: { id: 3 } }),
+  callMcpSkill({ toolId, toolName: "get_data", args: { id: 4 } }),
 ]);
 
-// Avoid: Sequential execution (slow)
+// AVOID: Too many parallel calls (can hit rate limits and cause timeouts)
+const [r1, r2, r3, r4, r5] = await Promise.all([...5+ calls...]); // ❌ May timeout
+
+// OK for simple cases: Sequential execution (slower but reliable)
 const result1 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 1 } });
 const result2 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 2 } });
-const result3 = await callMcpSkill({ toolId, toolName: "get_data", args: { id: 3 } });
 \`\`\`
+- **Why**: MCP tools connect to external APIs with varying rate limits. Making 5+ concurrent calls often causes timeouts.
 
 Rules:
 - Never import or execute modules outside the approved list.

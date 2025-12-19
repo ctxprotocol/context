@@ -15,7 +15,6 @@ import {
   type ResumableStreamContext,
 } from "resumable-stream";
 import type { ModelCatalog } from "tokenlens/core";
-import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
@@ -39,6 +38,7 @@ import {
   type UserTier,
 } from "@/lib/ai/entitlements";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
+import { getOpenRouterPricingCatalog } from "@/lib/ai/openrouter-pricing";
 import {
   buildToolSelectionPrompt,
   type EnabledToolSummary,
@@ -227,20 +227,27 @@ function getToolUsage(tool: AITool) {
   return typeof usage === "string" ? usage : undefined;
 }
 
-const getTokenlensCatalog = cache(
+/**
+ * Get model pricing catalog from OpenRouter API
+ *
+ * This fetches authoritative pricing directly from OpenRouter, ensuring
+ * cost calculations are always accurate for OpenRouter-routed requests.
+ * Falls back to hardcoded prices if the API is unavailable.
+ */
+const getModelPricingCatalog = cache(
   async (): Promise<ModelCatalog | undefined> => {
     try {
-      return await fetchModels();
+      return await getOpenRouterPricingCatalog();
     } catch (err) {
       console.warn(
-        "TokenLens: catalog fetch failed, using default catalog",
+        "[pricing] OpenRouter catalog fetch failed, using fallback",
         err
       );
-      return; // tokenlens helpers will fall back to defaultCatalog
+      return;
     }
   },
-  ["tokenlens-catalog"],
-  { revalidate: 24 * 60 * 60 } // 24 hours
+  ["openrouter-pricing-catalog"],
+  { revalidate: 60 * 60 } // 1 hour (OpenRouter pricing updates more frequently)
 );
 
 export function getStreamContext() {
@@ -586,7 +593,7 @@ export async function POST(request: Request) {
             onFinish: async ({ usage }) => {
               aiCallCount++;
               try {
-                const providers = await getTokenlensCatalog();
+                const providers = await getModelPricingCatalog();
                 const modelId =
                   provider.languageModel(selectedChatModel).modelId;
                 if (modelId && providers) {
@@ -609,7 +616,7 @@ export async function POST(request: Request) {
                   data: finalMergedUsage,
                 });
               } catch (err) {
-                console.warn("TokenLens enrichment failed", err);
+                console.warn("[pricing] Usage enrichment failed", err);
                 finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
@@ -719,7 +726,7 @@ export async function POST(request: Request) {
               // Track AI call for cost estimation
               aiCallCount++;
               try {
-                const providers = await getTokenlensCatalog();
+                const providers = await getModelPricingCatalog();
                 const modelId =
                   provider.languageModel(selectedChatModel).modelId;
                 if (!modelId) {
@@ -755,7 +762,7 @@ export async function POST(request: Request) {
                   data: finalMergedUsage,
                 });
               } catch (err) {
-                console.warn("TokenLens enrichment failed", err);
+                console.warn("[pricing] Usage enrichment failed", err);
                 finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
@@ -998,7 +1005,7 @@ export async function POST(request: Request) {
             // Get usage data from selection stream and track actual cost
             try {
               const selectionUsage = await selectionStream.usage;
-              const providers = await getTokenlensCatalog();
+              const providers = await getModelPricingCatalog();
               const modelId = provider.languageModel(selectedChatModel).modelId;
               if (modelId && providers && selectionUsage) {
                 const summary = getUsage({
@@ -1308,7 +1315,7 @@ The last message contains system information about tool evaluation results.
                   // Track AI call for cost estimation (no-tools final response)
                   aiCallCount++;
                   try {
-                    const providers = await getTokenlensCatalog();
+                    const providers = await getModelPricingCatalog();
                     const modelId =
                       provider.languageModel(selectedChatModel).modelId;
                     if (modelId && providers) {
@@ -1332,7 +1339,7 @@ The last message contains system information about tool evaluation results.
                       data: finalMergedUsage,
                     });
                   } catch (err) {
-                    console.warn("TokenLens enrichment failed", err);
+                    console.warn("[pricing] Usage enrichment failed", err);
                     finalMergedUsage = usage;
                     dataStream.write({
                       type: "data-usage",
@@ -2295,7 +2302,7 @@ ${devPrefix}`;
               // Track AI call for cost estimation (final response)
               aiCallCount++;
               try {
-                const providers = await getTokenlensCatalog();
+                const providers = await getModelPricingCatalog();
                 const modelId =
                   provider.languageModel(selectedChatModel).modelId;
                 if (!modelId) {
@@ -2331,7 +2338,7 @@ ${devPrefix}`;
                   data: finalMergedUsage,
                 });
               } catch (err) {
-                console.warn("TokenLens enrichment failed", err);
+                console.warn("[pricing] Usage enrichment failed", err);
                 finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",

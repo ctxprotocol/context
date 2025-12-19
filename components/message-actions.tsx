@@ -62,7 +62,8 @@ export function PureMessageActions({
         : textFromParts;
 
     await copyToClipboard(textToCopy);
-    toast.success("Copied to clipboard!");
+    // Use a unique ID to prevent duplicate toasts from React Strict Mode double-rendering
+    toast.success("Copied to clipboard!", { id: `copy-${message.id}` });
   };
 
   // User messages get edit (on hover) and copy actions

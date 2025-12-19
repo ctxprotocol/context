@@ -5,7 +5,7 @@ import { useFundWallet } from "@privy-io/react-auth";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
@@ -57,7 +57,6 @@ import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { AddFundsDialog } from "./tools/add-funds-dialog";
 import { ContextSidebar } from "./tools/context-sidebar";
 import type { VisibilityType } from "./visibility-selector";
-import { WalletLinkingPrompt } from "./wallet-linking-prompt";
 
 /**
  * Throttle interval for streaming updates (ms)
@@ -130,6 +129,7 @@ export function Chat({
   const debugModeRef = useRef(isDebugMode);
   const { isAutoMode, recordSpend } = useAutoPay();
   const autoModeRef = useRef(isAutoMode);
+  const visibilityTypeRef = useRef(visibilityType);
   const { client: smartWalletClient } = useSmartWallets();
   const { settings } = useUserSettings();
 
@@ -235,6 +235,10 @@ export function Chat({
   useEffect(() => {
     autoModeRef.current = isAutoMode;
   }, [isAutoMode]);
+
+  useEffect(() => {
+    visibilityTypeRef.current = visibilityType;
+  }, [visibilityType]);
 
   if (process.env.NODE_ENV === "development") {
     // eslint-disable-next-line no-console
@@ -680,8 +684,34 @@ export function Chat({
     activeWallet?.address,
     smartWalletClient,
     fundWallet,
-    refetchAutoModeBalance,
   ]);
+
+  // IMPORTANT: Memoize the transport to prevent it from being recreated on every render.
+  // Creating a new transport instance loses the request queue and causes "nothing happens" bugs.
+  // All dynamic values are accessed via refs at request time to ensure we send current values.
+  const chatTransport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        fetch: fetchWithErrorHandlers,
+        prepareSendMessagesRequest(request) {
+          return {
+            body: {
+              id: request.id,
+              message: request.messages.at(-1),
+              selectedChatModel: currentModelIdRef.current,
+              // Use refs so we always send the latest values,
+              // even though the transport closure was created earlier.
+              selectedVisibilityType: visibilityTypeRef.current,
+              isDebugMode: debugModeRef.current,
+              isAutoMode: autoModeRef.current,
+              ...request.body,
+            },
+          };
+        },
+      }),
+    [] // Empty deps - transport is created once, refs provide current values
+  );
 
   const {
     messages,
@@ -696,25 +726,7 @@ export function Chat({
     messages: initialMessages,
     experimental_throttle: 100,
     generateId: generateUUID,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      fetch: fetchWithErrorHandlers,
-      prepareSendMessagesRequest(request) {
-        return {
-          body: {
-            id: request.id,
-            message: request.messages.at(-1),
-            selectedChatModel: currentModelIdRef.current,
-            selectedVisibilityType: visibilityType,
-            // Use refs so we always send the latest values,
-            // even though the transport closure was created earlier.
-            isDebugMode: debugModeRef.current,
-            isAutoMode: autoModeRef.current,
-            ...request.body,
-          },
-        };
-      },
-    }),
+    transport: chatTransport,
     onData: (dataPart) => {
       if (process.env.NODE_ENV === "development") {
         // Client-side debug log for streaming parts

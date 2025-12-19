@@ -132,11 +132,12 @@ export function SidebarUserNav() {
     try {
       await navigator.clipboard.writeText(address);
       setCopied(true);
-      toast.success(`${label} copied to clipboard!`);
+      // Use unique ID to prevent duplicate toasts from React Strict Mode
+      toast.success(`${label} copied to clipboard!`, { id: `copy-${label}` });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Copy error:", error);
-      toast.error("Failed to copy address.");
+      toast.error("Failed to copy address.", { id: `copy-error-${label}` });
     }
   };
 
