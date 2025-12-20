@@ -1563,6 +1563,32 @@ export async function unfeatureAITool({ toolId }: { toolId: string }) {
   }
 }
 
+/**
+ * Verify an AI tool (admin function)
+ * Marks the tool as verified and records who verified it
+ */
+export async function verifyAITool({
+  toolId,
+  verifiedBy,
+}: {
+  toolId: string;
+  verifiedBy: string;
+}) {
+  try {
+    return await db
+      .update(aiTool)
+      .set({
+        isVerified: true,
+        verifiedBy,
+        verifiedAt: new Date(),
+      })
+      .where(eq(aiTool.id, toolId));
+  } catch (error) {
+    console.error("Failed to verify tool:", error);
+    throw new ChatSDKError("bad_request:database", "Failed to verify tool");
+  }
+}
+
 // ============================================================================
 // USER SETTINGS QUERIES (BYOK / Tier System)
 // ============================================================================

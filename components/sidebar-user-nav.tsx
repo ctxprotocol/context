@@ -89,7 +89,7 @@ export function SidebarUserNav() {
   // Display email if available, otherwise show formatted wallet address
   const displayName = isConnected
     ? userEmail || (walletAddress ? formatWalletAddress(walletAddress) : "User")
-    : "Connect Wallet";
+    : "Sign In";
 
   const { login } = useLogin({
     onComplete: ({ user }) => {

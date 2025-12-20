@@ -63,7 +63,7 @@ export default function Page() {
         <div className="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
           <h3 className="font-semibold text-xl dark:text-zinc-50">Sign In</h3>
           <p className="text-gray-500 text-sm dark:text-zinc-400">
-            Connect your wallet to begin
+            Sign in to get started
           </p>
         </div>
         <div className="flex flex-col items-center px-4 pb-16 sm:px-16">

@@ -11,6 +11,12 @@ import type { ChatModel } from "./models";
  */
 export type UserTier = "convenience" | "byok";
 
+/**
+ * Legacy tier type that may still exist in database.
+ * "free" gets treated as "convenience" throughout the app.
+ */
+export type LegacyUserTier = "free" | "convenience" | "byok";
+
 type Entitlements = {
   maxMessagesPerDay: number;
   availableChatModelIds: ChatModel["id"][];
@@ -68,10 +74,14 @@ export const modelIdsByTier: Record<Exclude<UserTier, "byok">, string[]> = {
 /**
  * Get available model IDs for a user based on their tier.
  * For BYOK users, returns null (they use provider-specific models).
+ * Accepts LegacyUserTier for backwards compatibility - "free" is treated as "convenience".
  */
-export function getAvailableModelIds(tier: UserTier): string[] | null {
+export function getAvailableModelIds(tier: LegacyUserTier): string[] | null {
   if (tier === "byok") {
     return null; // BYOK users get models from their provider
   }
-  return modelIdsByTier[tier];
+  // Normalize legacy "free" tier to "convenience"
+  const normalizedTier: Exclude<UserTier, "byok"> =
+    tier === "free" ? "convenience" : tier;
+  return modelIdsByTier[normalizedTier];
 }

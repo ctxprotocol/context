@@ -1391,9 +1391,7 @@ function PureMultimodalInput({
             minHeight={44}
             onChange={handleInput}
             placeholder={
-              isReadonly
-                ? "Connect your wallet to start chatting..."
-                : "Send a message..."
+              isReadonly ? "Sign in to start chatting..." : "Send a message..."
             }
             ref={textareaRef}
             rows={1}
