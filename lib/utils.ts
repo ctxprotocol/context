@@ -97,6 +97,21 @@ export function sanitizeText(text: string) {
   return text.replace('<has_function_call>', '');
 }
 
+/**
+ * Wallet skip note pattern - added when user skips wallet linking.
+ * This note is sent to the model but should not be displayed to users.
+ */
+const WALLET_SKIP_NOTE_PATTERN = /\n\n\(Note: User chose to proceed without linking a wallet\. Provide general analysis without portfolio-specific data\.\)$/;
+
+/**
+ * Strip the wallet skip note from user message text for display.
+ * The note is still sent to the model so it knows to provide general analysis,
+ * but users should not see this internal instruction in the chat UI.
+ */
+export function stripWalletSkipNote(text: string): string {
+  return text.replace(WALLET_SKIP_NOTE_PATTERN, '');
+}
+
 export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
   return messages.map((message) => ({
     id: message.id,
