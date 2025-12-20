@@ -686,71 +686,72 @@ function PureMultimodalInput({
     }
   }, [switchChainAsync]);
 
-  const handleFundWallet = useCallback(async () => {
-    if (!fundingRequest) {
-      setShowAddFundsDialog(false);
-      return;
-    }
-
-    if (!activeWallet?.address) {
-      toast.error("Embedded wallet not ready. Please try again.");
-      return;
-    }
-
-    const parsedAmount = Number.parseFloat(fundingRequest.amount || "0");
-    const amountToFund =
-      Number.isFinite(parsedAmount) && parsedAmount > 0
-        ? parsedAmount.toFixed(2)
-        : "1.00";
-
-    // Fund the smart wallet (not the EOA) so funds are available for gas-sponsored txs
-    const addressToFund = smartWalletAddress || activeWallet.address;
-
-    try {
-      setIsFundingWallet(true);
-      await fundWallet({
-        address: addressToFund,
-        options: {
-          chain: base,
-          asset: "USDC",
-          amount: amountToFund,
-        },
-      });
-      await refetchBalance();
-      toast.success(
-        "Funds added to your smart wallet. You can try the tool again."
-      );
-      setShowAddFundsDialog(false);
-      setFundingRequest(null);
-
-      // If Auto Pay is enabled and can afford, trigger auto-payment
-      // Otherwise show the payment dialog
-      if (isAutoPay && canAfford(Number(fundingRequest.amount))) {
-        setPendingAutoPayment(true);
-      } else {
-        setShowPayDialog(true);
+  const handleFundWallet = useCallback(
+    async (selectedAmount: number) => {
+      if (!fundingRequest) {
+        setShowAddFundsDialog(false);
+        return;
       }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Funding flow cancelled.";
-      if (message.toLowerCase().includes("exited")) {
-        toast.error("Funding cancelled.");
-      } else {
-        console.error("fundWallet error:", error);
-        toast.error("Failed to open funding flow. Please try again.");
+
+      if (!activeWallet?.address) {
+        toast.error("Embedded wallet not ready. Please try again.");
+        return;
       }
-    } finally {
-      setIsFundingWallet(false);
-    }
-  }, [
-    activeWallet?.address,
-    smartWalletAddress,
-    fundWallet,
-    fundingRequest,
-    refetchBalance,
-    isAutoPay,
-    canAfford,
-  ]);
+
+      // Use the selected amount from the dialog (default $10 for better UX)
+      const amountToFund =
+        selectedAmount > 0 ? selectedAmount.toFixed(2) : "10.00";
+
+      // Fund the smart wallet (not the EOA) so funds are available for gas-sponsored txs
+      const addressToFund = smartWalletAddress || activeWallet.address;
+
+      try {
+        setIsFundingWallet(true);
+        await fundWallet({
+          address: addressToFund,
+          options: {
+            chain: base,
+            asset: "USDC",
+            amount: amountToFund,
+          },
+        });
+        await refetchBalance();
+        toast.success(
+          "Funds added to your smart wallet. You can try the tool again."
+        );
+        setShowAddFundsDialog(false);
+        setFundingRequest(null);
+
+        // If Auto Pay is enabled and can afford, trigger auto-payment
+        // Otherwise show the payment dialog
+        if (isAutoPay && canAfford(Number(fundingRequest.amount))) {
+          setPendingAutoPayment(true);
+        } else {
+          setShowPayDialog(true);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Funding flow cancelled.";
+        if (message.toLowerCase().includes("exited")) {
+          toast.error("Funding cancelled.");
+        } else {
+          console.error("fundWallet error:", error);
+          toast.error("Failed to open funding flow. Please try again.");
+        }
+      } finally {
+        setIsFundingWallet(false);
+      }
+    },
+    [
+      activeWallet?.address,
+      smartWalletAddress,
+      fundWallet,
+      fundingRequest,
+      refetchBalance,
+      isAutoPay,
+      canAfford,
+    ]
+  );
 
   useEffect(() => {
     if (status === "ready") {

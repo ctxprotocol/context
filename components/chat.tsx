@@ -628,62 +628,152 @@ export function Chat({
 
   /**
    * Handle funding wallet for Auto Mode (when insufficient balance)
+   * After funding completes, the query will automatically continue via balance polling.
    */
-  const handleAutoModeFundWallet = useCallback(async () => {
-    if (!autoModeFundingRequest || !activeWallet?.address) {
-      setShowAutoModeAddFunds(false);
+  const handleAutoModeFundWallet = useCallback(
+    async (selectedAmount: number) => {
+      if (!autoModeFundingRequest || !activeWallet?.address) {
+        setShowAutoModeAddFunds(false);
+        return;
+      }
+
+      // Use the selected amount from the dialog (default $10 for better UX)
+      const amountToFund =
+        selectedAmount > 0 ? selectedAmount.toFixed(2) : "10.00";
+
+      // Fund the smart wallet
+      const addressToFund =
+        smartWalletClient?.account?.address || activeWallet.address;
+
+      try {
+        setIsAutoModeFunding(true);
+        await fundWallet({
+          address: addressToFund,
+          options: {
+            chain: base,
+            asset: "USDC",
+            amount: amountToFund,
+          },
+        });
+        // Note: fundWallet resolves when the modal opens, not when funding completes.
+        // Keep the pending selection so we can auto-retry when balance increases.
+        // The selection is stored in autoModeFundingRequest.toolSelection or .modelCostPayment
+        setShowAutoModeAddFunds(false);
+        // Don't clear autoModeFundingRequest yet - we'll use it for auto-retry
+        console.log(
+          "[chat] Funding flow opened, waiting for balance to increase"
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Funding flow cancelled.";
+        // User closing the modal is not an error - just log it
+        if (
+          message.toLowerCase().includes("exited") ||
+          message.toLowerCase().includes("closed") ||
+          message.toLowerCase().includes("cancelled")
+        ) {
+          console.log("[chat] User exited funding flow");
+          // Clear pending state on cancel
+          setAutoModeFundingRequest(null);
+          setPendingToolSelection(null);
+          setPendingModelCostPayment(null);
+        } else {
+          console.error("fundWallet error:", error);
+          toast.error("Failed to open funding flow. Please try again.");
+        }
+      } finally {
+        setIsAutoModeFunding(false);
+      }
+    },
+    [autoModeFundingRequest, activeWallet?.address, smartWalletClient, fundWallet]
+  );
+
+  /**
+   * Auto-retry payment after funding completes
+   * Poll balance and retry when it increases above the needed amount
+   */
+  useEffect(() => {
+    // Only poll if we have a pending funding request (after user clicked "Add funds")
+    // and the dialog is closed (funding flow opened)
+    if (!autoModeFundingRequest || showAutoModeAddFunds || isAutoModeFunding) {
       return;
     }
 
-    const parsedAmount = Number.parseFloat(
-      autoModeFundingRequest.amount || "0"
-    );
-    const amountToFund =
-      Number.isFinite(parsedAmount) && parsedAmount > 0
-        ? parsedAmount.toFixed(2)
-        : "1.00";
+    const pendingSelection = autoModeFundingRequest.toolSelection;
+    const pendingModelCost = autoModeFundingRequest.modelCostPayment;
 
-    // Fund the smart wallet
-    const addressToFund =
-      smartWalletClient?.account?.address || activeWallet.address;
-
-    try {
-      setIsAutoModeFunding(true);
-      await fundWallet({
-        address: addressToFund,
-        options: {
-          chain: base,
-          asset: "USDC",
-          amount: amountToFund,
-        },
-      });
-      // Note: fundWallet resolves when the modal opens, not when funding completes.
-      // User will need to resend their message after adding funds.
-      setShowAutoModeAddFunds(false);
+    // Need either a tool selection or model cost payment to retry
+    if (!pendingSelection && !pendingModelCost) {
       setAutoModeFundingRequest(null);
-      setPendingToolSelection(null);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Funding flow cancelled.";
-      // User closing the modal is not an error - just log it
-      if (
-        message.toLowerCase().includes("exited") ||
-        message.toLowerCase().includes("closed") ||
-        message.toLowerCase().includes("cancelled")
-      ) {
-        console.log("[chat] User exited funding flow");
-      } else {
-        console.error("fundWallet error:", error);
-        toast.error("Failed to open funding flow. Please try again.");
-      }
-    } finally {
-      setIsAutoModeFunding(false);
+      return;
     }
+
+    console.log("[chat] Starting balance poll for auto-retry", {
+      hasToolSelection: Boolean(pendingSelection),
+      hasModelCostPayment: Boolean(pendingModelCost),
+    });
+
+    // Parse the needed amount
+    const neededAmount = Number.parseFloat(autoModeFundingRequest.amount) || 0;
+    const neededAmountUnits = BigInt(Math.ceil(neededAmount * 1_000_000));
+
+    let pollCount = 0;
+    const maxPolls = 60; // Poll for up to 5 minutes (60 * 5s)
+
+    const pollInterval = setInterval(async () => {
+      pollCount++;
+
+      if (pollCount > maxPolls) {
+        console.log("[chat] Balance poll timeout, clearing pending state");
+        clearInterval(pollInterval);
+        setAutoModeFundingRequest(null);
+        setPendingToolSelection(null);
+        setPendingModelCostPayment(null);
+        return;
+      }
+
+      try {
+        const { data: balanceData } = await refetchAutoModeBalance();
+        const balance = (balanceData as bigint | undefined) ?? 0n;
+
+        console.log("[chat] Balance poll", {
+          poll: pollCount,
+          balance: Number(balance) / 1_000_000,
+          needed: neededAmount,
+        });
+
+        if (balance >= neededAmountUnits) {
+          console.log(
+            "[chat] Balance sufficient, auto-retrying payment",
+            balance
+          );
+          clearInterval(pollInterval);
+
+          // Clear the funding request and trigger retry
+          setAutoModeFundingRequest(null);
+
+          // Restore the pending selection/payment for the payment processing effect
+          if (pendingSelection) {
+            setPendingToolSelection(pendingSelection);
+          } else if (pendingModelCost) {
+            setPendingModelCostPayment(pendingModelCost);
+          }
+
+          toast.success("Funds received! Continuing your query...");
+        }
+      } catch {
+        // Ignore refetch errors during polling
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => {
+      clearInterval(pollInterval);
+    };
   }, [
     autoModeFundingRequest,
-    activeWallet?.address,
-    smartWalletClient,
-    fundWallet,
+    showAutoModeAddFunds,
+    isAutoModeFunding,
+    refetchAutoModeBalance,
   ]);
 
   // IMPORTANT: Memoize the transport to prevent it from being recreated on every render.
@@ -1101,12 +1191,14 @@ export function Chat({
                     onSkip: () => {
                       const originalQuery = pendingWalletLinking.originalQuery;
                       setPendingWalletLinking(null);
+                      // Use distinctive prefix so messages.tsx can hide this from UI
+                      // The model still receives the full query with instructions
                       sendMessage({
                         role: "user" as const,
                         parts: [
                           {
                             type: "text",
-                            text: `${originalQuery}\n\n(Note: User chose to proceed without linking a wallet. Provide general analysis without portfolio-specific data.)`,
+                            text: `[Proceed without wallet]\n${originalQuery}\n\n(Note: User chose to proceed without linking a wallet. Provide general analysis without portfolio-specific data.)`,
                           },
                         ],
                       });

@@ -6,7 +6,7 @@ import { memo, useState } from "react";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
-import { cn, sanitizeText, stripWalletSkipNote } from "@/lib/utils";
+import { cn, sanitizeText } from "@/lib/utils";
 import { useDataStream } from "./data-stream-provider";
 import { DocumentToolResult } from "./document";
 import { DocumentPreview } from "./document-preview";
@@ -130,17 +130,10 @@ const PurePreviewMessage = ({
             if (type === "text") {
               if (mode === "view") {
                 // Parse tool context from user messages
-                const { userText: rawUserText, toolContext } =
+                const { userText, toolContext } =
                   message.role === "user"
                     ? parseToolContext(part.text)
                     : { userText: part.text, toolContext: null };
-
-                // Strip wallet skip note from user messages for display
-                // The note is still sent to the model but should not be shown to users
-                const userText =
-                  message.role === "user"
-                    ? stripWalletSkipNote(rawUserText)
-                    : rawUserText;
 
                 // Extract blob URLs from assistant messages for download cards
                 const blobUrls =

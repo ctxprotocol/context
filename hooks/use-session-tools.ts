@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import useSWRInfinite from "swr/infinite";
 import { useLocalStorage } from "usehooks-ts";
 import type { AITool } from "@/lib/db/schema";
+import { fetcher } from "@/lib/utils";
 
 // Subset of AITool fields returned by the API for listing and payments
 export type ToolListItem = Pick<
@@ -26,21 +28,32 @@ const PAGE_SIZE = 30;
 
 const LOG_PREFIX = "[useSessionTools]";
 
+// SWR key function for paginated tools
+// Returns null to stop fetching when we've reached the end
+type ToolsPage = {
+  tools: ToolListItem[];
+  hasMore: boolean;
+  total?: number;
+};
+
+function getToolsPaginationKey(
+  pageIndex: number,
+  previousPageData: ToolsPage | null
+): string | null {
+  // Stop if previous page indicated no more data
+  if (previousPageData && !previousPageData.hasMore) {
+    return null;
+  }
+
+  const offset = pageIndex * PAGE_SIZE;
+  return `/api/tools?limit=${PAGE_SIZE}&offset=${offset}&count=true`;
+}
+
 export function useSessionTools() {
   const [activeToolIds, setActiveToolIds] = useLocalStorage<string[]>(
     "context-active-tools",
     []
   );
-  const [tools, setTools] = useState<ToolListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [total, setTotal] = useState<number | null>(null);
-  const offsetRef = useRef(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Track whether initial fetch has completed (distinguishes "loading" from "empty")
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Track component instance for debugging
   const instanceIdRef = useRef(Math.random().toString(36).slice(2, 8));
@@ -49,102 +62,55 @@ export function useSessionTools() {
   // This ensures tools toggled from search results are available for payment
   const [extraTools, setExtraTools] = useState<ToolListItem[]>([]);
 
-  // Debug: Log state on every render
-  console.log(LOG_PREFIX, `[${instanceIdRef.current}] render:`, {
-    loading,
-    isInitialized,
-    toolsCount: tools.length,
+  // Use SWR for caching - tools won't refetch on every remount
+  const {
+    data: paginatedToolPages,
+    size,
+    setSize,
+    isLoading,
+    isValidating,
+  } = useSWRInfinite<ToolsPage>(getToolsPaginationKey, fetcher, {
+    revalidateOnFocus: false, // Don't refetch when window regains focus
+    revalidateOnReconnect: false, // Don't refetch on reconnect
+    revalidateFirstPage: false, // Don't refetch first page when subsequent pages load
   });
 
-  // Fetch initial page of tools
-  useEffect(() => {
-    console.log(
-      LOG_PREFIX,
-      `[${instanceIdRef.current}] useEffect MOUNT - starting fetch`
-    );
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  // Derive state from SWR data
+  const tools = useMemo(() => {
+    if (!paginatedToolPages) {
+      return [];
+    }
+    return paginatedToolPages.flatMap((page) => page.tools);
+  }, [paginatedToolPages]);
 
-    setLoading(true);
-    setIsInitialized(false);
-    console.log(
-      LOG_PREFIX,
-      `[${instanceIdRef.current}] set loading=true, isInitialized=false`
-    );
+  const total = paginatedToolPages?.[0]?.total ?? null;
 
-    fetch(`/api/tools?limit=${PAGE_SIZE}&offset=0&count=true`, {
-      signal: controller.signal,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        // Don't update state if aborted (component unmounted)
-        if (controller.signal.aborted) {
-          console.log(
-            LOG_PREFIX,
-            `[${instanceIdRef.current}] fetch SUCCESS but ABORTED, skipping state update`
-          );
-          return;
-        }
-        console.log(
-          LOG_PREFIX,
-          `[${instanceIdRef.current}] fetch SUCCESS, tools:`,
-          data.tools?.length ?? 0
-        );
-        setTools(data.tools || []);
-        setTotal(data.total ?? null);
-        setHasMore(data.hasMore ?? false);
-        offsetRef.current = data.tools?.length ?? 0;
-        // Only mark as initialized after successful data load
-        setLoading(false);
-        setIsInitialized(true);
-      })
-      .catch((error) => {
-        if (error.name !== "AbortError") {
-          console.error(
-            LOG_PREFIX,
-            `[${instanceIdRef.current}] fetch ERROR:`,
-            error
-          );
-          // On error (not abort), still mark as initialized so we show empty state
-          setLoading(false);
-          setIsInitialized(true);
-        } else {
-          console.log(LOG_PREFIX, `[${instanceIdRef.current}] fetch ABORTED`);
-          // Don't update state on abort - component is unmounting
-        }
-      });
+  const hasMore = paginatedToolPages
+    ? (paginatedToolPages.at(-1)?.hasMore ?? false)
+    : true;
 
-    return () => {
-      console.log(
-        LOG_PREFIX,
-        `[${instanceIdRef.current}] useEffect CLEANUP - aborting`
-      );
-      controller.abort();
-    };
-  }, []);
+  // isInitialized = we have data OR we've finished loading with no data
+  const isInitialized = !isLoading;
+
+  // loadingMore = fetching additional pages (not the first page)
+  const loadingMore = isValidating && size > 1;
+
+  // Debug: Log state on every render
+  console.log(LOG_PREFIX, `[${instanceIdRef.current}] render:`, {
+    loading: isLoading,
+    isInitialized,
+    toolsCount: tools.length,
+    pages: paginatedToolPages?.length ?? 0,
+  });
 
   // Load more tools (for infinite scroll / pagination)
-  const loadMore = useCallback(async () => {
+  const loadMore = useCallback(() => {
     if (loadingMore || !hasMore) {
       return;
     }
-
-    setLoadingMore(true);
-    try {
-      const res = await fetch(
-        `/api/tools?limit=${PAGE_SIZE}&offset=${offsetRef.current}&count=true`
-      );
-      const data = await res.json();
-
-      setTools((prev) => [...prev, ...(data.tools || [])]);
-      setHasMore(data.hasMore ?? false);
-      offsetRef.current += data.tools?.length ?? 0;
-    } catch (error) {
-      console.error("Failed to load more tools:", error);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMore]);
+    // SWR handles the actual fetching - just increment the page size
+    setSize(size + 1);
+  }, [loadingMore, hasMore, setSize, size]);
 
   const toggleTool = useCallback(
     (toolId: string) => {
@@ -201,7 +167,7 @@ export function useSessionTools() {
 
   return {
     tools,
-    loading,
+    loading: isLoading,
     isInitialized,
     loadingMore,
     hasMore,

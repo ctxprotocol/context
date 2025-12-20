@@ -179,9 +179,25 @@ function PureMessages({
               message.parts[0].type === "text" &&
               message.parts[0].text.startsWith("[Continue with ");
 
+            // FIX: Hide wallet skip continuation messages
+            // When user clicks "Skip" on wallet linking prompt, we send the original
+            // query with a distinctive prefix so the model knows to provide general
+            // analysis. This message should not be visible since the original query
+            // is already shown in the chat.
+            const isWalletSkipContinuation =
+              message.role === "user" &&
+              message.parts?.length === 1 &&
+              message.parts[0].type === "text" &&
+              message.parts[0].text.startsWith("[Proceed without wallet]\n");
+
             // Never render pure data-only assistant messages, empty "ghost" messages,
-            // or Auto Mode continuation messages.
-            if (isGhost || hasOnlyDataParts || isAutoModeContinuation) {
+            // Auto Mode continuation messages, or wallet skip continuation messages.
+            if (
+              isGhost ||
+              hasOnlyDataParts ||
+              isAutoModeContinuation ||
+              isWalletSkipContinuation
+            ) {
               return null;
             }
 
