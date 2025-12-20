@@ -296,3 +296,4 @@ export async function getOpenRouterPricingCatalog(): Promise<ModelCatalog> {
     return getFallbackCatalog();
   }
 }
+

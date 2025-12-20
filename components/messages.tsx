@@ -7,13 +7,12 @@ import { useMessages } from "@/hooks/use-messages";
 import { usePaymentStatus } from "@/hooks/use-payment-status";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage, WalletLinkingRequirement } from "@/lib/types";
-import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
 import { Greeting } from "./greeting";
+import { SparklesIcon } from "./icons";
 import { PreviewMessage, ThinkingMessage } from "./message";
 import { OnboardingHero } from "./onboarding-hero";
 import { WalletLinkingPrompt } from "./wallet-linking-prompt";
-import { SparklesIcon } from "./icons";
 
 type MessagesProps = {
   chatId: string;
@@ -168,13 +167,17 @@ function PureMessages({
               message.parts.every((part) => part.type.startsWith("data-"));
 
             // FIX: Hide Auto Mode continuation messages
-            // These are system messages sent to trigger execution after payment.
+            // These are internal system messages sent to trigger execution after payment.
             // They should not be visible in the chat UI.
+            // Uses prefix matching to catch all continuation patterns:
+            // - "[Continue with execution]" - when tools are selected
+            // - "[Continue with response]" - when no tools needed (model-cost-only)
+            // - Any future "[Continue with ...]" variations
             const isAutoModeContinuation =
               message.role === "user" &&
               message.parts?.length === 1 &&
               message.parts[0].type === "text" &&
-              message.parts[0].text === "[Continue with execution]";
+              message.parts[0].text.startsWith("[Continue with ");
 
             // Never render pure data-only assistant messages, empty "ghost" messages,
             // or Auto Mode continuation messages.
@@ -231,7 +234,7 @@ function PureMessages({
               <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
                 <SparklesIcon size={14} />
               </div>
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 w-full">
+              <div className="fade-in slide-in-from-bottom-2 w-full animate-in duration-300">
                 <WalletLinkingPrompt
                   onCancel={walletLinking.onCancel}
                   onSkip={walletLinking.onSkip}

@@ -4,8 +4,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import {
-  flowCostMultipliers,
   type FlowType,
+  flowCostMultipliers,
   modelCostHistory,
 } from "@/lib/db/schema";
 import { chatModels } from "./models";
@@ -20,16 +20,18 @@ export type { FlowType } from "@/lib/db/schema";
 /**
  * Default multipliers if no historical data exists
  * Conservative estimates to avoid undercharging
- * 
+ *
  * These account for self-healing retries (up to 2 per execution):
- * - manual_simple: 1 AI call
+ * - manual_simple: 1 AI call (direct chat, no tools)
  * - manual_tools: 2-5 AI calls (planning + self-healing retries + final response)
- * - auto_mode: 3-7 AI calls (selection + planning + code retries + self-healing + final)
+ * - auto_mode: 3-7 AI calls (discovery + planning + code retries + self-healing + final)
+ * - auto_mode_no_tools: 2 AI calls (discovery + final response, AI determined no tools needed)
  */
 const DEFAULT_MULTIPLIERS: Record<FlowType, number> = {
   manual_simple: 1.0, // Single AI call
   manual_tools: 3.0, // Planning + self-healing (0-2) + final response
-  auto_mode: 5.0, // Discovery + selection + planning + retries + self-healing + final
+  auto_mode: 5.0, // Discovery + planning + retries + self-healing + final
+  auto_mode_no_tools: 2.0, // Discovery + final response (no tools selected)
 };
 
 /**
@@ -234,8 +236,7 @@ export async function recordActualCost(params: {
 
     // 4. Log delta for monitoring
     const delta = actualCost - estimatedCost;
-    const deltaPercent =
-      estimatedCost > 0 ? (delta / estimatedCost) * 100 : 0;
+    const deltaPercent = estimatedCost > 0 ? (delta / estimatedCost) * 100 : 0;
 
     console.log("[cost-estimation] Cost tracking:", {
       modelId,
@@ -300,4 +301,3 @@ export async function getAllFlowMultipliers() {
 export function getDefaultFlowMultiplier(flowType: FlowType): number {
   return DEFAULT_MULTIPLIERS[flowType];
 }
-

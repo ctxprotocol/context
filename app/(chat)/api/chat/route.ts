@@ -671,8 +671,8 @@ export async function POST(request: Request) {
                   userId: session.user.id,
                   chatId: id,
                   modelId: selectedChatModel,
-                  flowType: "manual_simple", // No tools = simple
-                  estimatedCost: baseCostEstimate,
+                  flowType: "auto_mode_no_tools", // Auto mode but AI determined no tools needed
+                  estimatedCost: baseCostEstimate * 2, // 2 AI calls expected (discovery + final)
                   actualCost,
                   aiCallCount,
                 });
@@ -1177,16 +1177,22 @@ export async function POST(request: Request) {
               // Convenience tier users must pay for model costs even without tools.
               // Send payment request to client and wait for payment confirmation.
               if (userTier === "convenience") {
-                // Calculate estimated model cost for this response
-                // Use manual_simple multiplier (1x) since no tools involved
+                // Calculate estimated model cost using learned multiplier for no-tools flow
+                // This accounts for the fact that auto_mode_no_tools = 2 AI calls (discovery + final)
+                const noToolsMultiplier = await getFlowMultiplier(
+                  selectedChatModel,
+                  "auto_mode_no_tools"
+                );
                 const modelCostEstimate =
-                  getEstimatedModelCost(selectedChatModel);
+                  baseCostEstimate * noToolsMultiplier.multiplier;
 
                 console.log(
                   "[chat-api] Auto Mode Discovery: requesting model cost payment",
                   {
                     chatId: id,
                     modelCost: modelCostEstimate,
+                    multiplier: noToolsMultiplier.multiplier,
+                    confidence: noToolsMultiplier.confidence,
                     tier: userTier,
                   }
                 );

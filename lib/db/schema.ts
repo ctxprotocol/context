@@ -17,7 +17,15 @@ import {
 import type { AppUsage } from "../usage";
 
 // Flow types for cost estimation
-export type FlowType = "manual_simple" | "manual_tools" | "auto_mode";
+// - manual_simple: Direct chat without tools (1 AI call)
+// - manual_tools: Manual mode with tools selected (2-5 AI calls)
+// - auto_mode: Auto mode with tools (3-7 AI calls: discovery + planning + retries + final)
+// - auto_mode_no_tools: Auto mode where AI determined no tools needed (2 AI calls: discovery + final)
+export type FlowType =
+  | "manual_simple"
+  | "manual_tools"
+  | "auto_mode"
+  | "auto_mode_no_tools";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
