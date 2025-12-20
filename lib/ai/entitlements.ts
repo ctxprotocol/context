@@ -2,12 +2,14 @@ import type { UserType } from "@/app/(auth)/auth";
 import type { ChatModel } from "./models";
 
 /**
- * User tier for the BYOK system:
- * - free: Limited daily queries using platform's API key
+ * User tier for the platform:
+ * - convenience: Pay-as-you-go model cost pass-through (DEFAULT)
  * - byok: Unlimited queries using user's own API key
- * - convenience: Pay-as-you-go model cost pass-through
+ *
+ * Note: Free tier was removed - users need USDC for tools anyway,
+ * so the payment friction exists regardless. Convenience is now the default.
  */
-export type UserTier = "free" | "byok" | "convenience";
+export type UserTier = "convenience" | "byok";
 
 type Entitlements = {
   maxMessagesPerDay: number;
@@ -16,7 +18,7 @@ type Entitlements = {
 
 /**
  * Base entitlements by user type (anti-abuse limits).
- * These are high ceilings - actual limiting is via tier system.
+ * These are high ceilings for anti-abuse purposes only.
  */
 export const entitlementsByUserType: Record<UserType, Entitlements> = {
   /*
@@ -30,8 +32,8 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
 
   /*
    * For users with an account
-   * High ceiling for anti-abuse only - actual limiting is via tier system
-   * Includes all models but actual availability is filtered by tier
+   * High ceiling for anti-abuse only
+   * All models available - paid via USDC wallet
    */
   regular: {
     maxMessagesPerDay: 10_000,
@@ -49,44 +51,12 @@ export const entitlementsByUserType: Record<UserType, Entitlements> = {
 };
 
 /**
- * Free tier daily limit for regular users.
- * Users can upgrade to BYOK or Convenience tier for unlimited queries.
- */
-export const FREE_TIER_DAILY_LIMIT = 1000;
-
-/**
- * Check if a user has exceeded their free tier limit.
- * Returns the remaining queries or -1 if unlimited (BYOK/convenience tier).
- */
-export function getRemainingFreeQueries(
-  tier: UserTier,
-  usedToday: number
-): number {
-  if (tier === "byok" || tier === "convenience") {
-    return -1; // Unlimited
-  }
-  return Math.max(0, FREE_TIER_DAILY_LIMIT - usedToday);
-}
-
-/**
- * Check if a user can make a query based on their tier and usage.
- */
-export function canMakeQuery(tier: UserTier, usedToday: number): boolean {
-  if (tier === "byok" || tier === "convenience") {
-    return true; // Unlimited for BYOK and convenience tiers
-  }
-  return usedToday < FREE_TIER_DAILY_LIMIT;
-}
-
-/**
  * Model IDs available by tier (for non-BYOK users).
  * BYOK users get their provider's models instead.
  *
- * - Free tier: Gemini Flash only (via OpenRouter)
- * - Convenience tier: All models including Claude (via OpenRouter)
+ * Convenience tier (default): All models including Claude (via OpenRouter)
  */
 export const modelIdsByTier: Record<Exclude<UserTier, "byok">, string[]> = {
-  free: ["gemini-flash-model"],
   convenience: [
     "gemini-flash-model",
     "gemini-model",

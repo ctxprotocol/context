@@ -1,27 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import useSWR from "swr";
-import type { UserTier } from "@/lib/ai/entitlements";
-
 type BYOKProvider = "gemini" | "anthropic" | null;
 
+// Note: "free" is a legacy tier that may still exist in database
+// New users default to "convenience", but we accept "free" for backwards compatibility
+type LegacyUserTier = "free" | "convenience" | "byok";
+
 export type UserSettings = {
-  tier: UserTier;
+  tier: LegacyUserTier;
   useBYOK: boolean;
   byokProvider: BYOKProvider;
   configuredProviders: ("gemini" | "anthropic")[];
-  freeQueriesUsedToday: number;
-  freeQueriesDailyLimit: number;
+  accumulatedModelCost: string;
 };
 
 const DEFAULT_SETTINGS: UserSettings = {
-  tier: "free",
+  tier: "convenience",
   useBYOK: false,
   byokProvider: null,
   configuredProviders: [],
-  freeQueriesUsedToday: 0,
-  freeQueriesDailyLimit: 20,
+  accumulatedModelCost: "0",
 };
 
 const SETTINGS_CACHE_KEY = "context-user-settings";
@@ -57,12 +57,11 @@ const fetcher = async (url: string): Promise<UserSettings> => {
   }
   const data = await response.json();
   const settings: UserSettings = {
-    tier: data.tier || "free",
+    tier: data.tier || "convenience",
     useBYOK: data.useBYOK || false,
     byokProvider: data.byokProvider || null,
     configuredProviders: data.configuredProviders || [],
-    freeQueriesUsedToday: data.freeQueriesUsedToday || 0,
-    freeQueriesDailyLimit: data.freeQueriesDailyLimit || 20,
+    accumulatedModelCost: data.accumulatedModelCost || "0",
   };
   // Cache for instant hydration on next page load
   cacheSettings(settings);

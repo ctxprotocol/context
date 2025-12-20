@@ -20,35 +20,28 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { UserTier } from "@/lib/ai/entitlements";
+// Note: "free" is a legacy tier that may still exist in database
+// It gets treated as "convenience" in the UI
+type LegacyUserTier = "free" | "convenience" | "byok";
 import { cn } from "@/lib/utils";
 
 type BYOKProvider = "gemini" | "anthropic";
 
 type SettingsData = {
-  tier: UserTier;
+  tier: LegacyUserTier;
   useBYOK: boolean;
   byokProvider: BYOKProvider | null;
   configuredProviders: BYOKProvider[];
   enableModelCostPassthrough: boolean;
-  freeQueriesUsedToday: number;
-  freeQueriesDailyLimit: number;
   accumulatedModelCost: string;
 };
 
 const TIER_CONFIG = {
-  free: {
-    name: "Free Tier",
-    description: "Limited daily queries using platform resources",
-    icon: Sparkles,
-    badge: "default" as const,
-  },
   byok: {
     name: "BYOK",
     description: "Unlimited queries with your own API key",
@@ -56,10 +49,10 @@ const TIER_CONFIG = {
     badge: "secondary" as const,
   },
   convenience: {
-    name: "Convenience",
-    description: "Pay-as-you-go model costs",
+    name: "Pay-as-you-go",
+    description: "Model + tool costs paid from your USDC wallet",
     icon: Zap,
-    badge: "outline" as const,
+    badge: "default" as const,
   },
 };
 
@@ -221,42 +214,18 @@ export function SettingsForm() {
     }
   };
 
-  const handleSwitchToFreeTier = async () => {
-    setSaving(true);
-    try {
-      const response = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier: "free" }),
-      });
-
-      if (response.ok) {
-        toast.success("Switched to free tier");
-        await refreshSettings();
-      } else {
-        toast.error("Failed to switch tier");
-      }
-    } catch (_error) {
-      toast.error("Failed to switch tier");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Switch to Convenience tier (pay-as-you-go model costs)
+  // Switch back to Convenience tier (from BYOK)
   const handleSwitchToConvenienceTier = async () => {
     setSaving(true);
     try {
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enableModelCostPassthrough: true }),
+        body: JSON.stringify({ tier: "convenience" }),
       });
 
       if (response.ok) {
-        toast.success(
-          "Switched to Convenience tier. Model costs will be tracked per query."
-        );
+        toast.success("Switched to pay-as-you-go tier");
         await refreshSettings();
       } else {
         toast.error("Failed to switch tier");
@@ -291,7 +260,6 @@ export function SettingsForm() {
                 <div className="h-4 w-32 animate-pulse rounded-md bg-muted" />
                 <div className="h-4 w-16 animate-pulse rounded-md bg-muted" />
               </div>
-              <div className="h-2 w-full animate-pulse rounded-full bg-muted" />
             </div>
           </CardContent>
         </Card>
@@ -308,7 +276,7 @@ export function SettingsForm() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[1, 2, 3].map((i) => (
+            {[1, 2].map((i) => (
               <div className="rounded-lg border p-4" key={i}>
                 <div className="flex items-center gap-3">
                   <div className="size-10 animate-pulse rounded-lg bg-muted" />
@@ -319,23 +287,6 @@ export function SettingsForm() {
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
-
-        {/* Convenience Tier Card Skeleton */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="size-10 animate-pulse rounded-lg bg-muted" />
-              <div className="space-y-2">
-                <div className="h-5 w-36 animate-pulse rounded-md bg-muted" />
-                <div className="h-4 w-56 animate-pulse rounded-md bg-muted" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-4 w-full animate-pulse rounded-md bg-muted" />
-            <div className="mt-2 h-4 w-3/4 animate-pulse rounded-md bg-muted" />
           </CardContent>
         </Card>
       </div>
@@ -352,7 +303,9 @@ export function SettingsForm() {
     );
   }
 
-  const currentTier = TIER_CONFIG[settings.tier];
+  // Handle legacy "free" tier values from database - treat as "convenience"
+  const effectiveTier = settings.tier === "free" ? "convenience" : settings.tier;
+  const currentTier = TIER_CONFIG[effectiveTier] || TIER_CONFIG.convenience;
   const TierIcon = currentTier.icon;
 
   return (
@@ -374,39 +327,11 @@ export function SettingsForm() {
           </div>
         </CardHeader>
         <CardContent>
-          {settings.tier === "free" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Queries used today
-                </span>
-                <span className="font-medium">
-                  {settings.freeQueriesUsedToday} /{" "}
-                  {settings.freeQueriesDailyLimit}
-                </span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{
-                    width: `${Math.min(100, (settings.freeQueriesUsedToday / settings.freeQueriesDailyLimit) * 100)}%`,
-                  }}
-                />
-              </div>
-              {settings.freeQueriesUsedToday >=
-                settings.freeQueriesDailyLimit && (
-                <p className="text-destructive text-sm">
-                  Daily limit reached. Add your own API key below to continue.
-                </p>
-              )}
-            </div>
-          )}
-
-          {settings.tier === "byok" && settings.byokProvider && (
+          {effectiveTier === "byok" && settings.byokProvider && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <CheckCircle2 className="size-4 text-green-500" />
-                <span>Unlimited queries with your own API key</span>
+                <span>Using your own API key - no model costs from wallet</span>
               </div>
               <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
                 {(() => {
@@ -421,10 +346,18 @@ export function SettingsForm() {
                   Active
                 </Badge>
               </div>
+              <Button
+                className="w-full"
+                disabled={saving}
+                onClick={handleSwitchToConvenienceTier}
+                variant="outline"
+              >
+                Switch to Pay-as-you-go
+              </Button>
             </div>
           )}
 
-          {settings.tier === "convenience" && (
+          {effectiveTier === "convenience" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">
@@ -435,24 +368,12 @@ export function SettingsForm() {
                 </span>
               </div>
               <p className="text-muted-foreground text-xs">
-                Model costs are paid per query and go to the platform to cover
-                API expenses.
+                Model costs are paid per query from your USDC wallet alongside
+                tool costs.
               </p>
             </div>
           )}
         </CardContent>
-        {settings.tier !== "free" && (
-          <CardFooter>
-            <Button
-              className="w-full"
-              disabled={saving}
-              onClick={handleSwitchToFreeTier}
-              variant="outline"
-            >
-              Switch to Free Tier
-            </Button>
-          </CardFooter>
-        )}
       </Card>
 
       {/* BYOK Providers Section */}
@@ -467,8 +388,8 @@ export function SettingsForm() {
                 Bring Your Own Key (BYOK)
               </CardTitle>
               <CardDescription>
-                Use your own API key for unlimited queries. Choose from three
-                providers.
+                Power users: use your own API key to skip model costs. You still
+                pay tool costs via USDC.
               </CardDescription>
             </div>
           </div>
@@ -662,92 +583,6 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Convenience Tier - Pay-as-you-go model costs */}
-      <Card
-        className={cn(
-          "transition-all",
-          settings.tier === "convenience" && "border-primary bg-primary/5"
-        )}
-      >
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex size-10 items-center justify-center rounded-lg",
-                settings.tier === "convenience"
-                  ? "bg-primary/10"
-                  : "bg-secondary"
-              )}
-            >
-              <Zap
-                className={cn(
-                  "size-5",
-                  settings.tier === "convenience"
-                    ? "text-primary"
-                    : "text-secondary-foreground"
-                )}
-              />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Convenience Tier</CardTitle>
-              <CardDescription>
-                Pay-as-you-go model costs without managing API keys
-              </CardDescription>
-            </div>
-            {settings.tier === "convenience" && (
-              <Badge className="ml-auto" variant="default">
-                Active
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-sm">
-            Pay actual model costs as a pass-through, without needing to manage
-            your own API key. Model costs are estimated upfront and tracked per
-            query. Works with both Manual Mode (selected tools) and Auto Mode
-            (AI-discovered tools).
-          </p>
-
-          {/* Show accumulated costs when on convenience tier */}
-          {settings.tier === "convenience" && (
-            <div className="rounded-md border bg-muted/30 p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">
-                  Accumulated model costs
-                </span>
-                <span className="font-medium font-mono">
-                  ${Number(settings.accumulatedModelCost).toFixed(4)}
-                </span>
-              </div>
-              <p className="mt-2 text-muted-foreground text-xs">
-                Model costs are estimated upfront and paid to the platform. In
-                agentic flows, multiple AI calls may occur per response.
-              </p>
-            </div>
-          )}
-
-          {/* Show enable button when not on convenience tier */}
-          {settings.tier !== "convenience" && (
-            <Button
-              className="w-full"
-              disabled={saving}
-              onClick={handleSwitchToConvenienceTier}
-              variant="outline"
-            >
-              {saving && (
-                <span className="mr-2 animate-spin">
-                  <LoaderIcon size={16} />
-                </span>
-              )}
-              Switch to Convenience Tier
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Info Section - Removed */}
     </div>
   );
 }

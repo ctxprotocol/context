@@ -11,7 +11,7 @@ const runtime: SkillRuntime = {
       id: "test-user",
       email: "test@example.com",
       name: "Test User",
-      type: "free",
+      type: "regular",
     } as any,
   },
 };

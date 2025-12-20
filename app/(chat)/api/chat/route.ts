@@ -32,12 +32,7 @@ import {
   getFlowMultiplier,
   recordActualCost,
 } from "@/lib/ai/cost-estimation";
-import {
-  canMakeQuery,
-  entitlementsByUserType,
-  FREE_TIER_DAILY_LIMIT,
-  type UserTier,
-} from "@/lib/ai/entitlements";
+import { entitlementsByUserType, type UserTier } from "@/lib/ai/entitlements";
 import { type ChatModel, getEstimatedModelCost } from "@/lib/ai/models";
 import { getOpenRouterPricingCatalog } from "@/lib/ai/openrouter-pricing";
 import {
@@ -66,11 +61,9 @@ import {
   deleteChatById,
   getAIToolById,
   getChatById,
-  getFreeQueriesUsedToday,
   getMessageCountByUserId,
   getMessagesByChatId,
   getUserSettings,
-  incrementFreeQueriesUsed,
   recordToolQuery,
   saveChat,
   saveMessages,
@@ -343,21 +336,12 @@ export async function POST(request: Request) {
       return new ChatSDKError("rate_limit:chat").toResponse();
     }
 
-    // === TIER SYSTEM: Determine user's tier and validate access ===
+    // === TIER SYSTEM: Determine user's tier ===
     const userSettingsData = await getUserSettings(session.user.id);
-    const userTier: UserTier = (userSettingsData?.tier as UserTier) || "free";
-
-    // Free tier: Check daily limit
-    if (userTier === "free") {
-      const queriesUsedToday = await getFreeQueriesUsedToday(session.user.id);
-
-      if (!canMakeQuery(userTier, queriesUsedToday)) {
-        return new ChatSDKError(
-          "rate_limit:chat",
-          `Free tier limit reached (${FREE_TIER_DAILY_LIMIT}/day). Add your own API key (BYOK) or enable Convenience Tier to continue.`
-        ).toResponse();
-      }
-    }
+    // Map legacy "free" tier to "convenience" (free tier was removed)
+    const rawTier = userSettingsData?.tier || "convenience";
+    const userTier: UserTier =
+      rawTier === "free" ? "convenience" : (rawTier as UserTier);
 
     // BYOK tier: Get user's API key and provider for dynamic provider
     let byokConfig: BYOKConfig | undefined;
@@ -796,11 +780,6 @@ export async function POST(request: Request) {
               chatId: id,
             })),
           });
-
-          // === TIER SYSTEM: Track usage ===
-          if (userTier === "free") {
-            await incrementFreeQueriesUsed(session.user.id);
-          }
 
           if (finalMergedUsage) {
             try {
@@ -2385,11 +2364,6 @@ ${devPrefix}`;
             chatId: id,
           })),
         });
-
-        // === TIER SYSTEM: Track usage ===
-        if (userTier === "free") {
-          await incrementFreeQueriesUsed(session.user.id);
-        }
 
         if (finalMergedUsage) {
           try {

@@ -402,7 +402,7 @@ function PureMultimodalInput({
           (sum, t) => sum + Number(t.pricePerQuery ?? 0),
           0
         );
-        // Model cost only applies to convenience tier - free/BYOK users don't pay model costs
+        // Model cost only applies to convenience tier - BYOK users pay their provider directly
         // Apply flow multiplier heuristic: manual_tools = 3x (planning + self-healing + final)
         // Note: These match the backend DEFAULT_MULTIPLIERS in cost-estimation.ts
         const baseCost = getEstimatedModelCost(selectedModelId);
@@ -790,8 +790,7 @@ function PureMultimodalInput({
       toolFees += parseUnits(tool.pricePerQuery ?? "0.00", 6);
     }
 
-    // Model cost only applies to convenience tier - free/BYOK users don't pay model costs upfront
-    // (BYOK users pay directly to their provider, free tier model costs are absorbed by platform)
+    // Model cost only applies to convenience tier - BYOK users pay their provider directly
     // Apply flow multiplier: manual_tools = 3x (planning + self-healing + final response)
     const baseCostUSD = getEstimatedModelCost(selectedModelId);
     const hasToolsForPayment = toolsToPay.length > 0;

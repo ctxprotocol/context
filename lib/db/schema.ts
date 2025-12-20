@@ -59,8 +59,9 @@ export const userSettings = pgTable("UserSettings", {
 
   useBYOK: boolean("use_byok").notNull().default(false),
 
-  // Tier Settings: "free" | "byok" | "convenience"
-  tier: varchar("tier", { length: 20 }).notNull().default("free"),
+  // Tier Settings: "convenience" (default) | "byok"
+  // Note: "free" tier was removed - users need USDC for tools anyway
+  tier: varchar("tier", { length: 20 }).notNull().default("convenience"),
 
   // Convenience Tier - Model Cost Pass-through
   enableModelCostPassthrough: boolean("enable_model_cost_passthrough")
@@ -75,7 +76,8 @@ export const userSettings = pgTable("UserSettings", {
     .notNull()
     .default("0"),
 
-  // Free tier tracking (daily reset)
+  // DEPRECATED: Free tier was removed. These fields are kept for migration compatibility.
+  // Will be removed in a future migration.
   freeQueriesUsedToday: integer("free_queries_used_today").notNull().default(0),
   freeQueriesResetAt: timestamp("free_queries_reset_at"),
 

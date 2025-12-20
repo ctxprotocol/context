@@ -1,16 +1,11 @@
 import { auth } from "@/app/(auth)/auth";
 import type { UserTier } from "@/lib/ai/entitlements";
-import { FREE_TIER_DAILY_LIMIT } from "@/lib/ai/entitlements";
 import {
   getProviderDisplayName,
   validateProviderApiKey,
 } from "@/lib/ai/providers";
 import { encryptApiKey } from "@/lib/crypto";
-import {
-  getFreeQueriesUsedToday,
-  getUserSettings,
-  upsertUserSettings,
-} from "@/lib/db/queries";
+import { getUserSettings, upsertUserSettings } from "@/lib/db/queries";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 
@@ -33,21 +28,22 @@ export async function GET() {
   }
 
   const settings = await getUserSettings(session.user.id);
-  const freeQueriesUsed = await getFreeQueriesUsedToday(session.user.id);
 
   // Build configured providers list
   const configuredProviders: BYOKProvider[] = [];
   if (settings?.geminiApiKeyEncrypted) configuredProviders.push("gemini");
   if (settings?.anthropicApiKeyEncrypted) configuredProviders.push("anthropic");
 
+  // Map legacy "free" tier to "convenience" (free tier was removed)
+  const rawTier = settings?.tier || "convenience";
+  const tier: UserTier = rawTier === "free" ? "convenience" : (rawTier as UserTier);
+
   return Response.json({
-    tier: (settings?.tier as UserTier) || "free",
+    tier,
     useBYOK: settings?.useBYOK || false,
     byokProvider: (settings?.byokProvider as BYOKProvider) || null,
     configuredProviders,
-    enableModelCostPassthrough: settings?.enableModelCostPassthrough || false,
-    freeQueriesUsedToday: freeQueriesUsed,
-    freeQueriesDailyLimit: FREE_TIER_DAILY_LIMIT,
+    enableModelCostPassthrough: settings?.enableModelCostPassthrough ?? true,
     accumulatedModelCost: settings?.accumulatedModelCost || "0",
   });
 }
@@ -114,11 +110,11 @@ export async function POST(request: Request) {
     updates.tier = "byok";
   }
 
-  // Handle tier change
+  // Handle tier change (only convenience or byok allowed)
   if (tier !== undefined) {
-    if (!["free", "byok", "convenience"].includes(tier)) {
+    if (!["byok", "convenience"].includes(tier)) {
       return Response.json(
-        { error: "Invalid tier. Must be 'free', 'byok', or 'convenience'." },
+        { error: "Invalid tier. Must be 'byok' or 'convenience'." },
         { status: 400 }
       );
     }
@@ -126,8 +122,8 @@ export async function POST(request: Request) {
     updates.useBYOK = tier === "byok";
     updates.enableModelCostPassthrough = tier === "convenience";
 
-    // If switching to free tier, clear byokProvider
-    if (tier === "free") {
+    // If switching to convenience tier, clear byokProvider
+    if (tier === "convenience") {
       updates.byokProvider = null;
     }
   }
@@ -150,12 +146,13 @@ export async function POST(request: Request) {
       // Remove API key for this provider
       updates[keyField] = null;
 
-      // If this was the active provider, clear BYOK settings
+      // If this was the active provider, clear BYOK settings and switch to convenience
       const currentSettings = await getUserSettings(session.user.id);
       if (currentSettings?.byokProvider === provider) {
         updates.byokProvider = null;
         updates.useBYOK = false;
-        updates.tier = "free";
+        updates.tier = "convenience";
+        updates.enableModelCostPassthrough = true;
       }
     } else {
       // Validate API key format
@@ -186,19 +183,13 @@ export async function POST(request: Request) {
     }
   }
 
-  // Handle convenience tier toggle
+  // Handle convenience tier toggle (for backwards compatibility)
   if (enableModelCostPassthrough !== undefined) {
     updates.enableModelCostPassthrough = enableModelCostPassthrough;
     if (enableModelCostPassthrough) {
       updates.tier = "convenience";
       updates.useBYOK = false;
       updates.byokProvider = null;
-    } else if (updates.tier === undefined) {
-      // If disabling convenience and not explicitly setting tier, go to free
-      const currentSettings = await getUserSettings(session.user.id);
-      if (currentSettings?.tier === "convenience") {
-        updates.tier = "free";
-      }
     }
   }
 
@@ -214,7 +205,7 @@ export async function POST(request: Request) {
 
 /**
  * DELETE /api/settings
- * Remove all API keys and reset to free tier
+ * Remove all API keys and reset to convenience tier
  */
 export async function DELETE(request: Request) {
   const session = await auth();
@@ -254,9 +245,11 @@ export async function DELETE(request: Request) {
       if (newProvider) {
         updates.byokProvider = newProvider;
       } else {
+        // No other BYOK provider configured, switch to convenience tier
         updates.byokProvider = null;
         updates.useBYOK = false;
-        updates.tier = "free";
+        updates.tier = "convenience";
+        updates.enableModelCostPassthrough = true;
       }
     }
 
@@ -267,19 +260,19 @@ export async function DELETE(request: Request) {
     });
   }
 
-  // Delete all keys
+  // Delete all keys and reset to convenience tier
   await upsertUserSettings(session.user.id, {
     kimiApiKeyEncrypted: null,
     geminiApiKeyEncrypted: null,
     anthropicApiKeyEncrypted: null,
     byokProvider: null,
     useBYOK: false,
-    tier: "free",
-    enableModelCostPassthrough: false,
+    tier: "convenience",
+    enableModelCostPassthrough: true,
   });
 
   return Response.json({
     success: true,
-    message: "All API keys removed and reset to free tier.",
+    message: "All API keys removed and reset to pay-as-you-go tier.",
   });
 }

@@ -1,6 +1,6 @@
 import type { BYOKProvider } from "../db/schema";
 
-// Default to Gemini 3 Flash for all users (fast, free-tier friendly)
+// Default to Gemini 3 Flash for all users (fast and cost-effective)
 export const DEFAULT_CHAT_MODEL: string = "gemini-flash-model";
 
 export type ChatModel = {
@@ -59,10 +59,11 @@ export const PROVIDER_MODEL_INFO: Record<
 /**
  * Base chat models (platform defaults via OpenRouter)
  * Order: Gemini models first (Flash default, then Pro), then Claude models
- * - Gemini Flash: Available to free tier - DEFAULT
- * - Gemini Pro: Convenience tier only
- * - Claude Sonnet 4.5: Convenience tier only
- * - Claude Opus 4.5: Convenience tier only
+ * All models available to Convenience tier (default) - paid via USDC wallet
+ * - Gemini Flash: DEFAULT (cheapest, excellent for tool calling)
+ * - Gemini Pro: Advanced reasoning
+ * - Claude Sonnet 4.5: Premium quality
+ * - Claude Opus 4.5: Most capable
  */
 export const chatModels: ChatModel[] = [
   {
@@ -137,8 +138,8 @@ export function getChatModelsForProvider(
     ];
   }
 
-  // Platform mode (Free/Convenience tier) - return all platform models
-  // Filtering by tier happens in model-selector based on entitlements
+  // Platform mode (Convenience tier) - return all platform models
+  // All models available - paid via USDC wallet
   return [
     {
       id: "gemini-flash-model",

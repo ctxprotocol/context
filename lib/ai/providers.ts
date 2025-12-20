@@ -82,10 +82,10 @@ export type BYOKConfig = {
  * Supports Gemini and Anthropic.
  *
  * Platform users get access to models via OpenRouter:
- * - Gemini Flash (free tier)
- * - Gemini Pro (convenience tier)
- * - Claude Opus 4.5 (convenience tier)
- * - Claude Sonnet 4.5 (convenience tier)
+ * - Gemini Flash (default, cheapest)
+ * - Gemini Pro
+ * - Claude Sonnet 4.5
+ * - Claude Opus 4.5 (most capable)
  *
  * The official @openrouter/ai-sdk-provider handles reasoning_details
  * natively - no extractReasoningMiddleware needed!

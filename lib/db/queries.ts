@@ -1614,68 +1614,9 @@ export async function upsertUserSettings(
   }
 }
 
-/**
- * Increment free queries used counter for a user.
- * Automatically resets if it's a new day.
- */
-export async function incrementFreeQueriesUsed(
-  userId: string
-): Promise<number> {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  try {
-    // Get current settings
-    const settings = await getUserSettings(userId);
-
-    // Check if we need to reset (new day)
-    if (
-      !settings?.freeQueriesResetAt ||
-      settings.freeQueriesResetAt < todayStart
-    ) {
-      await upsertUserSettings(userId, {
-        freeQueriesUsedToday: 1,
-        freeQueriesResetAt: now,
-      });
-      return 1;
-    }
-
-    // Increment
-    const newCount = (settings.freeQueriesUsedToday ?? 0) + 1;
-    await upsertUserSettings(userId, { freeQueriesUsedToday: newCount });
-    return newCount;
-  } catch (error) {
-    console.error("Failed to increment free queries:", error);
-    // Don't throw - just log and return 0 to avoid breaking the flow
-    return 0;
-  }
-}
-
-/**
- * Get the current free queries used today for a user.
- * Accounts for daily reset.
- */
-export async function getFreeQueriesUsedToday(userId: string): Promise<number> {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  try {
-    const settings = await getUserSettings(userId);
-
-    // Check if reset needed (new day)
-    if (
-      !settings?.freeQueriesResetAt ||
-      settings.freeQueriesResetAt < todayStart
-    ) {
-      return 0;
-    }
-
-    return settings.freeQueriesUsedToday ?? 0;
-  } catch (error) {
-    console.error("Failed to get free queries count:", error);
-    return 0;
-  }
-}
+// DEPRECATED: Free tier functions removed - convenience tier is now the default
+// The database columns (freeQueriesUsedToday, freeQueriesResetAt) still exist
+// for migration compatibility and will be removed in a future migration.
 
 /**
  * Add accumulated model cost for convenience tier billing
