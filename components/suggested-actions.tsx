@@ -22,13 +22,13 @@ type SuggestedActionsProps = {
  */
 const ALL_SUGGESTED_ACTIONS = [
   // Polymarket → Exa: Find markets, then validate pricing
-  "Find the highest volume Polymarket markets right now and research if the odds are correctly priced",
+  "Find the highest volume Polymarket markets (urls) right now and research which bets provide the best returns",
   // Hyperliquid → Exa: Extreme funding → research why
-  "Which Hyperliquid perps have the most extreme funding rates? Research why and if it's justified",
+  "What’s your take on my current Polymarket positions, do you think I should keep holding them?",
   // Polymarket → Exa: Ending soon → news impact
-  "Find the most controversial prediction markets ending this week and research the latest news impacting results",
+  "Find the most controversial prediction markets (urls) ending this week and research the latest news impacting results",
   // Hyperliquid: Large order simulation (pure tool showcase)
-  "What's the slippage if I market sell $500K of HYPE right now? How long should I TWAP it to minimize impact?",
+  "What's the slippage if I market sell 100 of BTC into Hyperliquid perps right now? How long should I TWAP?",
   // Hyperliquid → Exa: OI spikes → find catalyst
   "Which Hyperliquid perps have unusual open interest spikes today? Search for news that explains the positioning",
   // Polymarket: Arbitrage detection (pure tool showcase)
@@ -36,15 +36,15 @@ const ALL_SUGGESTED_ACTIONS = [
   // Hyperliquid → Polymarket: Negative funding → crash sentiment
   "Identify perps with negative funding on Hyperliquid and check if prediction markets are pricing in a crash",
   // Polymarket → Exa: Whale flow → validate thesis
-  "Show me where whales are positioning on Polymarket and research if the smart money thesis is correct",
+  "Show me where whales are positioning on Polymarket with urls and research if the smart money thesis is correct",
   // Hyperliquid + Polymarket: Cross-market divergence
   "Find funding arbitrage on Hyperliquid and show me which prediction markets have whale divergence from retail",
   // Hyperliquid → Exa: Top movers → news correlation
-  "What are the top 5 movers on Hyperliquid perps today? Research what's driving each one",
+  "Analyze the Hyperliquid team unlock of 2.6M $HYPE tokens and how it will affect the price",
   // Polymarket → Exa: Low liquidity gems
-  "Find low liquidity Polymarket markets with upcoming catalysts and research if they're mispriced",
+  "Between Bitcoin and Ethereum, which has performed better since the FTX crash lows in terms of metrics like Sharpe?",
   // Hyperliquid: Position analysis (pure tool showcase)
-  "Analyze my open positions on Hyperliquid - what's my liquidation risk and should I adjust leverage?",
+  "Analyze my open positions on Hyperliquid, what's my liquidation risk and should I adjust leverage?",
 ];
 
 function PureSuggestedActions({
