@@ -90,7 +90,8 @@ export function OnboardingHero() {
           <div className="flex gap-3">
             <Link
               className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 font-medium text-secondary-foreground text-xs transition-colors hover:bg-secondary/80"
-              href="/contribute"
+              href="https://github.com/ctxprotocol/context#contribute-a-tool-mcp-tool"
+              target="_blank"
             >
               <Terminal className="size-3" />
               List a Tool

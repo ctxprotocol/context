@@ -224,7 +224,7 @@ pnpm dev
 
 Want to earn revenue from your data? Build an MCP server and register it as an MCP Tool.
 
-1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server. No special SDK required—just implement the [MCP structured output standard](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#output-schema):
+1. **Build a Standard MCP Server:** Use the official **[@modelcontextprotocol/sdk](https://modelcontextprotocol.io)** to build your server, plus **[@ctxprotocol/sdk](https://github.com/ctxprotocol/sdk)** to [secure your endpoint](https://github.com/ctxprotocol/sdk#securing-your-tool). Implement the [MCP structured output standard](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#output-schema):
 
    - **`outputSchema`** in your tool definitions (JSON Schema describing your response structure)
    - **`structuredContent`** in your responses (the machine-readable data matching your schema)
