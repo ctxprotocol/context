@@ -5,7 +5,12 @@ import {
   validateProviderApiKey,
 } from "@/lib/ai/providers";
 import { encryptApiKey } from "@/lib/crypto";
-import { getUserSettings, upsertUserSettings } from "@/lib/db/queries";
+import {
+  getUserSettings,
+  hasEngagementEvent,
+  trackEngagementEvent,
+  upsertUserSettings,
+} from "@/lib/db/queries";
 import type { BYOKProvider } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 
@@ -173,6 +178,18 @@ export async function POST(request: Request) {
 
         updates.useBYOK = true;
         updates.tier = "byok";
+
+        // Protocol Ledger: Track BYOK enablement (fire and forget, deduplicated)
+        // Only track once per user - power user signal for TGE
+        hasEngagementEvent(session.user.id, "BYOK_ENABLED").then((alreadyTracked) => {
+          if (!alreadyTracked) {
+            trackEngagementEvent({
+              userId: session.user.id,
+              eventType: "BYOK_ENABLED",
+              metadata: { provider },
+            });
+          }
+        });
       } catch (error) {
         console.error("[settings] Failed to encrypt API key:", error);
         return Response.json(

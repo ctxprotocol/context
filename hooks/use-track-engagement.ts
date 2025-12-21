@@ -16,7 +16,11 @@ type EngagementEventType =
   | "TOOL_CREATED"
   | "TOOL_STAKED"
   | "REFERRAL_LINK_CREATED"
-  | "REFERRAL_CONVERTED";
+  | "REFERRAL_CONVERTED"
+  // === NEW: Additional high-signal events ===
+  | "FIRST_PURCHASE"
+  | "BYOK_ENABLED"
+  | "REPEAT_CUSTOMER";
 
 type TrackEngagementParams = {
   eventType: EngagementEventType;
@@ -51,6 +55,7 @@ export async function trackEngagement({
 export function useTrackEngagement() {
   return { trackEngagement };
 }
+
 
 
 

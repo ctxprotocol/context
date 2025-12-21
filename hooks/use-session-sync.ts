@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { getAndClearReferralCode } from "./use-referral-capture";
 
 export function useSessionSync() {
   const { ready, authenticated, user, getAccessToken } = usePrivy();
@@ -39,6 +40,17 @@ export function useSessionSync() {
               console.error("Session sync sign-in failed:", result.error);
               toast.error("Authentication failed. Please try again.");
             } else {
+              // Apply referral code if one was captured from URL (fire and forget)
+              const refCode = getAndClearReferralCode();
+              if (refCode) {
+                fetch("/api/referral/apply", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ code: refCode }),
+                }).catch(() => {
+                  // Silently ignore - referral tracking is non-critical
+                });
+              }
               router.refresh(); // Refresh to update server components
             }
           }

@@ -134,6 +134,13 @@
       "when": 1764900000000,
       "tag": "0018_protocol_ledger_engagement",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1765000000000,
+      "tag": "0019_referral_system",
+      "breakpoints": true
     }
   ]
 }

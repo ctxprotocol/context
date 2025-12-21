@@ -1102,6 +1102,8 @@ export async function getAIToolForEmbedding({ id }: { id: string }) {
 /**
  * Record a paid query execution
  * Updates tool statistics (query count, revenue) and records the transaction
+ *
+ * Protocol Ledger: Also tracks FIRST_PURCHASE and REFERRAL_CONVERTED events
  */
 export async function recordToolQuery({
   toolId,
@@ -1149,6 +1151,12 @@ export async function recordToolQuery({
           updatedAt: new Date(),
         })
         .where(eq(aiTool.id, toolId));
+
+      // Protocol Ledger: Track purchase-related events (fire and forget)
+      // - FIRST_PURCHASE: User's very first tool payment (milestone)
+      // - REFERRAL_CONVERTED: Credit referrer when referred user makes first purchase
+      // - REPEAT_CUSTOMER: User paid for same tool 3+ times (loyalty signal)
+      trackPurchaseEvents(userId, toolId, amountPaid);
     }
 
     return query;
@@ -1158,6 +1166,101 @@ export async function recordToolQuery({
       "bad_request:database",
       "Failed to record tool query"
     );
+  }
+}
+
+/**
+ * Helper: Track purchase-related Protocol Ledger events
+ * Called after successful tool payment. Fire-and-forget, never blocks.
+ *
+ * Events tracked:
+ * - FIRST_PURCHASE: User's very first tool payment
+ * - REFERRAL_CONVERTED: Credit referrer when referred user makes first purchase
+ * - REPEAT_CUSTOMER: User paid for same tool 3+ times (tracked once per tool)
+ */
+async function trackPurchaseEvents(
+  userId: string,
+  toolId: string,
+  amountPaid: string
+): Promise<void> {
+  try {
+    // Check if this is the user's first purchase ever
+    const [priorFirstPurchase] = await db
+      .select({ count: count() })
+      .from(engagementEvent)
+      .where(
+        and(
+          eq(engagementEvent.userId, userId),
+          eq(engagementEvent.eventType, "FIRST_PURCHASE")
+        )
+      );
+
+    if ((priorFirstPurchase?.count ?? 0) === 0) {
+      // This is their first purchase - track it!
+      trackEngagementEvent({
+        userId,
+        eventType: "FIRST_PURCHASE",
+        resourceId: toolId,
+        metadata: { amountPaid },
+      });
+
+      // Also check if this user was referred - if so, credit the referrer
+      const [userData] = await db
+        .select({ referredBy: user.referredBy })
+        .from(user)
+        .where(eq(user.id, userId));
+
+      if (userData?.referredBy) {
+        // Track referral conversion for the referrer
+        trackEngagementEvent({
+          userId: userData.referredBy,
+          eventType: "REFERRAL_CONVERTED",
+          metadata: {
+            referredUserId: userId,
+            referredUserFirstSpend: amountPaid,
+          },
+        });
+      }
+    }
+
+    // Check for REPEAT_CUSTOMER: User paid for same tool 3+ times
+    // Only track once per user+tool combination
+    const [toolQueryCount] = await db
+      .select({ count: count() })
+      .from(toolQuery)
+      .where(
+        and(
+          eq(toolQuery.userId, userId),
+          eq(toolQuery.toolId, toolId),
+          eq(toolQuery.status, "completed")
+        )
+      );
+
+    // If this is their 3rd purchase of this tool, check if we've tracked it
+    if ((toolQueryCount?.count ?? 0) >= 3) {
+      const [priorRepeatEvent] = await db
+        .select({ count: count() })
+        .from(engagementEvent)
+        .where(
+          and(
+            eq(engagementEvent.userId, userId),
+            eq(engagementEvent.eventType, "REPEAT_CUSTOMER"),
+            eq(engagementEvent.resourceId, toolId)
+          )
+        );
+
+      if ((priorRepeatEvent?.count ?? 0) === 0) {
+        trackEngagementEvent({
+          userId,
+          eventType: "REPEAT_CUSTOMER",
+          resourceId: toolId,
+          metadata: { totalPurchases: toolQueryCount.count },
+        });
+      }
+    }
+  } catch (error) {
+    // Fire and forget - don't let tracking failures affect payments
+    console.warn("[trackPurchaseEvents] Failed:", error);
   }
 }
 
@@ -2302,5 +2405,195 @@ export async function getEngagementEventsByType(
   } catch (error) {
     console.error("[getEngagementEventsByType] Failed:", error);
     return [];
+  }
+}
+
+// =============================================================================
+// PROTOCOL LEDGER: Referral System
+// =============================================================================
+// These functions manage the referral system for TGE allocation.
+// Referrals are tracked both via User.referredBy and EngagementEvent.
+// =============================================================================
+
+/**
+ * Generate a unique referral code for a user.
+ * Code format: 8 alphanumeric characters (base36), collision-resistant.
+ */
+function generateReferralCode(): string {
+  // Use crypto for better randomness, fallback to Math.random
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+/**
+ * Get or create a referral code for a user.
+ * Idempotent - returns existing code if already generated.
+ */
+export async function getOrCreateReferralCode(userId: string): Promise<string | null> {
+  try {
+    // Check if user already has a code
+    const [existingUser] = await db
+      .select({ referralCode: user.referralCode })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    if (existingUser?.referralCode) {
+      return existingUser.referralCode;
+    }
+
+    // Generate new code with collision retry
+    let attempts = 0;
+    while (attempts < 5) {
+      const newCode = generateReferralCode();
+      try {
+        await db
+          .update(user)
+          .set({ referralCode: newCode })
+          .where(eq(user.id, userId));
+
+        // Track referral link creation (Protocol Ledger)
+        trackEngagementEvent({
+          userId,
+          eventType: "REFERRAL_LINK_CREATED",
+          metadata: { code: newCode },
+        });
+
+        return newCode;
+      } catch (error) {
+        // Likely a unique constraint violation, retry with new code
+        attempts++;
+        if (attempts >= 5) {
+          console.error("[getOrCreateReferralCode] Max retries exceeded:", error);
+          return null;
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("[getOrCreateReferralCode] Failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Look up a user by their referral code.
+ * Used when a new user signs up with a referral code.
+ */
+export async function getUserByReferralCode(code: string): Promise<{ id: string } | null> {
+  try {
+    const [referrer] = await db
+      .select({ id: user.id })
+      .from(user)
+      .where(eq(user.referralCode, code.toLowerCase()));
+    return referrer ?? null;
+  } catch (error) {
+    console.error("[getUserByReferralCode] Failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Set the referrer for a user (called during signup with referral code).
+ * Can only be set once - subsequent calls are no-ops.
+ */
+export async function setUserReferrer(userId: string, referrerId: string): Promise<boolean> {
+  try {
+    // Don't allow self-referral
+    if (userId === referrerId) {
+      return false;
+    }
+
+    // Only set if not already referred
+    const [existingUser] = await db
+      .select({ referredBy: user.referredBy })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    if (existingUser?.referredBy) {
+      return false; // Already has a referrer
+    }
+
+    await db
+      .update(user)
+      .set({ referredBy: referrerId })
+      .where(eq(user.id, userId));
+
+    return true;
+  } catch (error) {
+    console.error("[setUserReferrer] Failed:", error);
+    return false;
+  }
+}
+
+/**
+ * Get referral stats for a user (count of referred users, conversions).
+ * Used for displaying in settings UI.
+ */
+export async function getReferralStats(userId: string): Promise<{
+  referralCode: string | null;
+  totalReferred: number;
+  convertedCount: number;
+}> {
+  try {
+    // Get user's referral code
+    const [userData] = await db
+      .select({ referralCode: user.referralCode })
+      .from(user)
+      .where(eq(user.id, userId));
+
+    // Count users referred by this user
+    const [referredCount] = await db
+      .select({ count: count() })
+      .from(user)
+      .where(eq(user.referredBy, userId));
+
+    // Count conversion events (referred users who made a purchase)
+    const [conversionCount] = await db
+      .select({ count: count() })
+      .from(engagementEvent)
+      .where(
+        and(
+          eq(engagementEvent.userId, userId),
+          eq(engagementEvent.eventType, "REFERRAL_CONVERTED")
+        )
+      );
+
+    return {
+      referralCode: userData?.referralCode ?? null,
+      totalReferred: referredCount?.count ?? 0,
+      convertedCount: conversionCount?.count ?? 0,
+    };
+  } catch (error) {
+    console.error("[getReferralStats] Failed:", error);
+    return { referralCode: null, totalReferred: 0, convertedCount: 0 };
+  }
+}
+
+/**
+ * Check if a user has any prior engagement events of a given type.
+ * Used for deduplication (e.g., only track WALLET_CONNECTED once).
+ */
+export async function hasEngagementEvent(
+  userId: string,
+  eventType: EngagementEventType
+): Promise<boolean> {
+  try {
+    const [result] = await db
+      .select({ count: count() })
+      .from(engagementEvent)
+      .where(
+        and(
+          eq(engagementEvent.userId, userId),
+          eq(engagementEvent.eventType, eventType)
+        )
+      );
+    return (result?.count ?? 0) > 0;
+  } catch (error) {
+    console.error("[hasEngagementEvent] Failed:", error);
+    return false; // Assume no prior event on error (fail open for tracking)
   }
 }

@@ -34,6 +34,11 @@ export const user = pgTable("User", {
   privyDid: varchar("privyDid", { length: 255 }).unique(), // Add this line
   walletAddress: varchar("wallet_address", { length: 42 }), // Ethereum address for quick lookup
   isDeveloper: boolean("is_developer").notNull().default(false),
+
+  // Protocol Ledger: Referral system for TGE allocation
+  referralCode: varchar("referral_code", { length: 12 }).unique(), // User's unique invite code
+  referredBy: uuid("referred_by"), // Who referred this user (self-referencing FK)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export type User = InferSelectModel<typeof user>;
@@ -490,7 +495,11 @@ export type EngagementEventType =
   | "TOOL_CREATED" // Developer submitted a tool (supply side)
   | "TOOL_STAKED" // Developer staked on their tool (economic commitment)
   | "REFERRAL_LINK_CREATED" // User generated invite link
-  | "REFERRAL_CONVERTED"; // Referred user made first payment
+  | "REFERRAL_CONVERTED" // Referred user made first payment
+  // === NEW: Additional high-signal events ===
+  | "FIRST_PURCHASE" // User's very first tool payment (milestone)
+  | "BYOK_ENABLED" // User added their own API key (power user signal)
+  | "REPEAT_CUSTOMER"; // User paid for same tool 3+ times (loyalty signal)
 
 export const engagementEvent = pgTable("EngagementEvent", {
   id: uuid("id").primaryKey().defaultRandom(),

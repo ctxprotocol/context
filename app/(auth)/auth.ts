@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 // CORRECTED IMPORT: Import the specific function from queries.ts
 import {
   findOrCreateUserByPrivyDid,
+  hasEngagementEvent,
   trackEngagementEvent,
 } from "@/lib/db/queries";
 import { verifyPrivyToken } from "@/lib/privy";
@@ -89,12 +90,16 @@ export const {
             return null;
           }
 
-          // Protocol Ledger: Track wallet connection (fire and forget)
-          // This is a high-trust signal - user linked their Privy wallet
-          trackEngagementEvent({
-            userId: dbUser.id,
-            eventType: "WALLET_CONNECTED",
-            metadata: { hasEmail: Boolean(email) },
+          // Protocol Ledger: Track wallet connection (fire and forget, deduplicated)
+          // Only track ONCE per user - this is a high-trust signal for TGE
+          hasEngagementEvent(dbUser.id, "WALLET_CONNECTED").then((alreadyTracked) => {
+            if (!alreadyTracked) {
+              trackEngagementEvent({
+                userId: dbUser.id,
+                eventType: "WALLET_CONNECTED",
+                metadata: { hasEmail: Boolean(email) },
+              });
+            }
           });
 
           // Return a user object that next-auth can use for the session

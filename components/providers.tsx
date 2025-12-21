@@ -15,6 +15,7 @@ import { AutoPayProvider } from "@/hooks/use-auto-pay";
 import { ContextSidebarProvider } from "@/hooks/use-context-sidebar";
 import { PaymentStatusProvider } from "@/hooks/use-payment-status";
 import { isEmbeddedWallet, usePrivyWalletSync } from "@/hooks/use-privy-wallet-sync";
+import { useReferralCapture } from "@/hooks/use-referral-capture";
 import { useSessionSync } from "@/hooks/use-session-sync";
 import { wagmiConfig } from "@/lib/wagmi";
 import { privyConfig } from "../privy.config";
@@ -97,10 +98,11 @@ const selectWalletForWagmi: SetActiveWalletForWagmiType = ({ wallets, user }) =>
   return embeddedWallet ?? availableWallets[0];
 };
 
-// Client component that hosts the sync hook
+// Client component that hosts the sync hooks
 function SessionSyncManager({ children }: { children: React.ReactNode }) {
   useSessionSync();
   usePrivyWalletSync();
+  useReferralCapture(); // Captures ?ref=XXX from URL for Protocol Ledger
   return <>{children}</>;
 }
 

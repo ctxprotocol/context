@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { ApiKeysSection } from "./api-keys";
 import { LinkedWalletsSection } from "./linked-wallets";
+import { ReferralSection } from "./referral-section";
 import { SettingsForm } from "./settings-form";
 
 export default async function SettingsPage() {
@@ -49,6 +50,10 @@ export default async function SettingsPage() {
 
         <Suspense fallback={<SettingsSkeleton />}>
           <ApiKeysSection />
+        </Suspense>
+
+        <Suspense fallback={<SettingsSkeleton />}>
+          <ReferralSection />
         </Suspense>
       </div>
     </div>

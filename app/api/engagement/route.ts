@@ -29,6 +29,10 @@ const engagementEventSchema = z.object({
     "TOOL_STAKED",
     "REFERRAL_LINK_CREATED",
     "REFERRAL_CONVERTED",
+    // === NEW: Additional high-signal events ===
+    "FIRST_PURCHASE",
+    "BYOK_ENABLED",
+    "REPEAT_CUSTOMER",
   ]),
   resourceId: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).optional(),
@@ -69,6 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   }
 }
+
 
 
 
