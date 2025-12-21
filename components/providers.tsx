@@ -11,6 +11,7 @@ import {
 } from "@privy-io/wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
+import { Suspense } from "react";
 import { AutoPayProvider } from "@/hooks/use-auto-pay";
 import { ContextSidebarProvider } from "@/hooks/use-context-sidebar";
 import { PaymentStatusProvider } from "@/hooks/use-payment-status";
@@ -98,12 +99,25 @@ const selectWalletForWagmi: SetActiveWalletForWagmiType = ({ wallets, user }) =>
   return embeddedWallet ?? availableWallets[0];
 };
 
+// Internal component that uses useSearchParams (requires Suspense boundary)
+function ReferralCaptureManager() {
+  useReferralCapture(); // Captures ?ref=XXX from URL for Protocol Ledger
+  return null;
+}
+
 // Client component that hosts the sync hooks
 function SessionSyncManager({ children }: { children: React.ReactNode }) {
   useSessionSync();
   usePrivyWalletSync();
-  useReferralCapture(); // Captures ?ref=XXX from URL for Protocol Ledger
-  return <>{children}</>;
+  return (
+    <>
+      {/* Wrap useSearchParams in Suspense for Next.js 15 static generation compatibility */}
+      <Suspense fallback={null}>
+        <ReferralCaptureManager />
+      </Suspense>
+      {children}
+    </>
+  );
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
