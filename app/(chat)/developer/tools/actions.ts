@@ -313,7 +313,7 @@ export async function editTool(
     if (autoDeactivated) {
       message = `Tool updated but deactivated: new price requires $${newRequiredStake.toFixed(2)} stake. Deposit more to reactivate.`;
     } else if (stakeNowSufficient) {
-      message = `Price updated. Stake is now sufficient ($${currentStake.toFixed(2)} ≥ $${newRequiredStake.toFixed(2)}), toggle to reactivate.`;
+      message = `Price updated. Stake is now sufficient ($${currentStake.toFixed(2)} ≥ $${newRequiredStake.toFixed(2)}) — toggle to reactivate.`;
     } else if (endpointChanged) {
       message = "Tool updated and endpoint validated successfully";
     } else {
