@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { auth } from "@/app/(auth)/auth";
+import { calculateRequiredStake } from "@/lib/constants";
 import {
   getAIToolsByDeveloper,
   updateAITool,
@@ -20,6 +21,12 @@ export type EditToolState = {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Record<string, string>;
+  /** Set when tool was auto-deactivated due to price increase exceeding stake */
+  autoDeactivated?: boolean;
+  /** Set when price decreased and stake now meets requirement (tool still inactive) */
+  stakeNowSufficient?: boolean;
+  /** The new required stake amount (for UI display) */
+  newRequiredStake?: number;
 };
 
 export type RefreshToolState = {
@@ -269,14 +276,57 @@ export async function editTool(
         }),
     });
 
+    // Check if price changed and handle stake requirements
+    // This closes the security gap where a dev could increase price after staking
+    let autoDeactivated = false;
+    let stakeNowSufficient = false;
+    let newRequiredStake: number | undefined;
+
+    const oldPrice = Number.parseFloat(tool.pricePerQuery) || 0;
+    const newPrice = Number.parseFloat(parsed.data.pricePerQuery) || 0;
+    const currentStake = Number.parseFloat(tool.totalStaked ?? "0") || 0;
+    newRequiredStake = calculateRequiredStake(newPrice);
+
+    const priceIncreased = newPrice > oldPrice;
+    const priceDecreased = newPrice < oldPrice;
+
+    if (priceIncreased && tool.isActive) {
+      // Price increased: check if stake is now insufficient
+      if (currentStake < newRequiredStake) {
+        // Auto-deactivate: stake insufficient for new price
+        await updateAIToolStatus({ id: parsed.data.toolId, isActive: false });
+        autoDeactivated = true;
+      }
+    } else if (priceDecreased && !tool.isActive) {
+      // Price decreased on inactive tool: check if stake now meets requirement
+      // We don't auto-activate (explicit intent required), but we notify the user
+      if (currentStake >= newRequiredStake) {
+        stakeNowSufficient = true;
+      }
+    }
+
     revalidatePath("/developer/tools");
     revalidatePath("/chat");
 
-    const message = endpointChanged
-      ? "Tool updated and endpoint validated successfully"
-      : "Tool updated successfully";
+    // Build appropriate message based on what happened
+    let message: string;
+    if (autoDeactivated) {
+      message = `Tool updated but deactivated: new price requires $${newRequiredStake.toFixed(2)} stake. Deposit more to reactivate.`;
+    } else if (stakeNowSufficient) {
+      message = `Price updated. Stake is now sufficient ($${currentStake.toFixed(2)} ≥ $${newRequiredStake.toFixed(2)}), toggle to reactivate.`;
+    } else if (endpointChanged) {
+      message = "Tool updated and endpoint validated successfully";
+    } else {
+      message = "Tool updated successfully";
+    }
 
-    return { status: "success", message };
+    return {
+      status: "success",
+      message,
+      autoDeactivated,
+      stakeNowSufficient,
+      newRequiredStake,
+    };
   } catch {
     return { status: "error", message: "Failed to update tool" };
   }

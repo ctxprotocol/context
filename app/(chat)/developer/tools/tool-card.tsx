@@ -2,6 +2,7 @@
 
 import { Activity, Pencil, RefreshCw, Shield, TrendingUp } from "lucide-react";
 import { useActionState, useEffect, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { CrossIcon, LoaderIcon } from "@/components/icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -169,12 +170,42 @@ export function ToolCard({ tool }: { tool: Tool }) {
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   // Close sheet on successful edit (only if we actually submitted the form)
+  // Show toast notification with appropriate message
   useEffect(() => {
     if (editState.status === "success" && isSheetOpen && hasSubmitted) {
       setIsSheetOpen(false);
       setHasSubmitted(false);
+
+      // Show appropriate toast based on what happened
+      if (editState.autoDeactivated) {
+        // Warning toast for auto-deactivation due to insufficient stake
+        toast.warning(
+          `Tool deactivated: new price requires $${editState.newRequiredStake?.toFixed(2)} stake`,
+          {
+            description:
+              "Deposit additional stake in the Stake Management section to reactivate.",
+            duration: 8000,
+          }
+        );
+      } else if (editState.stakeNowSufficient) {
+        // Info toast when price decrease makes stake sufficient (but tool stays inactive)
+        toast.info("Price updated, stake is now sufficient", {
+          description:
+            "Toggle the Active switch to make your tool visible in the marketplace.",
+          duration: 6000,
+        });
+      } else {
+        toast.success("Tool updated successfully");
+      }
     }
-  }, [editState.status, isSheetOpen, hasSubmitted]);
+  }, [
+    editState.status,
+    editState.autoDeactivated,
+    editState.stakeNowSufficient,
+    editState.newRequiredStake,
+    isSheetOpen,
+    hasSubmitted,
+  ]);
 
   // Reset submitted state when sheet closes
   useEffect(() => {
