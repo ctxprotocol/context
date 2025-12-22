@@ -23,6 +23,17 @@ const platformOpenRouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
+// Provider preferences for Gemini models to avoid Google AI Studio geo-restrictions
+// Google AI Studio has geographic restrictions that can cause requests to fail with
+// "User location is not supported for the API use" errors. We configure OpenRouter
+// to skip Google AI Studio and prefer Vertex AI or allow fallbacks to other providers.
+const GEMINI_PROVIDER_PREFERENCES = {
+  // Skip Google AI Studio which has geo-restrictions in some regions
+  ignore: ["Google AI Studio"],
+  // Ensure fallbacks are enabled so OpenRouter can try other providers
+  allow_fallbacks: true,
+} as const;
+
 /**
  * Create a Google Gemini provider with a custom API key
  */
@@ -97,12 +108,16 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
     return customProvider({
       languageModels: {
         // Gemini Flash - Default model, fast and efficient
+        // Uses provider preferences to avoid Google AI Studio geo-restrictions
         "gemini-flash-model": platformOpenRouter.chat(
-          PROVIDER_MODELS.openrouter.geminiFlash
+          PROVIDER_MODELS.openrouter.geminiFlash,
+          { provider: GEMINI_PROVIDER_PREFERENCES }
         ),
         // Gemini Pro - Advanced reasoning
+        // Uses provider preferences to avoid Google AI Studio geo-restrictions
         "gemini-model": platformOpenRouter.chat(
-          PROVIDER_MODELS.openrouter.geminiPro
+          PROVIDER_MODELS.openrouter.geminiPro,
+          { provider: GEMINI_PROVIDER_PREFERENCES }
         ),
         // Claude Opus 4.5 - Most capable, superior reasoning
         "claude-opus-model": platformOpenRouter.chat(
@@ -114,20 +129,26 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
         ),
         // Backward compatibility aliases
         // chat-model -> Gemini Flash (default)
+        // Uses provider preferences to avoid Google AI Studio geo-restrictions
         "chat-model": platformOpenRouter.chat(
-          PROVIDER_MODELS.openrouter.geminiFlash
+          PROVIDER_MODELS.openrouter.geminiFlash,
+          { provider: GEMINI_PROVIDER_PREFERENCES }
         ),
         // chat-model-reasoning -> Claude Sonnet (native reasoning)
         "chat-model-reasoning": platformOpenRouter.chat(
           PROVIDER_MODELS.openrouter.claudeSonnet
         ),
         // title-model -> Gemini Flash (fast for title generation)
+        // Uses provider preferences to avoid Google AI Studio geo-restrictions
         "title-model": platformOpenRouter.chat(
-          PROVIDER_MODELS.openrouter.geminiFlash
+          PROVIDER_MODELS.openrouter.geminiFlash,
+          { provider: GEMINI_PROVIDER_PREFERENCES }
         ),
         // artifact-model -> Gemini Flash (fast for artifacts)
+        // Uses provider preferences to avoid Google AI Studio geo-restrictions
         "artifact-model": platformOpenRouter.chat(
-          PROVIDER_MODELS.openrouter.geminiFlash
+          PROVIDER_MODELS.openrouter.geminiFlash,
+          { provider: GEMINI_PROVIDER_PREFERENCES }
         ),
       },
     });
@@ -170,13 +191,16 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
 
     default:
       // Fallback to platform default (OpenRouter)
+      // Uses provider preferences to avoid Google AI Studio geo-restrictions
       return customProvider({
         languageModels: {
           "gemini-flash-model": platformOpenRouter.chat(
-            PROVIDER_MODELS.openrouter.geminiFlash
+            PROVIDER_MODELS.openrouter.geminiFlash,
+            { provider: GEMINI_PROVIDER_PREFERENCES }
           ),
           "gemini-model": platformOpenRouter.chat(
-            PROVIDER_MODELS.openrouter.geminiPro
+            PROVIDER_MODELS.openrouter.geminiPro,
+            { provider: GEMINI_PROVIDER_PREFERENCES }
           ),
           "claude-opus-model": platformOpenRouter.chat(
             PROVIDER_MODELS.openrouter.claudeOpus
@@ -185,16 +209,19 @@ export function getProviderForUser(byokConfig?: BYOKConfig) {
             PROVIDER_MODELS.openrouter.claudeSonnet
           ),
           "chat-model": platformOpenRouter.chat(
-            PROVIDER_MODELS.openrouter.geminiFlash
+            PROVIDER_MODELS.openrouter.geminiFlash,
+            { provider: GEMINI_PROVIDER_PREFERENCES }
           ),
           "chat-model-reasoning": platformOpenRouter.chat(
             PROVIDER_MODELS.openrouter.claudeSonnet
           ),
           "title-model": platformOpenRouter.chat(
-            PROVIDER_MODELS.openrouter.geminiFlash
+            PROVIDER_MODELS.openrouter.geminiFlash,
+            { provider: GEMINI_PROVIDER_PREFERENCES }
           ),
           "artifact-model": platformOpenRouter.chat(
-            PROVIDER_MODELS.openrouter.geminiFlash
+            PROVIDER_MODELS.openrouter.geminiFlash,
+            { provider: GEMINI_PROVIDER_PREFERENCES }
           ),
         },
       });

@@ -30,19 +30,19 @@ const ALL_SUGGESTED_ACTIONS = [
   // Hyperliquid: Large order simulation (pure tool showcase)
   "What's the slippage if I market sell 100 of BTC into Hyperliquid perps right now? How long should I TWAP?",
   // Hyperliquid → Exa: OI spikes → find catalyst
-  "Which Hyperliquid perps have unusual open interest spikes today? Search for news that explains the positioning",
+  "Compare BTC funding rates across all exchanges on Coinglass, which has the highest spread vs Hyperliquid for funding arb?",
   // Polymarket: Arbitrage detection (pure tool showcase)
-  "Are there any arbitrage opportunities on Polymarket where I can lock in guaranteed profit right now?",
+  "Where are the biggest liquidation clusters on Coinglass? If those levels sweep, what does Polymarket say about crash probability?",
   // Hyperliquid → Polymarket: Negative funding → crash sentiment
-  "Identify perps with negative funding on Hyperliquid and check if prediction markets are pricing in a crash",
+  "Find coins where 80%+ traders are long on Coinglass but OI is falling, are longs getting trapped?",
   // Polymarket → Exa: Whale flow → validate thesis
   "Show me where whales are positioning on Polymarket with urls and research if the smart money thesis is correct",
   // Hyperliquid + Polymarket: Cross-market divergence
-  "Find funding arbitrage on Hyperliquid and show me which prediction markets have whale divergence from retail",
+  "Is BTC flowing into or out of exchanges on Coinglass? Search for news explaining the flow",
   // Hyperliquid → Exa: Top movers → news correlation
   "Analyze the Hyperliquid team unlock of 2.6M $HYPE tokens and how it will affect the price",
   // Polymarket → Exa: Low liquidity gems
-  "Between Bitcoin and Ethereum, which has performed better since the FTX crash lows in terms of metrics like Sharpe?",
+  "Between BTC and ETH, which has performed better since the FTX crash lows on Coingekko in terms of metrics like Sharpe?",
   // Hyperliquid: Position analysis (pure tool showcase)
   "Analyze my open positions on Hyperliquid, what's my liquidation risk and should I adjust leverage?",
 ];

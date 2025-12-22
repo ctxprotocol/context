@@ -66,6 +66,13 @@ import type { VisibilityType } from "./visibility-selector";
 const STREAMING_THROTTLE_MS = 150;
 
 /**
+ * Timeout for detecting unresponsive streams (ms)
+ * If we're "streaming" but haven't received data in this time, warn the user.
+ * Set slightly higher than Vercel's function timeout to avoid false positives.
+ */
+const STREAM_INACTIVITY_TIMEOUT_MS = 65_000;
+
+/**
  * Auto Mode Tool Selection data from server (two-phase model)
  * Sent after discovery phase when AI has selected tools to use
  * User must approve and pay before execution phase begins
@@ -991,6 +998,93 @@ export function Chat({
       }
     },
   });
+
+  // Track previous status to detect incomplete streams (timeout/disconnect)
+  const prevStatusRef = useRef(status);
+  const lastDataReceivedRef = useRef<number>(Date.now());
+  const hasShownTimeoutWarningRef = useRef(false);
+
+  // Update last data received time when messages change during streaming
+  useEffect(() => {
+    if (status === "streaming") {
+      lastDataReceivedRef.current = Date.now();
+      hasShownTimeoutWarningRef.current = false;
+    }
+  }, [status, messages]);
+
+  // Proactive inactivity detection during streaming
+  // Checks periodically if we're "streaming" but haven't received data
+  useEffect(() => {
+    if (status !== "streaming") {
+      return;
+    }
+
+    const checkInactivity = () => {
+      const timeSinceLastData = Date.now() - lastDataReceivedRef.current;
+
+      if (
+        timeSinceLastData >= STREAM_INACTIVITY_TIMEOUT_MS &&
+        !hasShownTimeoutWarningRef.current
+      ) {
+        hasShownTimeoutWarningRef.current = true;
+        toast.error(
+          "Request is taking longer than expected. It may have timed out.",
+          {
+            duration: 8000,
+            description:
+              "Try stopping the request and asking again, or use a simpler query.",
+            action: {
+              label: "Stop",
+              onClick: () => stop(),
+            },
+          }
+        );
+      }
+    };
+
+    // Check every 5 seconds while streaming
+    const intervalId = setInterval(checkInactivity, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [status, stop]);
+
+  // Detect incomplete stream (timeout or disconnect without proper error)
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    // Only check when transitioning from streaming to idle
+    if (prevStatus === "streaming" && status === "idle") {
+      const lastMessage = messages.at(-1);
+
+      // Check if the last message is from assistant and appears incomplete
+      if (lastMessage?.role === "assistant") {
+        const hasContent =
+          lastMessage.content &&
+          typeof lastMessage.content === "string" &&
+          lastMessage.content.trim().length > 0;
+
+        const hasToolParts = lastMessage.parts?.some(
+          (part) =>
+            part.type === "tool-invocation" ||
+            part.type === "text" ||
+            part.type === "reasoning"
+        );
+
+        // If no content and no tool activity, likely a timeout/disconnect
+        if (!hasContent && !hasToolParts) {
+          toast.error(
+            "Response interrupted. The request may have timed out. Please try again.",
+            {
+              duration: 6000,
+              description:
+                "This can happen with complex queries that take a long time to process.",
+            }
+          );
+        }
+      }
+    }
+  }, [status, messages]);
 
   /**
    * Process Auto Mode payment and trigger execution phase (two-phase model)

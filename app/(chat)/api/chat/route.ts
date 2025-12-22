@@ -947,37 +947,74 @@ export async function POST(request: Request) {
 
             let selectionText = "";
             let selectionReasoning = "";
+            let streamError: Error | undefined;
 
             // Stream chunks to client for real-time display (matches planning phase behavior)
-            for await (const part of selectionStream.fullStream) {
-              if (part.type === "reasoning-delta") {
-                const delta = (part as { text?: string }).text;
-                if (delta) {
-                  selectionReasoning += delta;
-                  dataStream.write({
-                    type: "data-reasoning",
-                    data: selectionReasoning,
-                  });
-                }
-              } else if (part.type === "text-delta") {
-                const delta = (part as { text?: string }).text;
-                if (delta) {
-                  // First text-delta after reasoning means reasoning is complete
-                  if (
-                    selectionReasoning.length > 0 &&
-                    selectionText.length === 0
-                  ) {
+            // Wrapped in try-catch to handle provider errors (e.g., geo-restrictions)
+            try {
+              for await (const part of selectionStream.fullStream) {
+                if (part.type === "reasoning-delta") {
+                  const delta = (part as { text?: string }).text;
+                  if (delta) {
+                    selectionReasoning += delta;
                     dataStream.write({
-                      type: "data-reasoningComplete",
-                      data: true,
+                      type: "data-reasoning",
+                      data: selectionReasoning,
                     });
                   }
-                  selectionText += delta;
-                  // Stream as debug code so thinking accordion shows it
-                  dataStream.write({
-                    type: "data-debugCode",
-                    data: selectionText,
-                  });
+                } else if (part.type === "text-delta") {
+                  const delta = (part as { text?: string }).text;
+                  if (delta) {
+                    // First text-delta after reasoning means reasoning is complete
+                    if (
+                      selectionReasoning.length > 0 &&
+                      selectionText.length === 0
+                    ) {
+                      dataStream.write({
+                        type: "data-reasoningComplete",
+                        data: true,
+                      });
+                    }
+                    selectionText += delta;
+                    // Stream as debug code so thinking accordion shows it
+                    dataStream.write({
+                      type: "data-debugCode",
+                      data: selectionText,
+                    });
+                  }
+                }
+              }
+            } catch (err) {
+              streamError = err as Error;
+              console.error(
+                "[chat-api] Auto Mode Discovery Step 2: stream error",
+                {
+                  chatId: id,
+                  error: streamError.message,
+                  errorName: streamError.name,
+                  // Extract provider error details if available
+                  cause:
+                    streamError.cause ||
+                    (streamError as { responseBody?: string }).responseBody,
+                }
+              );
+
+              // Try to extract useful error info for the user
+              const responseBody = (streamError as { responseBody?: string })
+                .responseBody;
+              if (responseBody) {
+                try {
+                  const errorData = JSON.parse(responseBody);
+                  const errorMessage =
+                    errorData?.error?.metadata?.raw ||
+                    errorData?.error?.message ||
+                    streamError.message;
+                  console.error(
+                    "[chat-api] Auto Mode Discovery Step 2: provider error details",
+                    { chatId: id, providerError: errorMessage }
+                  );
+                } catch {
+                  // Ignore parse errors
                 }
               }
             }
@@ -1031,44 +1068,70 @@ export async function POST(request: Request) {
               dataAlreadyAvailable?: boolean;
             } = { selectedTools: [] };
 
-            try {
-              // Extract JSON from the response (handle markdown code blocks and text before JSON)
-              let jsonText = selectionText;
+            // If stream errored, set appropriate error message before trying to parse
+            if (streamError && selectionText.length === 0) {
+              // Stream failed completely - likely provider error (geo-restrictions, etc.)
+              const errorMessage =
+                streamError.message || "Provider returned error";
+              const isGeoRestriction =
+                errorMessage.includes("location is not supported") ||
+                errorMessage.includes("FAILED_PRECONDITION");
 
-              // Try to extract from code block first (```json or ``` with no tag)
-              const jsonMatch = JSON_CODE_BLOCK_REGEX.exec(jsonText);
-              if (jsonMatch) {
-                jsonText = jsonMatch[1].trim();
-              } else {
-                // No code block - try to find raw JSON object in the text
-                // Look for { ... } pattern that contains "selectedTools"
-                const rawJsonMatch = RAW_JSON_REGEX.exec(jsonText);
-                if (rawJsonMatch) {
-                  jsonText = rawJsonMatch[0];
-                }
-              }
-
-              discoveryResult = JSON.parse(jsonText);
-              console.log(
-                "[chat-api] Auto Mode Discovery: parsed selection successfully",
-                {
-                  chatId: id,
-                  selectedCount: discoveryResult.selectedTools?.length ?? 0,
-                }
-              );
-            } catch (parseError) {
-              console.error(
-                "[chat-api] Auto Mode Discovery: failed to parse selection",
-                {
-                  chatId: id,
-                  response: selectionText.slice(0, 500),
-                  error: parseError,
-                }
-              );
               discoveryResult = {
                 selectedTools: [],
-                error: "Failed to parse tool selection response",
+                error: isGeoRestriction
+                  ? "Provider geo-restriction error. Please try again - the system will use a fallback provider."
+                  : `Tool selection failed: ${errorMessage}`,
               };
+
+              console.error(
+                "[chat-api] Auto Mode Discovery: stream failed completely",
+                {
+                  chatId: id,
+                  isGeoRestriction,
+                  error: errorMessage,
+                }
+              );
+            } else {
+              try {
+                // Extract JSON from the response (handle markdown code blocks and text before JSON)
+                let jsonText = selectionText;
+
+                // Try to extract from code block first (```json or ``` with no tag)
+                const jsonMatch = JSON_CODE_BLOCK_REGEX.exec(jsonText);
+                if (jsonMatch) {
+                  jsonText = jsonMatch[1].trim();
+                } else {
+                  // No code block - try to find raw JSON object in the text
+                  // Look for { ... } pattern that contains "selectedTools"
+                  const rawJsonMatch = RAW_JSON_REGEX.exec(jsonText);
+                  if (rawJsonMatch) {
+                    jsonText = rawJsonMatch[0];
+                  }
+                }
+
+                discoveryResult = JSON.parse(jsonText);
+                console.log(
+                  "[chat-api] Auto Mode Discovery: parsed selection successfully",
+                  {
+                    chatId: id,
+                    selectedCount: discoveryResult.selectedTools?.length ?? 0,
+                  }
+                );
+              } catch (parseError) {
+                console.error(
+                  "[chat-api] Auto Mode Discovery: failed to parse selection",
+                  {
+                    chatId: id,
+                    response: selectionText.slice(0, 500),
+                    error: parseError,
+                  }
+                );
+                discoveryResult = {
+                  selectedTools: [],
+                  error: "Failed to parse tool selection response",
+                };
+              }
             }
 
             // Enrich selected tools with full data from search results
