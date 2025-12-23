@@ -692,7 +692,12 @@ export function Chat({
         setIsAutoModeFunding(false);
       }
     },
-    [autoModeFundingRequest, activeWallet?.address, smartWalletClient, fundWallet]
+    [
+      autoModeFundingRequest,
+      activeWallet?.address,
+      smartWalletClient,
+      fundWallet,
+    ]
   );
 
   /**
@@ -1002,12 +1007,12 @@ export function Chat({
     },
   });
 
-  // Track previous status to detect incomplete streams (timeout/disconnect)
-  const prevStatusRef = useRef(status);
+  // Track data received time for inactivity warning during streaming
   const lastDataReceivedRef = useRef<number>(Date.now());
   const hasShownTimeoutWarningRef = useRef(false);
 
   // Update last data received time when messages change during streaming
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages triggers re-run to reset inactivity timer
   useEffect(() => {
     if (status === "streaming") {
       lastDataReceivedRef.current = Date.now();
@@ -1050,44 +1055,6 @@ export function Chat({
 
     return () => clearInterval(intervalId);
   }, [status, stop]);
-
-  // Detect incomplete stream (timeout or disconnect without proper error)
-  useEffect(() => {
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = status;
-
-    // Only check when transitioning from streaming to idle
-    if (prevStatus === "streaming" && status === "idle") {
-      const lastMessage = messages.at(-1);
-
-      // Check if the last message is from assistant and appears incomplete
-      if (lastMessage?.role === "assistant") {
-        const hasContent =
-          lastMessage.content &&
-          typeof lastMessage.content === "string" &&
-          lastMessage.content.trim().length > 0;
-
-        const hasToolParts = lastMessage.parts?.some(
-          (part) =>
-            part.type === "tool-invocation" ||
-            part.type === "text" ||
-            part.type === "reasoning"
-        );
-
-        // If no content and no tool activity, likely a timeout/disconnect
-        if (!hasContent && !hasToolParts) {
-          toast.error(
-            "Response interrupted. The request may have timed out. Please try again.",
-            {
-              duration: 6000,
-              description:
-                "This can happen with complex queries that take a long time to process.",
-            }
-          );
-        }
-      }
-    }
-  }, [status, messages]);
 
   /**
    * Process Auto Mode payment and trigger execution phase (two-phase model)

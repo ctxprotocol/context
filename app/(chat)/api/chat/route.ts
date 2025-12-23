@@ -2059,13 +2059,10 @@ The user asked: "${message.parts
                   enableDataCompletenessCheck &&
                   agenticResult.missingCapability
                 ) {
-                  console.log(
-                    "[chat-api] Auto Mode: rediscovery triggered",
-                    {
-                      chatId: id,
-                      missingCapability: agenticResult.missingCapability,
-                    }
-                  );
+                  console.log("[chat-api] Auto Mode: rediscovery triggered", {
+                    chatId: id,
+                    missingCapability: agenticResult.missingCapability,
+                  });
 
                   dataStream.write({
                     type: "data-toolStatus",
@@ -2074,7 +2071,9 @@ The user asked: "${message.parts
                   await new Promise((resolve) => setTimeout(resolve, 10));
 
                   // Search marketplace for tools with the missing capability
-                  const alreadyTriedToolIds = Array.from(autoModeAllowedTools.keys());
+                  const alreadyTriedToolIds = Array.from(
+                    autoModeAllowedTools.keys()
+                  );
                   const rediscoveryQuery = `${userQuestion} ${agenticResult.missingCapability}`;
 
                   try {
@@ -2088,7 +2087,7 @@ The user asked: "${message.parts
                     const alternativeTools = rediscoveryResults.filter(
                       (tool) =>
                         !alreadyTriedToolIds.includes(tool.id) &&
-                        Number(tool.pricePerQuery) === 0
+                        Number(tool.price) === 0
                     );
 
                     if (alternativeTools.length > 0) {
@@ -2134,10 +2133,10 @@ The user asked: "${message.parts
                         ] of rediscoveryAllowedTools.entries()) {
                           rediscToolSummaries.push({
                             toolId,
-                            toolName: ctx.tool.name,
+                            name: ctx.tool.name,
                             description: ctx.tool.description,
-                            pricePerQuery: ctx.tool.pricePerQuery,
-                            schemaHash: ctx.tool.schemaHash,
+                            price: ctx.tool.pricePerQuery,
+                            kind: "mcp",
                           });
                         }
 
@@ -2147,7 +2146,7 @@ The user asked: "${message.parts
 
 ${rediscToolSummaries
   .map(
-    (t) => `### ${t.toolName} (${t.toolId})
+    (t) => `### ${t.name} (${t.toolId})
 ${t.description}
 Price: FREE`
   )
@@ -2241,13 +2240,10 @@ Write code to answer the user's question using these alternative tools.`;
                       );
                     }
                   } catch (rediscErr) {
-                    console.warn(
-                      "[chat-api] Auto Mode: rediscovery failed",
-                      {
-                        chatId: id,
-                        error: rediscErr,
-                      }
-                    );
+                    console.warn("[chat-api] Auto Mode: rediscovery failed", {
+                      chatId: id,
+                      error: rediscErr,
+                    });
                   }
                 }
 
