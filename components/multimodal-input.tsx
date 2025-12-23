@@ -154,7 +154,8 @@ function PureMultimodalInput({
   } = usePaymentStatus();
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
   const { fundWallet } = useFundWallet();
-  const { isAutoPay, canAfford, recordSpend, isAutoMode } = useAutoPay();
+  const { isAutoPay, canAfford, recordSpend, isAutoMode, requestApproval } =
+    useAutoPay();
   const { client: smartWalletClient } = useSmartWallets();
 
   // Wallet and contract addresses
@@ -536,6 +537,43 @@ function PureMultimodalInput({
       settings.tier, // Needed to determine if model cost applies (convenience tier only)
     ]
   );
+
+  /**
+   * Handle form submission with allowance check for Auto Mode
+   * If Auto Mode is enabled and allowance is insufficient, show approval dialog instead
+   */
+  const handleFormSubmit = useCallback(async () => {
+    // For Auto Mode, check allowance before sending to avoid wasted AI costs
+    if (isAutoMode && isAutoPay) {
+      try {
+        const { data: allowanceData } = await refetchAllowance();
+        const allowance = (allowanceData as bigint | undefined) ?? 0n;
+
+        // If allowance is 0 or very low, request approval before proceeding
+        // Minimum threshold: $0.01 (10000 units with 6 decimals)
+        const MIN_ALLOWANCE_THRESHOLD = 10000n;
+
+        if (allowance < MIN_ALLOWANCE_THRESHOLD) {
+          console.log(
+            "[multimodal-input] Auto Mode: insufficient allowance, requesting approval",
+            {
+              allowance: Number(allowance) / 1_000_000,
+            }
+          );
+
+          toast.info("Please approve a spending cap to use Auto Mode.");
+          requestApproval();
+          return;
+        }
+      } catch (error) {
+        console.error("[multimodal-input] Failed to check allowance", error);
+        // Proceed anyway - the payment flow will catch this
+      }
+    }
+
+    // Proceed with normal submission
+    submitForm();
+  }, [isAutoMode, isAutoPay, refetchAllowance, requestApproval, submitForm]);
 
   const uploadFile = useCallback(async (file: File) => {
     const formData = new FormData();
@@ -1325,7 +1363,8 @@ function PureMultimodalInput({
           if (status !== "ready") {
             toast.error("Please wait for the model to finish its response!");
           } else {
-            submitForm();
+            // Use handleFormSubmit which checks allowance for Auto Mode
+            handleFormSubmit();
           }
         }}
       >

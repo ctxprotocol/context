@@ -134,7 +134,7 @@ export function Chat({
   } = usePaymentStatus();
   const { isDebugMode, toggleDebugMode } = useDebugMode();
   const debugModeRef = useRef(isDebugMode);
-  const { isAutoMode, recordSpend } = useAutoPay();
+  const { isAutoMode, recordSpend, invalidateAllowance } = useAutoPay();
   const autoModeRef = useRef(isAutoMode);
   const visibilityTypeRef = useRef(visibilityType);
   const { client: smartWalletClient } = useSmartWallets();
@@ -223,8 +223,10 @@ export function Chat({
   const { fundWallet } = useFundWallet();
   const { activeWallet, isEmbeddedWallet } = useWalletIdentity();
 
-  // USDC balance check for Auto Mode
+  // USDC address for balance/allowance checks
   const usdcAddress = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
+  
+  // USDC balance check for Auto Mode
   const { refetch: refetchAutoModeBalance } = useReadContract({
     address: usdcAddress,
     abi: ERC20_ABI,
@@ -273,6 +275,18 @@ export function Chat({
   // Router address for payment contract
   const routerAddress = process.env
     .NEXT_PUBLIC_CONTEXT_ROUTER_ADDRESS as `0x${string}`;
+
+  // USDC allowance check for Auto Mode (router approval)
+  // Must be after routerAddress is defined
+  const { refetch: refetchAutoModeAllowance } = useReadContract({
+    address: usdcAddress,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: smartWalletClient?.account?.address
+      ? [smartWalletClient.account.address, routerAddress]
+      : undefined,
+    query: { enabled: false },
+  });
 
   /**
    * Process payment for Auto Mode selected tools (two-phase model)
@@ -348,6 +362,38 @@ export function Chat({
               `Insufficient USDC balance. You need ${totalAmountStr} USDC on Base mainnet.`
             );
           }
+          setIsProcessingPayment(false);
+          return null;
+        }
+
+        // Check USDC allowance (router approval) before attempting transaction
+        const { data: allowanceData } = await refetchAutoModeAllowance();
+        const allowance = (allowanceData as bigint | undefined) ?? 0n;
+
+        if (allowance < totalAmount) {
+          console.log("[chat-client] Auto Mode: insufficient allowance", {
+            allowance: Number(allowance) / 1_000_000,
+            needed: Number(totalAmount) / 1_000_000,
+          });
+          
+          // Invalidate allowance to trigger sidebar refresh
+          invalidateAllowance();
+          
+          toast.error(
+            `Insufficient spending approval. Please increase your spending cap in the Tools sidebar.`,
+            {
+              duration: 5000,
+              action: {
+                label: "Open Settings",
+                onClick: () => {
+                  // Toggle sidebar open if not already
+                  if (!isContextSidebarOpen) {
+                    toggleContextSidebar();
+                  }
+                },
+              },
+            }
+          );
           setIsProcessingPayment(false);
           return null;
         }
@@ -448,8 +494,30 @@ export function Chat({
           error instanceof Error ? error.message : String(error);
         console.error("[chat-client] Auto Mode payment failed", error);
 
-        // Check for insufficient funds errors from the transaction
+        // Check for insufficient allowance errors (approval needed)
         if (
+          errorMessage.includes("exceeds allowance") ||
+          errorMessage.includes("transfer amount exceeds allowance")
+        ) {
+          // Invalidate allowance to trigger sidebar refresh
+          invalidateAllowance();
+
+          toast.error(
+            `Insufficient spending approval. Please increase your spending cap in the Tools sidebar.`,
+            {
+              duration: 5000,
+              action: {
+                label: "Open Settings",
+                onClick: () => {
+                  if (!isContextSidebarOpen) {
+                    toggleContextSidebar();
+                  }
+                },
+              },
+            }
+          );
+        } else if (
+          // Check for insufficient funds errors from the transaction
           errorMessage.includes("insufficient") ||
           errorMessage.includes("Insufficient") ||
           errorMessage.includes("exceeds balance")
@@ -486,6 +554,10 @@ export function Chat({
       routerAddress,
       recordSpend,
       refetchAutoModeBalance,
+      refetchAutoModeAllowance,
+      invalidateAllowance,
+      isContextSidebarOpen,
+      toggleContextSidebar,
       isEmbeddedWallet,
       settings.tier,
     ]
@@ -538,6 +610,37 @@ export function Chat({
               `Insufficient USDC balance. You need ${amountStr} USDC on Base mainnet.`
             );
           }
+          setIsProcessingPayment(false);
+          return null;
+        }
+
+        // Check USDC allowance (router approval) before attempting transaction
+        const { data: allowanceData } = await refetchAutoModeAllowance();
+        const allowance = (allowanceData as bigint | undefined) ?? 0n;
+
+        if (allowance < modelCostUnits) {
+          console.log("[chat-client] Model cost only: insufficient allowance", {
+            allowance: Number(allowance) / 1_000_000,
+            needed: Number(modelCostUnits) / 1_000_000,
+          });
+
+          // Invalidate allowance to trigger sidebar refresh
+          invalidateAllowance();
+
+          toast.error(
+            `Insufficient spending approval. Please increase your spending cap in the Tools sidebar.`,
+            {
+              duration: 5000,
+              action: {
+                label: "Open Settings",
+                onClick: () => {
+                  if (!isContextSidebarOpen) {
+                    toggleContextSidebar();
+                  }
+                },
+              },
+            }
+          );
           setIsProcessingPayment(false);
           return null;
         }
@@ -629,6 +732,10 @@ export function Chat({
       routerAddress,
       recordSpend,
       refetchAutoModeBalance,
+      refetchAutoModeAllowance,
+      invalidateAllowance,
+      isContextSidebarOpen,
+      toggleContextSidebar,
       isEmbeddedWallet,
     ]
   );

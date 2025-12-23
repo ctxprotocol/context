@@ -36,6 +36,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAutoPay } from "@/hooks/use-auto-pay";
 import { trackEngagement } from "@/hooks/use-track-engagement";
 import { useWalletIdentity } from "@/hooks/use-wallet-identity";
 import { ERC20_ABI } from "@/lib/abi/erc20";
@@ -190,6 +191,7 @@ function StakeToolRow({
   walletAddress?: string;
 }) {
   const router = useRouter();
+  const { invalidateAllowance } = useAutoPay();
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isDepositOpen, setIsDepositOpen] = useState(false);
@@ -371,6 +373,8 @@ function StakeToolRow({
 
       toast.success("Deposit transaction submitted!");
       setDepositSuccess(true);
+      // Signal other components (e.g., context-sidebar) to refetch allowance
+      invalidateAllowance();
     } catch (error) {
       console.error("Deposit failed:", error);
       const errorMessage =

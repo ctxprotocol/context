@@ -35,6 +35,13 @@ type AutoPayContextType = {
   autoModeRequested: boolean;
   requestAutoMode: () => void;
   clearAutoModeRequest: () => void;
+  // Allowance invalidation - used to signal cross-component refetch
+  allowanceVersion: number;
+  invalidateAllowance: () => void;
+  // Approval request - used when allowance is insufficient before sending
+  approvalRequested: boolean;
+  requestApproval: () => void;
+  clearApprovalRequest: () => void;
 };
 
 const STORAGE_KEYS = {
@@ -64,6 +71,8 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
   );
   const [isAutoMode, setIsAutoModeState] = useState(DEFAULT_VALUES.isAutoMode);
   const [autoModeRequested, setAutoModeRequested] = useState(false);
+  const [allowanceVersion, setAllowanceVersion] = useState(0);
+  const [approvalRequested, setApprovalRequested] = useState(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -175,6 +184,23 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
     setAutoModeRequested(false);
   }, []);
 
+  // Invalidate allowance - signals other components to refetch on-chain allowance
+  // Called when allowance is consumed elsewhere (e.g., stake deposit)
+  const invalidateAllowance = useCallback(() => {
+    setAllowanceVersion((v) => v + 1);
+  }, []);
+
+  // Request approval - signals sidebar to show approval dialog
+  // Called when allowance is insufficient before sending a message
+  const requestApproval = useCallback(() => {
+    setApprovalRequested(true);
+  }, []);
+
+  // Clear approval request (called after dialog is shown/handled)
+  const clearApprovalRequest = useCallback(() => {
+    setApprovalRequested(false);
+  }, []);
+
   const value = useMemo(
     () => ({
       isAutoPay,
@@ -192,6 +218,11 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
       autoModeRequested,
       requestAutoMode,
       clearAutoModeRequest,
+      allowanceVersion,
+      invalidateAllowance,
+      approvalRequested,
+      requestApproval,
+      clearApprovalRequest,
     }),
     [
       isAutoPay,
@@ -209,6 +240,11 @@ export function AutoPayProvider({ children }: { children: ReactNode }) {
       autoModeRequested,
       requestAutoMode,
       clearAutoModeRequest,
+      allowanceVersion,
+      invalidateAllowance,
+      approvalRequested,
+      requestApproval,
+      clearApprovalRequest,
     ]
   );
 

@@ -207,6 +207,9 @@ export function ContextSidebar({
     resetSpentAmount,
     autoModeRequested,
     clearAutoModeRequest,
+    allowanceVersion,
+    approvalRequested,
+    clearApprovalRequest,
   } = useAutoPay();
 
   // State for showing the approval dialog
@@ -237,6 +240,15 @@ export function ContextSidebar({
     clearAutoModeRequest,
   ]);
 
+  // Respond to approval requests (e.g., when allowance is insufficient before sending)
+  useEffect(() => {
+    if (approvalRequested) {
+      console.log(SIDEBAR_LOG, "Approval requested, showing dialog");
+      setShowApprovalDialog(true);
+      clearApprovalRequest();
+    }
+  }, [approvalRequested, clearApprovalRequest]);
+
   // Get addresses for allowance check
   const walletAddress = activeWallet?.address;
   const smartWalletAddress = smartWalletClient?.account?.address;
@@ -260,6 +272,10 @@ export function ContextSidebar({
         enabled: Boolean(
           allowanceCheckAddress && routerAddress && usdcAddress && isAutoPay
         ),
+        // Force fresh data - don't serve stale cached allowance
+        staleTime: 0,
+        // Refetch every 30 seconds when sidebar is open
+        refetchInterval: isOpen ? 30_000 : false,
       },
     }
   );
@@ -268,6 +284,40 @@ export function ContextSidebar({
   const currentAllowanceUSD = currentAllowance
     ? Number(currentAllowance) / 1_000_000
     : 0;
+
+  // Debug: log allowance state
+  useEffect(() => {
+    if (isAutoPay) {
+      console.log(SIDEBAR_LOG, "Allowance state:", {
+        rawAllowance: currentAllowance?.toString(),
+        allowanceUSD: currentAllowanceUSD,
+        spendingCap,
+        spentAmount,
+        allowanceVersion,
+      });
+    }
+  }, [currentAllowance, currentAllowanceUSD, spendingCap, spentAmount, allowanceVersion, isAutoPay]);
+
+  // Refetch allowance when invalidated by other components (e.g., stake deposit)
+  useEffect(() => {
+    if (allowanceVersion > 0 && isAutoPay) {
+      console.log(SIDEBAR_LOG, "Allowance invalidated, refetching...");
+      refetchAllowance();
+    }
+  }, [allowanceVersion, isAutoPay, refetchAllowance]);
+
+  // Refetch allowance when window regains focus (catches external changes)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isAutoPay) {
+        console.log(SIDEBAR_LOG, "Window focused, refetching allowance...");
+        refetchAllowance();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [isAutoPay, refetchAllowance]);
 
   // When Auto Pay toggle is clicked
   const handleAutoPayToggle = () => {
