@@ -19,6 +19,9 @@ export type PaymentStage =
   | "executing"
   | "fixing" // Auto Mode: AI is fixing a crashed execution
   | "reflecting" // Auto Mode: AI is reflecting on suspicious results
+  | "verifying-data" // Answer Quality: Checking if tool results are complete
+  | "completing" // Answer Quality: Fixing incomplete data
+  | "rediscovering-tools" // Answer Quality: Current tools can't help, searching for alternatives
   | "thinking";
 
 export type ExecutionLogEntry = {
@@ -225,6 +228,12 @@ export function getPaymentStatusMessage(
       return "Fixing runtime error...";
     case "reflecting":
       return "Reflecting on results...";
+    case "verifying-data":
+      return "Verifying data completeness...";
+    case "completing":
+      return "Completing missing data...";
+    case "rediscovering-tools":
+      return "Searching for alternative tools...";
     case "thinking":
       return "Analyzing results...";
     default:

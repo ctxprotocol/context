@@ -828,12 +828,27 @@ export async function POST(request: Request) {
       execute: async ({ writer: dataStream }) => {
         try {
           const baseModelMessages = convertToModelMessages(uiMessages);
+
+          // Extract user question for completeness checking
+          // This is used by the agentic execution to verify if the answer is complete
+          const userQuestion = message.parts
+            .filter(
+              (p): p is { type: "text"; text: string } => p.type === "text"
+            )
+            .map((p) => p.text)
+            .join(" ");
+
+          // Get answer quality settings
+          const enableDataCompletenessCheck =
+            userSettingsData?.enableDataCompletenessCheck ?? true;
+
           console.log("[chat-api] starting planning step", {
             chatId: id,
             toolInvocationsCount: toolInvocations.length,
             enabledToolIds: enabledToolSummaries.map((t) => t.toolId),
             isAutoModeDiscovery,
             isAutoModeExecution,
+            enableDataCompletenessCheck,
           });
 
           // ===========================================================
@@ -2018,7 +2033,7 @@ The user asked: "${message.parts
                   }
                 );
 
-                const agenticResult = await executeWithSelfHealing({
+                let agenticResult = await executeWithSelfHealing({
                   initialCode: codeBlock,
                   allowedModules: Array.from(allowedModules),
                   allowedTools: autoModeAllowedTools,
@@ -2028,7 +2043,213 @@ The user asked: "${message.parts
                   session,
                   chatId: id,
                   isAutoMode: true,
+                  userQuestion,
+                  enableDataCompletenessCheck,
                 });
+
+                // =============================================================
+                // REDISCOVERY: If current tools can't provide needed data
+                // =============================================================
+                // Only runs if:
+                // - Completeness check determined different tools are needed
+                // - Data completeness check is enabled
+                // - We have a missing capability to search for
+                if (
+                  agenticResult.needsDifferentTools &&
+                  enableDataCompletenessCheck &&
+                  agenticResult.missingCapability
+                ) {
+                  console.log(
+                    "[chat-api] Auto Mode: rediscovery triggered",
+                    {
+                      chatId: id,
+                      missingCapability: agenticResult.missingCapability,
+                    }
+                  );
+
+                  dataStream.write({
+                    type: "data-toolStatus",
+                    data: { status: "rediscovering-tools" },
+                  });
+                  await new Promise((resolve) => setTimeout(resolve, 10));
+
+                  // Search marketplace for tools with the missing capability
+                  const alreadyTriedToolIds = Array.from(autoModeAllowedTools.keys());
+                  const rediscoveryQuery = `${userQuestion} ${agenticResult.missingCapability}`;
+
+                  try {
+                    const rediscoveryResults = await searchMarketplace(
+                      rediscoveryQuery,
+                      10
+                    );
+
+                    // Filter out already-tried tools and only consider free tools
+                    // (to avoid payment complexity in this first implementation)
+                    const alternativeTools = rediscoveryResults.filter(
+                      (tool) =>
+                        !alreadyTriedToolIds.includes(tool.id) &&
+                        Number(tool.pricePerQuery) === 0
+                    );
+
+                    if (alternativeTools.length > 0) {
+                      console.log(
+                        "[chat-api] Auto Mode: found alternative free tools",
+                        {
+                          chatId: id,
+                          count: alternativeTools.length,
+                          tools: alternativeTools.map((t) => t.name),
+                        }
+                      );
+
+                      // Build allowed tools map for rediscovered tools (free, no payment needed)
+                      const rediscoveryAllowedTools = new Map<
+                        string,
+                        AllowedToolContext
+                      >();
+                      for (const tool of alternativeTools.slice(0, 3)) {
+                        // Limit to top 3
+                        const dbTool = await getAIToolById({ id: tool.id });
+                        if (dbTool) {
+                          rediscoveryAllowedTools.set(tool.id, {
+                            tool: dbTool,
+                            transactionHash: "free", // No payment for free tools
+                            executionCount: 0,
+                          });
+                        }
+                      }
+
+                      if (rediscoveryAllowedTools.size > 0) {
+                        // Generate new code for the rediscovered tools
+                        dataStream.write({
+                          type: "data-toolStatus",
+                          data: { status: "planning" },
+                        });
+                        await new Promise((resolve) => setTimeout(resolve, 10));
+
+                        // Build new planning prompt with rediscovered tools
+                        const rediscToolSummaries: EnabledToolSummary[] = [];
+                        for (const [
+                          toolId,
+                          ctx,
+                        ] of rediscoveryAllowedTools.entries()) {
+                          rediscToolSummaries.push({
+                            toolId,
+                            toolName: ctx.tool.name,
+                            description: ctx.tool.description,
+                            pricePerQuery: ctx.tool.pricePerQuery,
+                            schemaHash: ctx.tool.schemaHash,
+                          });
+                        }
+
+                        const rediscPlanningPrompt = `${regularPrompt}
+
+## Available Tools (Rediscovered)
+
+${rediscToolSummaries
+  .map(
+    (t) => `### ${t.toolName} (${t.toolId})
+${t.description}
+Price: FREE`
+  )
+  .join("\n\n")}
+
+## User's Original Question
+${userQuestion}
+
+## Why Rediscovery Was Needed
+The previously selected tools did not have: ${agenticResult.missingCapability}
+
+Write code to answer the user's question using these alternative tools.`;
+
+                        const rediscPlanningResult = await generateText({
+                          model: provider.languageModel(selectedChatModel),
+                          system: rediscPlanningPrompt,
+                          messages: [
+                            {
+                              role: "user",
+                              content:
+                                "Generate code to fetch the missing data using these tools.",
+                            },
+                          ],
+                        });
+
+                        const rediscCodeBlock = extractCodeBlock(
+                          rediscPlanningResult.text
+                        );
+
+                        if (rediscCodeBlock) {
+                          // Execute with rediscovered tools
+                          dataStream.write({
+                            type: "data-toolStatus",
+                            data: { status: "executing" },
+                          });
+                          await new Promise((resolve) =>
+                            setTimeout(resolve, 10)
+                          );
+
+                          const rediscResult = await executeWithSelfHealing({
+                            initialCode: rediscCodeBlock,
+                            allowedModules: Array.from(allowedModules),
+                            allowedTools: rediscoveryAllowedTools,
+                            dataStream,
+                            getLanguageModel: () =>
+                              provider.languageModel(selectedChatModel),
+                            session,
+                            chatId: id,
+                            isAutoMode: true,
+                            userQuestion,
+                            enableDataCompletenessCheck: false, // Don't recurse
+                          });
+
+                          // If rediscovery succeeded, use those results
+                          if (
+                            rediscResult.execution.ok &&
+                            hasNonEmptyData(rediscResult.execution.data)
+                          ) {
+                            console.log(
+                              "[chat-api] Auto Mode: rediscovery succeeded",
+                              { chatId: id }
+                            );
+                            // Merge results: original + rediscovered
+                            const mergedData = {
+                              originalData: agenticResult.execution.data,
+                              rediscoveredData: rediscResult.execution.data,
+                            };
+                            agenticResult = {
+                              ...agenticResult,
+                              execution: {
+                                ...agenticResult.execution,
+                                data: mergedData,
+                              },
+                              needsDifferentTools: false,
+                            };
+                          } else {
+                            console.log(
+                              "[chat-api] Auto Mode: rediscovery did not improve results",
+                              { chatId: id }
+                            );
+                          }
+                        }
+                      }
+                    } else {
+                      console.log(
+                        "[chat-api] Auto Mode: no alternative free tools found",
+                        {
+                          chatId: id,
+                          missingCapability: agenticResult.missingCapability,
+                        }
+                      );
+                    }
+                  } catch (rediscErr) {
+                    console.warn(
+                      "[chat-api] Auto Mode: rediscovery failed",
+                      {
+                        chatId: id,
+                        error: rediscErr,
+                      }
+                    );
+                  }
+                }
 
                 const execution = agenticResult.execution;
 
@@ -2145,6 +2366,8 @@ The user asked: "${message.parts
                   session,
                   chatId: id,
                   isAutoMode: false, // Manual mode
+                  userQuestion,
+                  enableDataCompletenessCheck,
                 });
 
                 const execution = agenticResult.execution;

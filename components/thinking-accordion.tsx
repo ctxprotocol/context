@@ -89,6 +89,9 @@ function isActivePhase(stage: PaymentStage): boolean {
     stage === "executing" ||
     stage === "fixing" ||
     stage === "reflecting" ||
+    stage === "verifying-data" ||
+    stage === "completing" ||
+    stage === "rediscovering-tools" ||
     stage === "querying-tool"
   );
 }
@@ -591,6 +594,30 @@ function PureThinkingAccordion({
               <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
                 <div className="size-1.5 animate-pulse rounded-full bg-purple-500/70" />
                 <span className="font-mono">reflecting on data...</span>
+              </div>
+            )}
+
+            {/* Verifying data stage - Checking if tool results are complete */}
+            {stage === "verifying-data" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-emerald-500/70" />
+                <span className="font-mono">verifying completeness...</span>
+              </div>
+            )}
+
+            {/* Completing stage - Fixing incomplete data by fetching more */}
+            {stage === "completing" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-teal-500/70" />
+                <span className="font-mono">fetching missing data...</span>
+              </div>
+            )}
+
+            {/* Rediscovering tools stage - Current tools can't help, searching for alternatives */}
+            {stage === "rediscovering-tools" && (
+              <div className="mt-2 flex items-center gap-2 rounded-md p-2 text-muted-foreground/50 text-xs">
+                <div className="size-1.5 animate-pulse rounded-full bg-amber-500/70" />
+                <span className="font-mono">searching for better tools...</span>
               </div>
             )}
 

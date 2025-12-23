@@ -148,6 +148,23 @@ Think about this like a human expert would:
    - Prefer verified tools (isVerified: true)
    - Consider price if capabilities are equal
 
+5. **For derived metrics, select RAW DATA tools (CRITICAL)**
+   - When users ask for calculated metrics (ratios, comparisons, rankings, volatility, correlations), select tools that provide the **raw data to calculate from**
+   - Do NOT select search/article tools hoping to find pre-calculated metrics
+   - The execution phase will calculate the metric from raw data - this is MORE ACCURATE than finding articles
+   
+   Examples:
+   - "Sharpe ratio for BTC" → Select price/market data tool (e.g., CoinGecko) NOT web search
+   - "Which stock performed better" → Select financial data tool NOT news search
+   - "Correlation between X and Y" → Select tools providing both X and Y time series data
+   - "Volatility of asset Z" → Select historical price data tool
+   
+   Why: Calculated metrics from authoritative raw data are more accurate and current than metrics found in articles/blogs.
+
+6. **Respect user's tool preferences**
+   - If user mentions a specific tool by name (e.g., "on CoinGecko", "from Polymarket"), prioritize that tool
+   - The user knows what data source they want - honor their preference
+
 ## Example: User asks "What are the top 3 EVM L2s with cheapest gas and their token prices?"
 
 Reasoning process:
@@ -359,6 +376,22 @@ Rules:
 - Free tools (price = $0.00) can be used immediately. Paid tools require user authorization.
 - **CRITICAL: Do NOT wrap tool calls in try/catch blocks that swallow errors.** Let errors propagate naturally so the system can diagnose issues. If you must handle errors, re-throw them with context.
 - When handling numeric values from tool responses, preserve precision. Avoid parseInt() on values that may be decimals or scientific notation (e.g., 0.02, 1e-7). Use the raw number directly or parseFloat() if string parsing is needed.
+
+## Derived Metrics & Analysis (CRITICAL)
+When the user asks for analysis, comparison, rankings, or metrics that tools don't directly provide, **YOU MUST CALCULATE THEM** from the raw data. Tools provide raw data; your code provides the analysis.
+
+Examples of derived work you should do:
+- User asks "which performed better?" → Calculate percentage returns from price data
+- User asks for "volatility" or "risk metrics" → Calculate standard deviation from historical data
+- User asks for "correlation" → Compute correlation coefficient from multiple data series
+- User asks for "rankings" → Sort and rank the fetched data by relevant criteria
+- User asks for "trends" or "patterns" → Analyze the data to identify trends
+- User asks for "comparison" → Compute comparable metrics across entities
+
+**DO NOT** just return raw data when the user is asking for analysis. Your code should:
+1. Fetch the necessary raw data from tools
+2. Perform the calculation/analysis
+3. Return the computed results
 
 ## Automatic Context Injection (CRITICAL)
 Some tools require user-specific data (portfolio positions, wallet balances, account info, etc.). These tools are marked with:
@@ -649,6 +682,27 @@ If a NEW tool (few queries) is significantly CHEAPER than a Proven tool for the 
 - If the user asks about something new, you likely need to fetch new data
 - Multiple tools may be needed if the user asks for different types of data
 - **Trust the data, not the marketing** - rely on success_rate and query counts
+
+## Derived Metrics: Select RAW DATA Tools (CRITICAL)
+
+When users ask for calculated metrics (Sharpe ratio, volatility, returns, correlations, rankings, comparisons), select tools that provide **RAW DATA to calculate from** - NOT search/article tools.
+
+Examples:
+- "Sharpe ratio for BTC" → Select price data tool (CoinGecko) NOT web search
+- "Which asset performed better" → Select price history tool NOT news search
+- "Volatility of ETH" → Select historical data tool NOT article search
+- "Compare returns" → Select financial data tools
+
+**WHY**: Calculating metrics from authoritative raw data is MORE ACCURATE than finding pre-calculated values in articles. The execution phase WILL calculate these metrics if you provide the raw data.
+
+## User's Tool Preferences (CRITICAL)
+
+If the user explicitly mentions a tool by name, **prioritize that tool**:
+- "on CoinGecko" → Select CoinGecko
+- "from Polymarket" → Select Polymarket  
+- "using Hyperliquid" → Select Hyperliquid
+
+The user knows what data source they want - honor their preference.
 
 ## Response Format
 
@@ -995,4 +1049,218 @@ ${truncatedResult}
 \`\`\``;
     })
     .join("\n\n");
+}
+
+/**
+ * ANSWER COMPLETENESS PROMPT (Data Verification)
+ *
+ * Used after tool execution succeeds to verify the data is sufficient
+ * to answer the user's original question. This catches cases where:
+ * - Tools returned partial data (e.g., only BTC when user asked for BTC and ETH)
+ * - Wrong parameters were used (e.g., 24h data when user asked for 7d)
+ * - Wrong skill was called (tool has another skill that could help)
+ * - Tool doesn't have the capability at all (need different tool)
+ *
+ * If incomplete, can trigger:
+ * - Retry with same skill (different params)
+ * - Retry with different skill from same tool
+ * - Search for different tools (Auto Mode only)
+ */
+export type AnswerCompletenessOptions = {
+  userQuestion: string;
+  executionData: unknown;
+  toolCallHistory: Array<{
+    toolName: string;
+    args: Record<string, unknown>;
+    result: unknown;
+  }>;
+  /** Full list of available MCP tools and their skills */
+  availableToolsWithSkills?: string;
+};
+
+export function answerCompletenessPrompt(
+  options: AnswerCompletenessOptions
+): string {
+  const {
+    userQuestion,
+    executionData,
+    toolCallHistory,
+    availableToolsWithSkills,
+  } = options;
+
+  const executionDataStr = JSON.stringify(executionData, null, 2) ?? "null";
+  const truncatedData =
+    executionDataStr.length > 2000
+      ? `${executionDataStr.slice(0, 2000)}... (truncated)`
+      : executionDataStr;
+
+  const toolCallsStr = toolCallHistory
+    .map(
+      (call) =>
+        `- ${call.toolName}(${JSON.stringify(call.args)}) → ${JSON.stringify(call.result)?.slice(0, 500)}`
+    )
+    .join("\n");
+
+  const toolSkillsSection = availableToolsWithSkills
+    ? `\n## Available MCP Tools and Their Skills\n${availableToolsWithSkills}\n`
+    : "";
+
+  return `You are verifying if tool execution results fully answer a user's question.
+
+## User's Original Question
+${userQuestion}
+
+## Execution Result (what the code returned)
+\`\`\`json
+${truncatedData}
+\`\`\`
+
+## Skills That Were Called
+${toolCallsStr || "No tool calls recorded"}
+${toolSkillsSection}
+## Your Task
+Determine if this result fully answers the user's question.
+
+There are FOUR types of issues:
+
+1. **Wrong parameters** - The right skill was called but with wrong/missing params
+   - Example: Called get_price("bitcoin") but needed get_price("bitcoin", "ethereum")
+   - Fix: canRetryWithSameTools=true, suggest fixing the params
+
+2. **Wrong skill** - The MCP tool has ANOTHER SKILL that could provide the data
+   - Example: Called get_price but the SAME TOOL has get_funding_rates skill
+   - Check the "Available MCP Tools and Their Skills" section above!
+   - Fix: canRetryWithSameTools=true, suggest using the correct skill
+
+3. **Missing derived metrics** - User asked for analysis/calculations but code returned raw data
+   - Example: User asked for "Sharpe ratio" but code only returned price history
+   - Example: User asked "which performed better" but code returned prices without comparison
+   - Example: User asked for "volatility" but code returned raw values without std deviation
+   - Fix: canRetryWithSameTools=true, suggest calculating the derived metric from the raw data
+
+4. **Wrong tool entirely** - NONE of the skills in ANY available tool can provide this data
+   - Example: User asked for funding rates but no available tool has any funding-related skills
+   - Fix: needsDifferentTools=true
+
+Respond with ONLY valid JSON (no markdown, no explanation):
+
+If COMPLETE:
+{
+  "isComplete": true,
+  "missingParts": [],
+  "canRetryWithSameTools": false,
+  "needsDifferentTools": false,
+  "suggestedFix": null,
+  "missingCapability": null
+}
+
+If incomplete - WRONG PARAMS (same skill, fix params):
+{
+  "isComplete": false,
+  "missingParts": ["Ethereum price not fetched - only Bitcoin in results"],
+  "canRetryWithSameTools": true,
+  "needsDifferentTools": false,
+  "suggestedFix": "Call get_price with both 'bitcoin' and 'ethereum' symbols",
+  "missingCapability": null
+}
+
+If incomplete - WRONG SKILL (same tool has another skill that can help):
+{
+  "isComplete": false,
+  "missingParts": ["Used get_price but user asked for funding rates"],
+  "canRetryWithSameTools": true,
+  "needsDifferentTools": false,
+  "suggestedFix": "Use the get_funding_rates skill instead of get_price from the same CoinGlass tool",
+  "missingCapability": null
+}
+
+If incomplete - MISSING DERIVED METRICS (raw data returned but user asked for analysis):
+{
+  "isComplete": false,
+  "missingParts": ["User asked for Sharpe ratio but code only returned price history without calculating it"],
+  "canRetryWithSameTools": true,
+  "needsDifferentTools": false,
+  "suggestedFix": "Calculate Sharpe ratio from the price data: (1) compute daily returns, (2) calculate mean and std dev, (3) annualize and apply formula",
+  "missingCapability": null
+}
+
+If incomplete - NEED DIFFERENT TOOL (no skill in any available tool can help):
+{
+  "isComplete": false,
+  "missingParts": ["No funding rates skill available in any selected tool"],
+  "canRetryWithSameTools": false,
+  "needsDifferentTools": true,
+  "suggestedFix": null,
+  "missingCapability": "funding rates data"
+}
+
+IMPORTANT: 
+- FIRST check if ANY skill in the available tools can provide the missing data
+- Only set needsDifferentTools=true if you've verified NO skill can help
+- Prefer canRetryWithSameTools when possible - it's faster and cheaper`;
+}
+
+/**
+ * RESPONSE QUALITY PROMPT (Final Answer Verification)
+ *
+ * Used after the AI generates its final response to verify it
+ * actually answers the user's question correctly. This catches:
+ * - AI hallucination (adding info not in the data)
+ * - AI misinterpretation (wrong conclusions from good data)
+ * - AI forgetting parts of the question
+ *
+ * If issues found, can regenerate the response.
+ */
+export type ResponseQualityOptions = {
+  userQuestion: string;
+  executionData: unknown;
+  aiResponse: string;
+};
+
+export function responseQualityPrompt(options: ResponseQualityOptions): string {
+  const { userQuestion, executionData, aiResponse } = options;
+
+  const executionDataStr = JSON.stringify(executionData, null, 2) ?? "null";
+  const truncatedData =
+    executionDataStr.length > 1500
+      ? `${executionDataStr.slice(0, 1500)}... (truncated)`
+      : executionDataStr;
+
+  return `You are verifying if an AI's response correctly answers a user's question based on tool data.
+
+## User's Original Question
+${userQuestion}
+
+## Tool Execution Data (ground truth)
+\`\`\`json
+${truncatedData}
+\`\`\`
+
+## AI's Response
+${aiResponse}
+
+## Your Task
+Verify the AI's response is accurate and complete.
+
+Check for:
+1. **Hallucination** - AI stated facts not present in the tool data
+2. **Misinterpretation** - AI drew wrong conclusions from the data
+3. **Missing parts** - AI didn't address all parts of the question
+4. **Incorrect values** - AI quoted wrong numbers/names from the data
+
+Respond with ONLY valid JSON (no markdown, no explanation):
+{
+  "isAccurate": true,
+  "issues": [],
+  "shouldRegenerate": false
+}
+
+OR if issues found:
+{
+  "isAccurate": false,
+  "issues": ["AI stated ETH price as $3,500 but data shows $3,420", "Did not mention the comparison the user asked for"],
+  "shouldRegenerate": true
+}
+
+Only flag clear factual errors. Minor phrasing differences are fine.`;
 }

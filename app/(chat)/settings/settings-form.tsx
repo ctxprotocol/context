@@ -6,6 +6,7 @@ import {
   Eye,
   EyeOff,
   Key,
+  Shield,
   Sparkles,
   Trash2,
   Zap,
@@ -39,6 +40,9 @@ type SettingsData = {
   configuredProviders: BYOKProvider[];
   enableModelCostPassthrough: boolean;
   accumulatedModelCost: string;
+  // Answer Quality settings
+  enableDataCompletenessCheck: boolean;
+  enableResponseQualityCheck: boolean;
 };
 
 const TIER_CONFIG = {
@@ -583,6 +587,159 @@ export function SettingsForm() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Answer Quality Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-emerald-500/10">
+              <Shield className="size-5 text-emerald-600 dark:text-emerald-500" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Answer Quality</CardTitle>
+              <CardDescription>
+                Configure how thoroughly the AI verifies responses. More checks
+                = more accurate but slower.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Data Completeness Check Toggle */}
+          <AnswerQualityToggle
+            title="Data Completeness Check"
+            description="Verify tool results contain all data needed to answer your question. Can retry with different parameters."
+            impact="+1-2 seconds, ~500 tokens"
+            enabled={settings.enableDataCompletenessCheck}
+            saving={saving}
+            onToggle={async () => {
+              setSaving(true);
+              try {
+                const response = await fetch("/api/settings", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    enableDataCompletenessCheck:
+                      !settings.enableDataCompletenessCheck,
+                  }),
+                });
+                if (response.ok) {
+                  await refreshSettings();
+                  toast.success(
+                    settings.enableDataCompletenessCheck
+                      ? "Data completeness check disabled"
+                      : "Data completeness check enabled"
+                  );
+                } else {
+                  toast.error("Failed to update setting");
+                }
+              } catch (_error) {
+                toast.error("Failed to update setting");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
+
+          {/* Response Quality Check Toggle - Coming Soon */}
+          <div
+            className={cn(
+              "flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-4 opacity-60"
+            )}
+          >
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Response Quality Check</span>
+                <Badge variant="outline">Coming Soon</Badge>
+              </div>
+              <p className="mt-1 text-muted-foreground text-sm">
+                Verify the final response actually answers your question. Catches
+                AI hallucination and misinterpretation.
+              </p>
+              <p className="mt-1 text-muted-foreground/70 text-xs">
+                Impact: +1-2 seconds, ~500 tokens
+              </p>
+            </div>
+            <Button disabled size="sm" variant="outline">
+              Enable
+            </Button>
+          </div>
+
+          {/* Info Section */}
+          <div className="flex items-start gap-2 rounded-md bg-emerald-500/10 p-2 dark:bg-emerald-500/15">
+            <div className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-500">
+              <svg
+                className="size-full"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path d="M12 2 L2 7 L12 12 L22 7 Z" />
+                <path d="M2 17 L12 22 L22 17" />
+                <path d="M2 12 L12 17 L22 12" />
+              </svg>
+            </div>
+            <div className="text-emerald-600/90 text-xs leading-relaxed dark:text-emerald-500/90">
+              <span className="font-semibold">Recommended:</span> Both checks
+              enabled for financial queries and important decisions. Disable for
+              faster, cheaper casual conversations.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Toggle component for Answer Quality settings
+ */
+function AnswerQualityToggle({
+  title,
+  description,
+  impact,
+  enabled,
+  saving,
+  onToggle,
+}: {
+  title: string;
+  description: string;
+  impact: string;
+  enabled: boolean;
+  saving: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 rounded-lg border p-4 transition-all",
+        enabled ? "border-emerald-500/50 bg-emerald-500/5" : "border-border"
+      )}
+    >
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{title}</span>
+          <Badge variant={enabled ? "default" : "secondary"}>
+            {enabled ? "ON" : "OFF"}
+          </Badge>
+        </div>
+        <p className="mt-1 text-muted-foreground text-sm">{description}</p>
+        <p className="mt-1 text-muted-foreground/70 text-xs">
+          Impact: {impact}
+        </p>
+      </div>
+      <Button
+        disabled={saving}
+        onClick={onToggle}
+        size="sm"
+        variant={enabled ? "default" : "outline"}
+      >
+        {enabled ? "Disable" : "Enable"}
+      </Button>
     </div>
   );
 }

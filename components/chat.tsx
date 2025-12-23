@@ -859,6 +859,9 @@ export function Chat({
               case "awaiting-tool-approval":
               case "fixing":
               case "reflecting":
+              case "verifying-data":
+              case "completing":
+              case "rediscovering-tools":
                 setStage(statusValue);
                 break;
               case "confirming-payment":

@@ -86,6 +86,16 @@ export const userSettings = pgTable("UserSettings", {
   freeQueriesUsedToday: integer("free_queries_used_today").notNull().default(0),
   freeQueriesResetAt: timestamp("free_queries_reset_at"),
 
+  // Answer Quality Settings - User-configurable accuracy vs speed trade-off
+  // These control additional AI verification steps in the agentic execution loop
+  // Both enabled by default for maximum accuracy with marketplace tools
+  enableDataCompletenessCheck: boolean("enable_data_completeness_check")
+    .notNull()
+    .default(true),
+  enableResponseQualityCheck: boolean("enable_response_quality_check")
+    .notNull()
+    .default(true),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

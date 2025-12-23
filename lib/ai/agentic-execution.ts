@@ -16,6 +16,7 @@ import type { Session } from "next-auth";
 import type { AllowedModule } from "@/lib/ai/code-executor";
 import { executeSkillCode } from "@/lib/ai/code-executor";
 import {
+  answerCompletenessPrompt,
   errorCorrectionPrompt,
   formatToolCallHistory,
   reflectionPrompt,
@@ -62,6 +63,10 @@ export type AgenticExecutionConfig = {
   chatId: string;
   /** Whether this is auto mode execution */
   isAutoMode: boolean;
+  /** Original user question for completeness checking (optional) */
+  userQuestion?: string;
+  /** Whether to run data completeness check (default: true) */
+  enableDataCompletenessCheck?: boolean;
 };
 
 /**
@@ -76,6 +81,10 @@ export type AgenticExecutionResult = {
   attemptCount: number;
   /** Tool call history from execution */
   toolCallHistory: ToolCallRecord[];
+  /** If completeness check determined different tools are needed (Auto Mode can rediscover) */
+  needsDifferentTools?: boolean;
+  /** What capability is missing (for rediscovery search query) */
+  missingCapability?: string;
 };
 
 /**
@@ -209,6 +218,34 @@ export function buildToolSchemaInfo(
 }
 
 /**
+ * Build a concise list of all MCP tools and their skills for completeness check
+ * This helps the AI understand what capabilities are available
+ */
+function buildToolsWithSkillsList(
+  allowedTools: Map<string, AllowedToolContext>
+): string {
+  return Array.from(allowedTools.entries())
+    .map(([, ctx]) => {
+      const toolSchema = ctx.tool.toolSchema as Record<string, unknown> | null;
+      const mcpTools = toolSchema?.tools as
+        | Array<{
+            name: string;
+            description?: string;
+          }>
+        | undefined;
+      if (!mcpTools || mcpTools.length === 0) {
+        return `### ${ctx.tool.name}\n(No skills available)`;
+      }
+      const skillsList = mcpTools
+        .map((t) => `  - ${t.name}: ${t.description || "(no description)"}`)
+        .join("\n");
+      return `### ${ctx.tool.name}\nSkills:\n${skillsList}`;
+    })
+    .filter((s) => s.length > 0)
+    .join("\n\n");
+}
+
+/**
  * Build tool schemas string for reflection prompt
  */
 function buildReflectionToolSchemas(
@@ -225,7 +262,9 @@ function buildReflectionToolSchemas(
             outputSchema?: unknown;
           }>
         | undefined;
-      if (!mcpTools) return "";
+      if (!mcpTools) {
+        return "";
+      }
       return mcpTools
         .map(
           (t) => `### ${ctx.tool.name} → ${t.name}
@@ -262,6 +301,11 @@ function formatExecutionData(data: unknown, maxLength = 1200) {
  */
 const CODE_BLOCK_REGEX = /```(?:\w+)?\s*([\s\S]*?)```/i;
 
+/**
+ * Extract JSON from markdown code block or raw text
+ */
+const JSON_CODE_BLOCK_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/;
+
 function extractCodeBlock(text: string) {
   const match = CODE_BLOCK_REGEX.exec(text);
   if (!match) {
@@ -294,7 +338,13 @@ export async function executeWithSelfHealing(
     session,
     chatId,
     isAutoMode,
+    userQuestion,
+    enableDataCompletenessCheck = true, // Default to enabled
   } = config;
+
+  // Track if completeness check found we need different tools
+  let needsDifferentTools = false;
+  let missingCapability: string | undefined;
 
   let currentCode = initialCode;
   let toolCallHistory: ToolCallRecord[] = [];
@@ -349,11 +399,14 @@ export async function executeWithSelfHealing(
     // SELF-HEALING: Handle Runtime Errors (code crashed)
     // =============================================================
     if (!execution.ok && attempt < MAX_REFLECTION_RETRIES) {
-      console.log("[agentic-execution] Self-Heal: execution crashed, attempting fix", {
-        chatId,
-        attempt,
-        error: execution.error,
-      });
+      console.log(
+        "[agentic-execution] Self-Heal: execution crashed, attempting fix",
+        {
+          chatId,
+          attempt,
+          error: execution.error,
+        }
+      );
 
       dataStream.write({
         type: "data-toolStatus",
@@ -387,18 +440,24 @@ export async function executeWithSelfHealing(
       const fixedCode = extractCodeBlock(errorFixResult.text);
 
       if (fixedCode && fixedCode !== currentCode) {
-        console.log("[agentic-execution] Self-Heal: AI provided fix for crash", {
-          chatId,
-          attempt,
-          errorFixed: execution.error.slice(0, 100),
-        });
+        console.log(
+          "[agentic-execution] Self-Heal: AI provided fix for crash",
+          {
+            chatId,
+            attempt,
+            errorFixed: execution.error.slice(0, 100),
+          }
+        );
         currentCode = fixedCode;
         continue; // Retry with fixed code
       }
 
-      console.log("[agentic-execution] Self-Heal: could not generate fix, giving up", {
-        chatId,
-      });
+      console.log(
+        "[agentic-execution] Self-Heal: could not generate fix, giving up",
+        {
+          chatId,
+        }
+      );
       // Fall through to break - can't fix this error
     }
 
@@ -416,12 +475,15 @@ export async function executeWithSelfHealing(
       );
 
       if (suspiciousCheck.isSuspicious) {
-        console.log("[agentic-execution] Reflection: suspicious results detected", {
-          chatId,
-          attempt,
-          reason: suspiciousCheck.reason,
-          nullPaths: suspiciousCheck.nullPaths,
-        });
+        console.log(
+          "[agentic-execution] Reflection: suspicious results detected",
+          {
+            chatId,
+            attempt,
+            reason: suspiciousCheck.reason,
+            nullPaths: suspiciousCheck.nullPaths,
+          }
+        );
 
         // Build tool schema section for reflection context
         const reflectionToolSchemas = buildReflectionToolSchemas(allowedTools);
@@ -467,11 +529,14 @@ HINT: Check that you're accessing the correct property names from the Output Sch
         const fixedCode = extractCodeBlock(reflectionResult.text);
 
         if (fixedCode && fixedCode !== currentCode) {
-          console.log("[agentic-execution] Reflection: AI provided fixed code", {
-            chatId,
-            attempt,
-            codePreview: fixedCode.slice(0, 200),
-          });
+          console.log(
+            "[agentic-execution] Reflection: AI provided fixed code",
+            {
+              chatId,
+              attempt,
+              codePreview: fixedCode.slice(0, 200),
+            }
+          );
           currentCode = fixedCode;
           // Continue to next iteration with fixed code
           continue;
@@ -487,15 +552,200 @@ HINT: Check that you're accessing the correct property names from the Output Sch
       }
     }
 
-    // No suspicious results or max retries reached - exit loop
+    // =============================================================
+    // COMPLETENESS CHECK: Verify answer addresses the question
+    // =============================================================
+    // Only run if:
+    // - Execution succeeded
+    // - We have a user question to check against
+    // - Completeness check is enabled
+    // - We have tool call history
+    // - We haven't exhausted retries
+    if (
+      execution.ok &&
+      userQuestion &&
+      enableDataCompletenessCheck &&
+      toolCallHistory.length > 0 &&
+      attempt < MAX_REFLECTION_RETRIES
+    ) {
+      dataStream.write({
+        type: "data-toolStatus",
+        data: { status: "verifying-data" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      try {
+        // Build full list of MCP tools and their skills for completeness check
+        const toolsWithSkills = buildToolsWithSkillsList(allowedTools);
+
+        const completenessResult = await generateText({
+          model: getLanguageModel(),
+          system: answerCompletenessPrompt({
+            userQuestion,
+            executionData: execution.data,
+            toolCallHistory: toolCallHistory.map((t) => ({
+              toolName: t.toolName,
+              args: t.args,
+              result: t.result,
+            })),
+            availableToolsWithSkills: toolsWithSkills,
+          }),
+          messages: [
+            { role: "user", content: "Analyze the execution results." },
+          ],
+        });
+
+        // Parse the JSON response
+        let completenessCheck: {
+          isComplete: boolean;
+          missingParts: string[];
+          canRetryWithSameTools: boolean;
+          needsDifferentTools: boolean;
+          suggestedFix: string | null;
+          missingCapability: string | null;
+        } = {
+          isComplete: true,
+          missingParts: [],
+          canRetryWithSameTools: false,
+          needsDifferentTools: false,
+          suggestedFix: null,
+          missingCapability: null,
+        };
+
+        try {
+          // Try parsing raw JSON first
+          const text = completenessResult.text.trim();
+          // Remove markdown code block if present
+          const jsonMatch = JSON_CODE_BLOCK_REGEX.exec(text);
+          const jsonText = jsonMatch ? jsonMatch[1] : text;
+          completenessCheck = JSON.parse(jsonText);
+        } catch {
+          console.warn("[agentic-execution] Completeness check parse failed", {
+            chatId,
+            text: completenessResult.text.slice(0, 200),
+          });
+        }
+
+        if (completenessCheck.isComplete) {
+          console.log("[agentic-execution] Completeness: data is complete", {
+            chatId,
+          });
+        } else if (completenessCheck.needsDifferentTools) {
+          // Tool doesn't have the capability - signal to caller for rediscovery
+          console.log(
+            "[agentic-execution] Completeness: needs different tools",
+            {
+              chatId,
+              missingParts: completenessCheck.missingParts,
+              missingCapability: completenessCheck.missingCapability,
+            }
+          );
+          needsDifferentTools = true;
+          missingCapability = completenessCheck.missingCapability ?? undefined;
+          // Don't retry here - let the caller handle rediscovery
+        } else if (
+          completenessCheck.canRetryWithSameTools &&
+          completenessCheck.suggestedFix
+        ) {
+          console.log("[agentic-execution] Completeness: answer incomplete", {
+            chatId,
+            attempt,
+            missingParts: completenessCheck.missingParts,
+            canRetry: completenessCheck.canRetryWithSameTools,
+          });
+
+          // Ask AI to fix the code to include missing data
+          dataStream.write({
+            type: "data-toolStatus",
+            data: { status: "completing" },
+          });
+          await new Promise((resolve) => setTimeout(resolve, 10));
+
+          const fixResult = await generateText({
+            model: getLanguageModel(),
+            system: `You are fixing code that returned incomplete results.
+
+## Problem
+${completenessCheck.missingParts.join("\n")}
+
+## Suggested Fix
+${completenessCheck.suggestedFix}
+
+## Original Code
+\`\`\`ts
+${currentCode}
+\`\`\`
+
+Output ONLY the corrected code block. Keep existing tool calls, add the missing ones.
+**CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations.**`,
+            messages: [
+              {
+                role: "user",
+                content: "Fix the code to include the missing data.",
+              },
+            ],
+          });
+
+          const fixedCode = extractCodeBlock(fixResult.text);
+          if (fixedCode && fixedCode !== currentCode) {
+            console.log("[agentic-execution] Completeness: AI provided fix", {
+              chatId,
+              attempt,
+              codePreview: fixedCode.slice(0, 200),
+            });
+            currentCode = fixedCode;
+            continue; // Retry with fixed code
+          }
+
+          // Can't retry - note incomplete in logs but continue
+          console.log(
+            "[agentic-execution] Completeness: cannot retry, proceeding with partial data",
+            {
+              chatId,
+              missingParts: completenessCheck.missingParts,
+            }
+          );
+        } else {
+          // Can't retry with same tools and doesn't need different tools
+          console.log(
+            "[agentic-execution] Completeness: incomplete but no retry option",
+            {
+              chatId,
+              missingParts: completenessCheck.missingParts,
+            }
+          );
+        }
+      } catch (err) {
+        // Don't block execution on completeness check failure
+        console.warn(
+          "[agentic-execution] Completeness check failed, proceeding",
+          {
+            chatId,
+            error: err,
+          }
+        );
+      }
+    }
+
+    // No issues found or max retries reached - exit loop
     break;
   }
 
+  // finalExecution should always be set since the loop runs at least once
+  // but TypeScript doesn't know this, so provide a safe fallback
+  const safeExecution: ExecutionResult = finalExecution ?? {
+    ok: false,
+    error: "Execution loop did not run",
+    logs: [],
+  };
+
   return {
-    execution: finalExecution!,
+    execution: safeExecution,
     finalCode: currentCode,
     attemptCount: finalAttemptCount,
     toolCallHistory,
+    needsDifferentTools,
+    missingCapability,
   };
 }
 
@@ -503,12 +753,14 @@ HINT: Check that you're accessing the correct property names from the Output Sch
  * Build a mediator message summarizing the execution result
  * Used to inform the final AI response about what happened
  */
-export function buildMediatorText(
-  execution: ExecutionResult,
-  attemptCount: number,
-  allowedModules: AllowedModule[],
-  hasData: boolean
-): string {
+export function buildMediatorText(options: {
+  execution: ExecutionResult;
+  attemptCount: number;
+  allowedModules: AllowedModule[];
+  hasData: boolean;
+  toolCallHistory?: ToolCallRecord[];
+}): string {
+  const { execution, attemptCount, allowedModules, hasData } = options;
   // Build retry info for transparency
   const retryInfo =
     attemptCount > 0
@@ -516,10 +768,11 @@ export function buildMediatorText(
       : "";
 
   // For failed executions, show last few logs (most relevant)
+  const logs = execution.logs ?? [];
   const truncatedFailureLogs =
-    execution.logs.length > 5
-      ? `...(${execution.logs.length - 5} earlier logs)\n${execution.logs.slice(-5).join("\n")}`
-      : execution.logs.join("\n");
+    logs.length > 5
+      ? `...(${logs.length - 5} earlier logs)\n${logs.slice(-5).join("\n")}`
+      : logs.join("\n");
 
   if (execution.ok) {
     return `Tool execution succeeded.${retryInfo}
@@ -537,12 +790,3 @@ STATUS: failed
 RECENT_LOGS:
 ${truncatedFailureLogs || "(no logs)"}`;
 }
-
-
-
-
-
-
-
-
-

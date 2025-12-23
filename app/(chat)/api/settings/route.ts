@@ -50,6 +50,9 @@ export async function GET() {
     configuredProviders,
     enableModelCostPassthrough: settings?.enableModelCostPassthrough ?? true,
     accumulatedModelCost: settings?.accumulatedModelCost || "0",
+    // Answer Quality settings - both enabled by default
+    enableDataCompletenessCheck: settings?.enableDataCompletenessCheck ?? true,
+    enableResponseQualityCheck: settings?.enableResponseQualityCheck ?? true,
   });
 }
 
@@ -70,6 +73,9 @@ export async function POST(request: Request) {
     apiKey?: string | null;
     selectProvider?: BYOKProvider;
     enableModelCostPassthrough?: boolean;
+    // Answer Quality settings
+    enableDataCompletenessCheck?: boolean;
+    enableResponseQualityCheck?: boolean;
   };
 
   try {
@@ -78,8 +84,15 @@ export async function POST(request: Request) {
     return new ChatSDKError("bad_request:api").toResponse();
   }
 
-  const { tier, provider, apiKey, selectProvider, enableModelCostPassthrough } =
-    body;
+  const {
+    tier,
+    provider,
+    apiKey,
+    selectProvider,
+    enableModelCostPassthrough,
+    enableDataCompletenessCheck,
+    enableResponseQualityCheck,
+  } = body;
   const updates: Record<string, unknown> = {};
 
   // Handle provider selection (switch active BYOK provider)
@@ -208,6 +221,14 @@ export async function POST(request: Request) {
       updates.useBYOK = false;
       updates.byokProvider = null;
     }
+  }
+
+  // Handle Answer Quality settings
+  if (enableDataCompletenessCheck !== undefined) {
+    updates.enableDataCompletenessCheck = enableDataCompletenessCheck;
+  }
+  if (enableResponseQualityCheck !== undefined) {
+    updates.enableResponseQualityCheck = enableResponseQualityCheck;
   }
 
   // Only update if there are changes
