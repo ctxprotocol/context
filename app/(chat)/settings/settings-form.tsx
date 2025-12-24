@@ -26,9 +26,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
 // Note: "free" is a legacy tier that may still exist in database
 // It gets treated as "convenience" in the UI
 type LegacyUserTier = "free" | "convenience" | "byok";
+
 import { cn } from "@/lib/utils";
 
 type BYOKProvider = "gemini" | "anthropic";
@@ -308,7 +310,8 @@ export function SettingsForm() {
   }
 
   // Handle legacy "free" tier values from database - treat as "convenience"
-  const effectiveTier = settings.tier === "free" ? "convenience" : settings.tier;
+  const effectiveTier =
+    settings.tier === "free" ? "convenience" : settings.tier;
   const currentTier = TIER_CONFIG[effectiveTier] || TIER_CONFIG.convenience;
   const TierIcon = currentTier.icon;
 
@@ -607,11 +610,9 @@ export function SettingsForm() {
         <CardContent className="space-y-4">
           {/* Data Completeness Check Toggle */}
           <AnswerQualityToggle
-            title="Data Completeness Check"
             description="Verify tool results contain all data needed to answer your question. Can retry with different parameters."
-            impact="+1-2 seconds, ~500 tokens"
             enabled={settings.enableDataCompletenessCheck}
-            saving={saving}
+            impact="+1-2 seconds, ~500 tokens"
             onToggle={async () => {
               setSaving(true);
               try {
@@ -639,6 +640,8 @@ export function SettingsForm() {
                 setSaving(false);
               }
             }}
+            saving={saving}
+            title="Data Completeness Check"
           />
 
           {/* Response Quality Check Toggle - Coming Soon */}
@@ -653,8 +656,8 @@ export function SettingsForm() {
                 <Badge variant="outline">Coming Soon</Badge>
               </div>
               <p className="mt-1 text-muted-foreground text-sm">
-                Verify the final response actually answers your question. Catches
-                AI hallucination and misinterpretation.
+                Verify the final response actually answers your question.
+                Catches AI hallucination and misinterpretation.
               </p>
               <p className="mt-1 text-muted-foreground/70 text-xs">
                 Impact: +1-2 seconds, ~500 tokens

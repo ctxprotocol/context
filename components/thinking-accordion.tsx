@@ -27,7 +27,8 @@ type ThinkingAccordionProps = {
 // Extract code block from planning response
 // Handles both complete blocks (with closing ```) and partial blocks (still streaming)
 // Supports: ts, typescript, json (for tool selection), js, javascript
-const COMPLETE_CODE_BLOCK_REGEX = /```(?:ts|typescript|json|js|javascript)?\s*([\s\S]*?)```/i;
+const COMPLETE_CODE_BLOCK_REGEX =
+  /```(?:ts|typescript|json|js|javascript)?\s*([\s\S]*?)```/i;
 const LANG_IDENTIFIER_REGEX = /^(ts|typescript|json|js|javascript)\s*/i;
 const WHITESPACE_REGEX = /^\s*/;
 
@@ -439,7 +440,7 @@ function PureThinkingAccordion({
   useEffect(() => {
     const prevStage = prevStageRef.current;
     prevStageRef.current = stage;
-    
+
     // Only reset when going from idle to an active stage (new query starting)
     if (prevStage === "idle" && isActive) {
       setUserToggled(false);
@@ -533,9 +534,9 @@ function PureThinkingAccordion({
                 {/* Combined stream: reasoning then code in one container */}
                 {(hasReasoning || extractedCode) && (
                   <CombinedStreamPreview
-                    reasoning={streamingReasoning}
                     code={extractedCode}
                     isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                    reasoning={streamingReasoning}
                   />
                 )}
               </>
@@ -566,9 +567,9 @@ function PureThinkingAccordion({
                 {/* Combined stream: reasoning then code in one container */}
                 {(hasReasoning || extractedCode) && (
                   <CombinedStreamPreview
-                    reasoning={streamingReasoning}
                     code={extractedCode}
                     isStreaming={isStreamingReasoning || Boolean(extractedCode)}
+                    reasoning={streamingReasoning}
                   />
                 )}
               </>

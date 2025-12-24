@@ -41,7 +41,8 @@ export async function GET() {
 
   // Map legacy "free" tier to "convenience" (free tier was removed)
   const rawTier = settings?.tier || "convenience";
-  const tier: UserTier = rawTier === "free" ? "convenience" : (rawTier as UserTier);
+  const tier: UserTier =
+    rawTier === "free" ? "convenience" : (rawTier as UserTier);
 
   return Response.json({
     tier,
@@ -194,15 +195,17 @@ export async function POST(request: Request) {
 
         // Protocol Ledger: Track BYOK enablement (fire and forget, deduplicated)
         // Only track once per user - power user signal for TGE
-        hasEngagementEvent(session.user.id, "BYOK_ENABLED").then((alreadyTracked) => {
-          if (!alreadyTracked) {
-            trackEngagementEvent({
-              userId: session.user.id,
-              eventType: "BYOK_ENABLED",
-              metadata: { provider },
-            });
+        hasEngagementEvent(session.user.id, "BYOK_ENABLED").then(
+          (alreadyTracked) => {
+            if (!alreadyTracked) {
+              trackEngagementEvent({
+                userId: session.user.id,
+                eventType: "BYOK_ENABLED",
+                metadata: { provider },
+              });
+            }
           }
-        });
+        );
       } catch (error) {
         console.error("[settings] Failed to encrypt API key:", error);
         return Response.json(
