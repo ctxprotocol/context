@@ -139,6 +139,7 @@ function detectSuspiciousResults(
   toolCallHistory?: Array<{ toolName: string; result: unknown }>
 ): SuspiciousResultCheck {
   const nullPaths: string[] = [];
+  const zeroPaths: string[] = [];
 
   // Only check if we have tool call history with actual data
   const hasToolData =
@@ -150,8 +151,21 @@ function detectSuspiciousResults(
     return { isSuspicious: false, nullPaths: [] };
   }
 
-  // Recursively find null values in the execution result
-  function findNullPaths(obj: unknown, path: string): void {
+  // Check for explicit error field when raw data succeeded
+  if (
+    executionData &&
+    typeof executionData === "object" &&
+    "error" in executionData
+  ) {
+    return {
+      isSuspicious: true,
+      reason: `Execution returned error "${(executionData as Record<string, unknown>).error}" but tool calls returned valid data. This suggests a data parsing bug.`,
+      nullPaths: ["error"],
+    };
+  }
+
+  // Recursively find null values and zero counts in the execution result
+  function findSuspiciousPaths(obj: unknown, path: string): void {
     if (obj === null || obj === undefined) {
       nullPaths.push(path);
       return;
@@ -167,12 +181,26 @@ function detectSuspiciousResults(
         ) {
           continue;
         }
-        findNullPaths(value, path ? `${path}.${key}` : key);
+        // Track zero values for count fields (e.g., polyCount: 0, oddsCount: 0)
+        if (
+          value === 0 &&
+          (key.toLowerCase().includes("count") ||
+            key.toLowerCase().includes("length") ||
+            key.toLowerCase().includes("total"))
+        ) {
+          zeroPaths.push(path ? `${path}.${key}` : key);
+        }
+        findSuspiciousPaths(value, path ? `${path}.${key}` : key);
       }
+    }
+
+    // Check for empty arrays that should have data
+    if (Array.isArray(obj) && obj.length === 0) {
+      zeroPaths.push(`${path} (empty array)`);
     }
   }
 
-  findNullPaths(executionData, "");
+  findSuspiciousPaths(executionData, "");
 
   // Suspicious if there are null values in the final result
   // but the raw tool data had values
@@ -181,6 +209,15 @@ function detectSuspiciousResults(
       isSuspicious: true,
       reason: `Execution returned null values at: ${nullPaths.join(", ")} - but tool calls returned data. This suggests a data processing bug.`,
       nullPaths,
+    };
+  }
+
+  // Also suspicious if there are zero counts/empty arrays when raw data has content
+  if (zeroPaths.length > 0) {
+    return {
+      isSuspicious: true,
+      reason: `Execution returned zero/empty values at: ${zeroPaths.join(", ")} - but tool calls returned actual data. This suggests a data parsing bug where the code is not accessing the correct response properties.`,
+      nullPaths: zeroPaths,
     };
   }
 
@@ -661,6 +698,10 @@ HINT: Check that you're accessing the correct property names from the Output Sch
           });
           await new Promise((resolve) => setTimeout(resolve, 10));
 
+          // Build tool schemas for context (helps AI understand response structure)
+          const completenessToolSchemas =
+            buildReflectionToolSchemas(allowedTools);
+
           const fixResult = await generateText({
             model: getLanguageModel(),
             system: `You are fixing code that returned incomplete results.
@@ -676,12 +717,21 @@ ${completenessCheck.suggestedFix}
 ${currentCode}
 \`\`\`
 
-Output ONLY the corrected code block. Keep existing tool calls, add the missing ones.
+## Raw Tool Outputs (CRITICAL - see the ACTUAL response structure!)
+${formatToolCallHistory(toolCallHistory)}
+
+## Tool Schemas (use correct property names from Output Schema!)
+${completenessToolSchemas || "(No schemas available)"}
+
+Output ONLY the corrected code block.
+**IMPORTANT**: Look at the Raw Tool Outputs above to see the ACTUAL JSON structure returned by the APIs.
+Access the correct property names (e.g., if API returns \`{markets: [...]}\`, access \`result.markets\`, NOT \`result.data.markets\` or \`result.outcomes\`).
 **CRITICAL: Write plain JavaScript only. Do NOT use TypeScript type annotations.**`,
             messages: [
               {
                 role: "user",
-                content: "Fix the code to include the missing data.",
+                content:
+                  "Fix the code to correctly parse the tool outputs. Look at the Raw Tool Outputs above to see what the APIs actually returned.",
               },
             ],
           });

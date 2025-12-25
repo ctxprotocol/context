@@ -22,11 +22,11 @@ type SuggestedActionsProps = {
  */
 const ALL_SUGGESTED_ACTIONS = [
   // Polymarket → Exa: Find markets, then validate pricing
-  "Find the highest volume Polymarket markets (urls) right now and research which bets provide the best returns",
+  "Find the highest volume Polymarket markets right now and research which bets provide the best returns, show me the urls",
   // Hyperliquid → Exa: Extreme funding → research why
   "What’s your take on my current Polymarket positions, do you think I should keep holding them?",
   // Polymarket → Exa: Ending soon → news impact
-  "Find the most controversial prediction markets (urls) ending this week and research the latest news impacting results",
+  "Compare Trump-related prediction markets between Polymarket and Kalshi. Are there any probability gaps greater than 3%?",
   // Hyperliquid: Large order simulation (pure tool showcase)
   "What's the slippage if I market sell 100 of BTC into Hyperliquid perps right now? How long should I TWAP?",
   // Hyperliquid → Exa: OI spikes → find catalyst
@@ -45,6 +45,10 @@ const ALL_SUGGESTED_ACTIONS = [
   "Between BTC and ETH, which has performed better since the FTX crash lows on Coingekko in terms of metrics like Sharpe?",
   // Hyperliquid: Position analysis (pure tool showcase)
   "Analyze my open positions on Hyperliquid, what's my liquidation risk and should I adjust leverage?",
+  // Hyperliquid: Position analysis (pure tool showcase)
+  "Find political prediction markets that exist on both Polymarket and Kalshi. Which platform is more bullish on Republican outcomes?",
+  // Hyperliquid: Position analysis (pure tool showcase)
+  "What's the biggest pricing discrepancy between Polymarket and Kalshi on any 2026 or 2027 political event?",
 ];
 
 function PureSuggestedActions({
