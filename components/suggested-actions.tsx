@@ -49,6 +49,8 @@ const ALL_SUGGESTED_ACTIONS = [
   "Find political prediction markets that exist on both Polymarket and Kalshi. Which platform is more bullish on Republican outcomes?",
   // Hyperliquid: Position analysis (pure tool showcase)
   "What's the biggest pricing discrepancy between Polymarket and Kalshi on any 2026 or 2027 political event?",
+  // Hyperliquid: Position analysis (pure tool showcase)
+  "What are the current probability gaps between Polymarket and sportsbooks for the Super Bowl?",
 ];
 
 function PureSuggestedActions({
