@@ -10,6 +10,7 @@ import {
   gte,
   inArray,
   lt,
+  lte,
   type SQL,
   sql,
 } from "drizzle-orm";
@@ -308,18 +309,100 @@ export async function voteMessage({
       .where(and(eq(vote.messageId, messageId)));
 
     if (existingVote) {
-      return await db
+      await db
         .update(vote)
         .set({ isUpvoted: type === "up" })
         .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
+    } else {
+      await db.insert(vote).values({
+        chatId,
+        messageId,
+        isUpvoted: type === "up",
+      });
     }
-    return await db.insert(vote).values({
-      chatId,
-      messageId,
-      isUpvoted: type === "up",
+
+    // =========================================================
+    // ANSWER QUALITY TRACKING: Connect votes to tools
+    // Fire-and-forget: Update tool success rates based on user feedback
+    // =========================================================
+    trackToolFeedback(chatId, messageId, type).catch((err) => {
+      console.error("[vote] Failed to track tool feedback:", err);
     });
+
+    return;
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to vote message");
+  }
+}
+
+/**
+ * Track user feedback (vote) on tools used in a message
+ *
+ * Strategy: Find tools used in the chat around the message timestamp,
+ * then adjust their success rate slightly based on user satisfaction.
+ *
+ * Impact:
+ * - Upvote: +0.1% to success rate (capped at 100%)
+ * - Downvote: -0.5% to success rate (asymmetric - negative signal is stronger)
+ *
+ * Why asymmetric? Users are more likely to vote when unhappy.
+ * A downvote is a stronger signal than an upvote.
+ */
+async function trackToolFeedback(
+  chatId: string,
+  messageId: string,
+  type: "up" | "down"
+): Promise<void> {
+  // Get the message to find its timestamp
+  const [msg] = await db
+    .select({ createdAt: message.createdAt })
+    .from(message)
+    .where(eq(message.id, messageId))
+    .limit(1);
+
+  if (!msg) {
+    return;
+  }
+
+  // Find tool queries in this chat within a 2-minute window of the message
+  // This is imprecise but catches the tools used to generate this response
+  const windowStart = new Date(msg.createdAt.getTime() - 2 * 60 * 1000);
+  const windowEnd = new Date(msg.createdAt.getTime() + 1 * 60 * 1000);
+
+  const toolQueries = await db
+    .select({ toolId: toolQuery.toolId })
+    .from(toolQuery)
+    .where(
+      and(
+        eq(toolQuery.chatId, chatId),
+        gte(toolQuery.executedAt, windowStart),
+        lte(toolQuery.executedAt, windowEnd)
+      )
+    );
+
+  if (toolQueries.length === 0) {
+    return;
+  }
+
+  // Deduplicate tool IDs (same tool may be called multiple times)
+  const uniqueToolIds = [...new Set(toolQueries.map((q) => q.toolId))];
+
+  // Adjust success rate for each tool
+  // Upvote: +0.1%, Downvote: -0.5% (asymmetric - negative is stronger signal)
+  const adjustment = type === "up" ? 0.1 : -0.5;
+
+  for (const toolId of uniqueToolIds) {
+    await db
+      .update(aiTool)
+      .set({
+        successRate: sql`GREATEST(0, LEAST(100, COALESCE(${aiTool.successRate}, 100) + ${adjustment}))`,
+        updatedAt: new Date(),
+      })
+      .where(eq(aiTool.id, toolId));
+
+    console.log(
+      `[vote] Tool ${toolId} success rate adjusted by ${adjustment}% (${type}vote)`
+    );
   }
 }
 
@@ -817,6 +900,9 @@ export async function getActiveAITools({
         successRate: aiTool.successRate,
         uptimePercent: aiTool.uptimePercent,
         totalStaked: aiTool.totalStaked,
+        // Cold start: Freshness indicators for [NEW] badge
+        createdAt: aiTool.createdAt,
+        updatedAt: aiTool.updatedAt,
       })
       .from(aiTool)
       .where(whereConditions)
@@ -2433,7 +2519,9 @@ function generateReferralCode(): string {
  * Get or create a referral code for a user.
  * Idempotent - returns existing code if already generated.
  */
-export async function getOrCreateReferralCode(userId: string): Promise<string | null> {
+export async function getOrCreateReferralCode(
+  userId: string
+): Promise<string | null> {
   try {
     // Check if user already has a code
     const [existingUser] = await db
@@ -2467,7 +2555,10 @@ export async function getOrCreateReferralCode(userId: string): Promise<string | 
         // Likely a unique constraint violation, retry with new code
         attempts++;
         if (attempts >= 5) {
-          console.error("[getOrCreateReferralCode] Max retries exceeded:", error);
+          console.error(
+            "[getOrCreateReferralCode] Max retries exceeded:",
+            error
+          );
           return null;
         }
       }
@@ -2483,7 +2574,9 @@ export async function getOrCreateReferralCode(userId: string): Promise<string | 
  * Look up a user by their referral code.
  * Used when a new user signs up with a referral code.
  */
-export async function getUserByReferralCode(code: string): Promise<{ id: string } | null> {
+export async function getUserByReferralCode(
+  code: string
+): Promise<{ id: string } | null> {
   try {
     const [referrer] = await db
       .select({ id: user.id })
@@ -2500,7 +2593,10 @@ export async function getUserByReferralCode(code: string): Promise<{ id: string 
  * Set the referrer for a user (called during signup with referral code).
  * Can only be set once - subsequent calls are no-ops.
  */
-export async function setUserReferrer(userId: string, referrerId: string): Promise<boolean> {
+export async function setUserReferrer(
+  userId: string,
+  referrerId: string
+): Promise<boolean> {
   try {
     // Don't allow self-referral
     if (userId === referrerId) {

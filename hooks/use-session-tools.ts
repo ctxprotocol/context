@@ -22,6 +22,9 @@ export type ToolListItem = Pick<
   | "successRate"
   | "uptimePercent"
   | "totalStaked"
+  // Cold start: Freshness indicators for [NEW] badge
+  | "createdAt"
+  | "updatedAt"
 >;
 
 const PAGE_SIZE = 30;

@@ -675,6 +675,12 @@ Each tool shows trust metrics. Use these to make safe selections:
 ### The Underdog Rule
 If a NEW tool (few queries) is significantly CHEAPER than a Proven tool for the same capability, consider trying it to save the user money. Note this in your reasoning.
 
+### Monopoly Situations (Beggars Can't Be Choosers)
+If only ONE tool can fulfill the request, **select it regardless of trust metrics**.
+The user came here for data - giving them "no results" is worse than giving them 
+unproven data. The execution phase validates outputs with schema checks.
+Don't refuse to use a tool just because it's new or unproven - someone has to be first.
+
 ## Key Principles
 
 - A tool's name is just a label - READ THE DESCRIPTION to know what it does
@@ -769,7 +775,55 @@ export type MarketplaceToolResult = {
   uptimePercent?: string;
   totalStaked?: string;
   isProven?: boolean;
+  // Discovery metrics (Cold Start)
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
 };
+
+/**
+ * NEW_TOOL_THRESHOLD: Tools created within this many days are considered "New"
+ * New tools get a [NEW] badge to help with cold start discovery
+ */
+const NEW_TOOL_THRESHOLD_DAYS = 14;
+
+/**
+ * Check if a tool qualifies for "New" status
+ * New tools are shown with [NEW] badge to encourage early adoption
+ */
+function isToolNew(createdAt?: Date | string): boolean {
+  if (!createdAt) {
+    return false;
+  }
+  const created =
+    typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  const daysAgo = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
+  return daysAgo <= NEW_TOOL_THRESHOLD_DAYS;
+}
+
+/**
+ * Format how long ago a tool was created/updated for display
+ */
+function formatTimeAgo(date?: Date | string): string {
+  if (!date) {
+    return "";
+  }
+  const d = typeof date === "string" ? new Date(date) : date;
+  const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
+
+  if (seconds < 60) {
+    return "just now";
+  }
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}m ago`;
+  }
+  if (seconds < 86_400) {
+    return `${Math.floor(seconds / 3600)}h ago`;
+  }
+  if (seconds < 604_800) {
+    return `${Math.floor(seconds / 86_400)}d ago`;
+  }
+  return `${Math.floor(seconds / 604_800)}w ago`;
+}
 
 /**
  * Build the full selection prompt with actual search results
@@ -789,16 +843,31 @@ export function buildToolSelectionPrompt(
             .join("\n")
         : "    (No methods listed)";
 
-      // Format trust metrics
-      const provenBadge = tool.isProven ? " [PROVEN]" : "";
+      // Format trust metrics and badges
+      const badges: string[] = [];
+      if (tool.isProven) {
+        badges.push("[PROVEN]");
+      }
+      if (isToolNew(tool.createdAt)) {
+        badges.push("[NEW]");
+      }
+      const badgeStr = badges.length > 0 ? ` ${badges.join(" ")}` : "";
+
       const successRate = tool.successRate ? `${tool.successRate}%` : "N/A";
       const queries = tool.totalQueries ?? 0;
       const staked = Number(tool.totalStaked || 0);
       const stakedDisplay = staked > 0 ? `$${staked.toFixed(2)}` : "None";
 
-      return `### ${index + 1}. ${tool.name}${provenBadge} (ID: ${tool.id})
+      // Show freshness for new/updated tools
+      const freshness = tool.updatedAt
+        ? ` | Updated ${formatTimeAgo(tool.updatedAt)}`
+        : tool.createdAt
+          ? ` | Added ${formatTimeAgo(tool.createdAt)}`
+          : "";
+
+      return `### ${index + 1}. ${tool.name}${badgeStr} (ID: ${tool.id})
 **Price:** $${Number(tool.price || 0).toFixed(4)}/query
-**Trust:** Success ${successRate} | ${queries} queries | Staked: ${stakedDisplay}
+**Trust:** Success ${successRate} | ${queries} queries | Staked: ${stakedDisplay}${freshness}
 **Description:** ${tool.description}
 **Available Methods:**
 ${mcpToolsList}`;

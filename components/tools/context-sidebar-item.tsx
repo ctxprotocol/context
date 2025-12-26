@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Info, Shield, TrendingUp } from "lucide-react";
+import { Activity, Clock, Info, Shield, Sparkles, TrendingUp } from "lucide-react";
 import { memo, useState } from "react";
 import {
   HoverCard,
@@ -17,6 +17,9 @@ const PROVEN_QUERY_THRESHOLD = 100;
 const PROVEN_SUCCESS_RATE_THRESHOLD = 95;
 const PROVEN_UPTIME_THRESHOLD = 98;
 
+// Cold Start: Tools created within this many days are "New"
+const NEW_TOOL_THRESHOLD_DAYS = 14;
+
 function isToolProven(
   totalQueries: number,
   successRate: string | null | undefined,
@@ -30,6 +33,44 @@ function isToolProven(
     success >= PROVEN_SUCCESS_RATE_THRESHOLD &&
     uptime >= PROVEN_UPTIME_THRESHOLD
   );
+}
+
+/**
+ * Check if a tool qualifies for "New" status
+ * New tools get a [NEW] badge to encourage early adoption
+ */
+function isToolNew(createdAt?: Date | string | null): boolean {
+  if (!createdAt) {
+    return false;
+  }
+  const created = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  const daysAgo = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
+  return daysAgo <= NEW_TOOL_THRESHOLD_DAYS;
+}
+
+/**
+ * Format how long ago a tool was created/updated for display
+ */
+function formatTimeAgo(date?: Date | string | null): string {
+  if (!date) {
+    return "";
+  }
+  const d = typeof date === "string" ? new Date(date) : date;
+  const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
+
+  if (seconds < 60) {
+    return "just now";
+  }
+  if (seconds < 3_600) {
+    return `${Math.floor(seconds / 60)}m ago`;
+  }
+  if (seconds < 86_400) {
+    return `${Math.floor(seconds / 3_600)}h ago`;
+  }
+  if (seconds < 604_800) {
+    return `${Math.floor(seconds / 86_400)}d ago`;
+  }
+  return `${Math.floor(seconds / 604_800)}w ago`;
 }
 
 const PureContextSidebarItem = ({
@@ -53,6 +94,7 @@ const PureContextSidebarItem = ({
     tool.successRate,
     tool.uptimePercent
   );
+  const isNew = isToolNew(tool.createdAt);
 
   // Read stake directly from contract (source of truth) - only when hover card is open
   const toolIdBigInt = uuidToUint256(tool.id);
@@ -129,12 +171,20 @@ const PureContextSidebarItem = ({
               {/* Header */}
               <div className="flex items-center justify-between gap-2">
                 <h4 className="font-semibold text-sm">{tool.name}</h4>
-                {isProven && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600 text-xs dark:bg-emerald-500/15 dark:text-emerald-400">
-                    <TrendingUp className="size-3" />
-                    Proven
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {isNew && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 font-medium text-violet-600 text-xs dark:bg-violet-500/15 dark:text-violet-400">
+                      <Sparkles className="size-3" />
+                      New
+                    </span>
+                  )}
+                  {isProven && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600 text-xs dark:bg-emerald-500/15 dark:text-emerald-400">
+                      <TrendingUp className="size-3" />
+                      Proven
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Description */}
@@ -169,6 +219,16 @@ const PureContextSidebarItem = ({
                   <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 font-medium text-blue-600 text-xs dark:bg-blue-500/15 dark:text-blue-400">
                     <Shield className="size-3" />${totalStaked.toFixed(0)}{" "}
                     staked
+                  </span>
+                )}
+
+                {/* Freshness indicator */}
+                {(tool.updatedAt || tool.createdAt) && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs">
+                    <Clock className="size-3" />
+                    {tool.updatedAt
+                      ? `Updated ${formatTimeAgo(tool.updatedAt)}`
+                      : `Added ${formatTimeAgo(tool.createdAt)}`}
                   </span>
                 )}
               </div>

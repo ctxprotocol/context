@@ -54,6 +54,9 @@ type MarketplaceSearchResult = {
   totalStaked: string;
   // Computed: true if totalQueries > 100 AND successRate > 95% AND uptimePercent > 98%
   isProven: boolean;
+  // Cold Start: When tool was created/updated (for [NEW] badge)
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 // Trust thresholds for "Proven" status
@@ -176,6 +179,7 @@ async function searchMarketplaceVector(
   // The <=> operator computes cosine distance (1 - cosine_similarity)
   // Lower distance = more similar
   // Include trust metrics for AI decision-making
+  // Include timestamps for cold start [NEW] badge
   const results = await db.execute(sql`
     SELECT 
       id,
@@ -189,6 +193,8 @@ async function searchMarketplaceVector(
       success_rate as "successRate",
       uptime_percent as "uptimePercent",
       total_staked as "totalStaked",
+      created_at as "createdAt",
+      updated_at as "updatedAt",
       1 - (embedding <=> ${embeddingStr}::vector) as similarity
     FROM "AITool"
     WHERE is_active = true
@@ -226,6 +232,9 @@ async function searchMarketplaceVector(
       uptimePercent,
       totalStaked,
       isProven: isToolProven(totalQueries, successRate, uptimePercent),
+      // Cold start timestamps
+      createdAt: tool.createdAt as Date | undefined,
+      updatedAt: tool.updatedAt as Date | undefined,
     };
   });
 }
@@ -252,7 +261,9 @@ async function searchMarketplaceFallback(
       total_queries as "totalQueries",
       success_rate as "successRate",
       uptime_percent as "uptimePercent",
-      total_staked as "totalStaked"
+      total_staked as "totalStaked",
+      created_at as "createdAt",
+      updated_at as "updatedAt"
     FROM "AITool"
     WHERE is_active = true
       AND (
@@ -293,6 +304,9 @@ async function searchMarketplaceFallback(
       uptimePercent,
       totalStaked,
       isProven: isToolProven(totalQueries, successRate, uptimePercent),
+      // Cold start timestamps
+      createdAt: tool.createdAt as Date | undefined,
+      updatedAt: tool.updatedAt as Date | undefined,
     };
   });
 }
