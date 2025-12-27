@@ -7,3 +7,5 @@ ADD COLUMN IF NOT EXISTS "enable_data_completeness_check" boolean NOT NULL DEFAU
 ALTER TABLE "UserSettings" 
 ADD COLUMN IF NOT EXISTS "enable_response_quality_check" boolean NOT NULL DEFAULT true;
 
+
+

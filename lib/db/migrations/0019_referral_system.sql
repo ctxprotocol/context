@@ -26,3 +26,5 @@ CREATE INDEX IF NOT EXISTS idx_user_referred_by ON "User"(referred_by);
 COMMENT ON COLUMN "User"."referral_code" IS 'Unique invite code for referral tracking (Protocol Ledger)';
 COMMENT ON COLUMN "User"."referred_by" IS 'User ID of the referrer, if this user was referred';
 
+
+

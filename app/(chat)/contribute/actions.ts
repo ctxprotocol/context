@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
+import { generateSmokeTestToken } from "@/lib/auth/service-auth";
 import { calculateRequiredStake } from "@/lib/constants";
 import { createAITool, getAIToolsByDeveloper } from "@/lib/db/queries";
 import { validateToolOutput } from "@/lib/tools/schema-validator";
@@ -17,6 +18,94 @@ import { type ContributeFormState, contributeFormSchema } from "./schema";
  * Set conservatively high since some tools need to warm up cold starts.
  */
 const SMOKE_TEST_TIMEOUT_MS = 30_000; // 30 seconds
+
+/**
+ * Get an actionable fix suggestion based on the error message.
+ * These messages should be developer-friendly and explain what THEY need to fix
+ * on THEIR server, not what we (Context) need to do.
+ */
+function getActionableFixForError(errorMsg: string): string {
+  // HTTP 401 Unauthorized - most common for APIs requiring auth
+  if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
+    return `Your MCP server returned 401 Unauthorized. We send a signed JWT during smoke testing. Possible causes:
+1. Your server uses custom auth instead of createContextMiddleware() from @ctxprotocol/sdk
+2. Your server is behind a proxy that strips the Authorization header
+3. If you use third-party API keys internally, ensure your tool handles them gracefully (don't return 401 for missing internal keys)`;
+  }
+
+  // HTTP 403 Forbidden
+  if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
+    return `Your MCP server returned 403 Forbidden. The smoke test request was rejected. Check your server's access controls, CORS settings, or rate limiting rules.`;
+  }
+
+  // HTTP 404 Not Found
+  if (errorMsg.includes("404") || errorMsg.includes("Not Found")) {
+    return `Your MCP server returned 404 Not Found. The tool endpoint may be misconfigured. Verify the tool is properly registered in your MCP server.`;
+  }
+
+  // HTTP 500 Internal Server Error
+  if (
+    errorMsg.includes("500") ||
+    errorMsg.includes("Internal Server Error") ||
+    errorMsg.includes("internal error")
+  ) {
+    return `Your MCP server returned 500 Internal Server Error. Check your server logs for the stack trace. Common causes: unhandled exceptions, missing environment variables, or database connection issues.`;
+  }
+
+  // HTTP 502/503/504 - Gateway/Service errors
+  if (
+    errorMsg.includes("502") ||
+    errorMsg.includes("503") ||
+    errorMsg.includes("504") ||
+    errorMsg.includes("Bad Gateway") ||
+    errorMsg.includes("Service Unavailable") ||
+    errorMsg.includes("Gateway Timeout")
+  ) {
+    return `Your MCP server returned a gateway error (502/503/504). This usually means your server is down, overloaded, or behind a misconfigured proxy. Check that your server is running and accessible.`;
+  }
+
+  // Connection refused
+  if (
+    errorMsg.includes("ECONNREFUSED") ||
+    errorMsg.includes("fetch failed") ||
+    errorMsg.includes("ENOTFOUND")
+  ) {
+    return `Could not reach your MCP server. Verify that:
+1. Your server is running and publicly accessible (not localhost)
+2. The endpoint URL is correct
+3. There's no firewall blocking the connection`;
+  }
+
+  // Invalid/missing input
+  if (
+    errorMsg.includes("Invalid") ||
+    errorMsg.includes("required") ||
+    errorMsg.includes("missing")
+  ) {
+    return `Your tool rejected the test input. We generate test data from your inputSchema. Add "default" or "examples" fields to guide test generation:
+{ "type": "string", "default": "ETH", "examples": ["BTC", "ETH", "SOL"] }`;
+  }
+
+  // Timeout (shouldn't reach here but just in case)
+  if (errorMsg.includes("timeout") || errorMsg.includes("ETIMEDOUT")) {
+    return `Your tool took too long to respond. Optimize your tool to respond within 30 seconds. Consider adding caching, optimizing API calls, or handling cold starts faster.`;
+  }
+
+  // JSON parse errors
+  if (
+    errorMsg.includes("JSON") ||
+    errorMsg.includes("parse") ||
+    errorMsg.includes("Unexpected token")
+  ) {
+    return `Your tool returned invalid JSON. Ensure your MCP server returns properly formatted JSON responses.`;
+  }
+
+  // Generic fallback - still actionable but more general
+  return `Your tool threw an error during the smoke test. Check your MCP server logs for details. Common issues:
+1. Missing environment variables or API keys
+2. Input validation rejecting test data (add "default" values to inputSchema)
+3. External API dependencies failing`;
+}
 
 /**
  * Generate sample input values from a JSON Schema
@@ -211,22 +300,7 @@ async function smokeTestTools(
               : "Unknown error during tool call";
 
           // Provide specific fix based on common error patterns
-          let fix =
-            "Your tool threw an error during execution. Check your server logs for details.";
-
-          if (
-            errorMsg.includes("Invalid") ||
-            errorMsg.includes("required") ||
-            errorMsg.includes("missing")
-          ) {
-            fix = `Your tool rejected the test input. Add "default" or "examples" to your inputSchema so we can generate valid test data. Example: { type: "string", default: "0x1234..." }`;
-          } else if (
-            errorMsg.includes("ECONNREFUSED") ||
-            errorMsg.includes("fetch failed")
-          ) {
-            fix =
-              "Could not reach your server. Ensure it's publicly accessible and not behind a firewall.";
-          }
+          const fix = getActionableFixForError(errorMsg);
 
           results.push({
             success: false,
@@ -273,8 +347,14 @@ function detectTransportType(endpoint: string): "sse" | "http-streaming" {
 /**
  * Connect to an MCP server and list available tools
  * Tries HTTP Streaming first, falls back to SSE if that fails
+ *
+ * @param endpoint - The MCP server endpoint URL
+ * @param authToken - Optional JWT token for authenticating with the MCP server
  */
-async function connectAndListTools(endpoint: string): Promise<{
+async function connectAndListTools(
+  endpoint: string,
+  authToken?: string | null
+): Promise<{
   client: Client;
   tools: Array<{
     name: string;
@@ -287,11 +367,16 @@ async function connectAndListTools(endpoint: string): Promise<{
   const url = new URL(endpoint);
   const transportType = detectTransportType(endpoint);
 
+  // Build request init with auth headers if token provided
+  const requestInit: RequestInit | undefined = authToken
+    ? { headers: { Authorization: `Bearer ${authToken}` } }
+    : undefined;
+
   // Try primary transport first
   const primaryTransport =
     transportType === "sse"
-      ? new SSEClientTransport(url)
-      : new StreamableHTTPClientTransport(url);
+      ? new SSEClientTransport(url, { requestInit })
+      : new StreamableHTTPClientTransport(url, { requestInit });
 
   const client = new Client(
     { name: "context-verification", version: "1.0.0" },
@@ -326,7 +411,7 @@ async function connectAndListTools(endpoint: string): Promise<{
       );
 
       try {
-        const sseTransport = new SSEClientTransport(url);
+        const sseTransport = new SSEClientTransport(url, { requestInit });
         await fallbackClient.connect(sseTransport);
         const result = await fallbackClient.listTools();
 
@@ -368,6 +453,14 @@ export async function submitTool(
     price: formData.get("price"),
     developerWallet: formData.get("developerWallet"),
   };
+
+  // Debug: Log form data to track category submission issues
+  console.log("[contribute] Form data received:", {
+    name: raw.name,
+    category: raw.category,
+    endpoint: raw.endpoint,
+    price: raw.price,
+  });
 
   // Cast raw to any for payload repopulation (string values work better for form)
   const payload = raw as unknown as ContributeFormState["payload"];
@@ -429,9 +522,19 @@ export async function submitTool(
   }[] = [];
 
   try {
+    // Generate smoke test token for authentication
+    // This allows MCP servers using createContextMiddleware() to verify the request
+    const smokeTestToken = await generateSmokeTestToken(parsed.data.endpoint);
+    if (smokeTestToken) {
+      console.log("[contribute] Generated smoke test token for authentication");
+    } else {
+      console.log("[contribute] No smoke test token (dev mode or missing key)");
+    }
+
     // Auto-detect and use appropriate transport (HTTP Streaming or SSE)
     const { client, tools, transportUsed } = await connectAndListTools(
-      parsed.data.endpoint
+      parsed.data.endpoint,
+      smokeTestToken
     );
     console.log(
       `[contribute] Connected via ${transportUsed} to:`,

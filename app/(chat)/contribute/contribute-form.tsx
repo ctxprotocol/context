@@ -3,7 +3,7 @@
 import { ExternalLink, Github, Package, Shield } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { LoaderIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +39,33 @@ export function ContributeForm() {
   const walletAddress = activeWallet?.address;
   const isConnected = !!walletAddress;
 
+  // Track price for dynamic helper text (Free vs Paid)
+  const [price, setPrice] = useState(state.payload?.price || "0.00");
+  const priceValue = Number.parseFloat(price) || 0;
+
+  // Track category with controlled state for reliable form submission
+  // Radix UI Select with defaultValue can have timing issues
+  const [category, setCategory] = useState(state.payload?.category || "");
+
+  // Track submission attempts to use as key for inputs
+  // This ensures inputs re-mount with returned payload data on failure
+  const submissionCount = useRef(0);
+  useEffect(() => {
+    if (state.status === "error" && state.payload) {
+      submissionCount.current += 1;
+      // Also sync price and category state with returned payload
+      if (state.payload.price) {
+        setPrice(state.payload.price);
+      }
+      if (state.payload.category) {
+        setCategory(state.payload.category);
+      }
+    }
+  }, [state.status, state.payload]);
+
+  // Form key forces re-mount of uncontrolled inputs when payload returns on error
+  const formKey = `form-${submissionCount.current}`;
+
   // Redirect to developer tools after showing success message
   useEffect(() => {
     if (state.status === "success") {
@@ -48,10 +75,6 @@ export function ContributeForm() {
       return () => clearTimeout(timer);
     }
   }, [state.status, router]);
-
-  // Track price for dynamic helper text (Free vs Paid)
-  const [price, setPrice] = useState(state.payload?.price || "0.00");
-  const priceValue = Number.parseFloat(price) || 0;
 
   const nameError = state.fieldErrors?.name;
   const descriptionError = state.fieldErrors?.description;
@@ -93,6 +116,7 @@ Agent tips:
               )}
               defaultValue={state.payload?.name || ""}
               id="name"
+              key={`name-${formKey}`}
               name="name"
               placeholder="Blocknative Gas"
             />
@@ -109,6 +133,7 @@ Agent tips:
               )}
               defaultValue={state.payload?.description || ""}
               id="description"
+              key={`description-${formKey}`}
               maxLength={5000}
               name="description"
               placeholder={descriptionPlaceholder}
@@ -135,8 +160,9 @@ Agent tips:
             <div className="space-y-3">
               <Label htmlFor="category">Category</Label>
               <Select
-                defaultValue={state.payload?.category || ""}
                 name="category"
+                onValueChange={setCategory}
+                value={category}
               >
                 <SelectTrigger
                   aria-invalid={categoryError ? true : undefined}
@@ -184,6 +210,7 @@ Agent tips:
                 )}
                 defaultValue={state.payload?.price || "0.00"}
                 id="price"
+                key={`price-${formKey}`}
                 max="100"
                 min="0"
                 name="price"
@@ -254,6 +281,7 @@ Agent tips:
               )}
               defaultValue={state.payload?.endpoint || ""}
               id="endpoint"
+              key={`endpoint-${formKey}`}
               name="endpoint"
               placeholder="https://your-mcp-server.com/sse or /mcp"
               type="url"

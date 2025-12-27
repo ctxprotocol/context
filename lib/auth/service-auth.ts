@@ -59,5 +59,61 @@ export async function generateServiceToken(
   }
 }
 
+/**
+ * Generates a signed JWT for smoke testing during tool submission.
+ * Similar to generateServiceToken but uses a placeholder toolId since
+ * the tool doesn't exist in the database yet.
+ *
+ * The smoke test token uses:
+ * - iss: "https://ctxprotocol.com" (issuer)
+ * - aud: The tool endpoint URL (audience)
+ * - toolId: "smoke-test" (placeholder - tool not yet created)
+ * - purpose: "smoke-test" (indicates this is a verification call)
+ * - iat: Issue time
+ * - exp: Expiration (2 minutes)
+ *
+ * @param endpoint - The MCP server endpoint URL being tested
+ * @returns Signed JWT string, or null if signing is unavailable
+ */
+export async function generateSmokeTestToken(
+  endpoint: string
+): Promise<string | null> {
+  if (!PRIVATE_KEY) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(
+        "[Auth] CONTEXT_PROTOCOL_PRIVATE_KEY is missing in production!"
+      );
+    } else {
+      console.warn(
+        "[Auth] No private key found. Skipping smoke test signing (Dev Mode)."
+      );
+    }
+    return null;
+  }
+
+  try {
+    const alg = "RS256";
+    const pem = PRIVATE_KEY.includes("PRIVATE KEY")
+      ? PRIVATE_KEY
+      : Buffer.from(PRIVATE_KEY, "base64").toString("utf-8");
+
+    const privateKey = await importPKCS8(pem, alg);
+
+    return new SignJWT({ toolId: "smoke-test", purpose: "smoke-test" })
+      .setProtectedHeader({ alg })
+      .setIssuedAt()
+      .setIssuer("https://ctxprotocol.com")
+      .setAudience(endpoint)
+      .setExpirationTime("2m")
+      .sign(privateKey);
+  } catch (error) {
+    console.error("[Auth] Failed to sign smoke test token:", error);
+    return null;
+  }
+}
+
+
+
+
 
 
