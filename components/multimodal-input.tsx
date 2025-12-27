@@ -417,6 +417,7 @@ function PureMultimodalInput({
 
         if (needsPayment) {
           // If Auto Pay is enabled and within budget, trigger auto-payment
+          // Network check happens inside confirmPayment (will auto-switch if needed)
           if (isAutoPay && canAfford(totalCost)) {
             // Set flag to trigger auto-payment via useEffect
             setPendingAutoPayment(true);
@@ -817,10 +818,20 @@ function PureMultimodalInput({
       return;
     }
 
-    // Double-check network (shouldn't happen with UI guard, but safety first)
+    // Auto-switch to Base mainnet if needed (Privy embedded wallets support programmatic switching)
     if (chainId !== base.id) {
-      toast.error("Please switch to Base mainnet first.");
-      return;
+      try {
+        await switchChainAsync({ chainId: base.id });
+        // Give Wagmi/Privy a moment to propagate the new chain
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error("[confirmPayment] Failed to switch network:", error);
+        toast.error("Failed to switch to Base network. Please try again.");
+        setIsPaying(false);
+        setShowPayDialog(false);
+        resetPaymentStatus();
+        return;
+      }
     }
 
     // Calculate tool fees (outside try so it's accessible in catch)
@@ -1298,6 +1309,7 @@ function PureMultimodalInput({
     activeTools,
     effectiveWalletAddress,
     chainId,
+    switchChainAsync, // For auto-switching to Base if needed
     routerAddress,
     usdcAddress,
     refetchBalance,
