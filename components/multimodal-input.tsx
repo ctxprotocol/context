@@ -540,12 +540,13 @@ function PureMultimodalInput({
   );
 
   /**
-   * Handle form submission with allowance check for Auto Mode
-   * If Auto Mode is enabled and allowance is insufficient, show approval dialog instead
+   * Handle form submission with allowance check for Auto Pay
+   * If Auto Pay is enabled and allowance is insufficient, show approval dialog instead
    */
   const handleFormSubmit = useCallback(async () => {
-    // For Auto Mode, check allowance before sending to avoid wasted AI costs
-    if (isAutoMode && isAutoPay) {
+    // For Auto Pay (with or without Auto Mode), check allowance before proceeding
+    // This ensures the spending cap is set before any auto-payment flow
+    if (isAutoPay) {
       try {
         const { data: allowanceData } = await refetchAllowance();
         const allowance = (allowanceData as bigint | undefined) ?? 0n;
@@ -556,13 +557,13 @@ function PureMultimodalInput({
 
         if (allowance < MIN_ALLOWANCE_THRESHOLD) {
           console.log(
-            "[multimodal-input] Auto Mode: insufficient allowance, requesting approval",
+            "[multimodal-input] Auto Pay: insufficient allowance, requesting approval",
             {
               allowance: Number(allowance) / 1_000_000,
             }
           );
 
-          toast.info("Please approve a spending cap to use Auto Mode.");
+          toast.info("Please approve a spending cap to use Auto Pay.");
           requestApproval();
           return;
         }
@@ -574,7 +575,7 @@ function PureMultimodalInput({
 
     // Proceed with normal submission
     submitForm();
-  }, [isAutoMode, isAutoPay, refetchAllowance, requestApproval, submitForm]);
+  }, [isAutoPay, refetchAllowance, requestApproval, submitForm]);
 
   const uploadFile = useCallback(async (file: File) => {
     const formData = new FormData();
